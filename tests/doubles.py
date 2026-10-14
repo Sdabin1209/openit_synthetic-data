@@ -184,13 +184,18 @@ class FakeFailureStore:
         return copy.deepcopy(t)
 
 
-def failure_case(case_id: str, trace_ref: str, expected: Optional[dict], *, status="CONFIRMED", deidentified=True) -> dict:
-    c = {"pipeline_schema_version": "1.0", "case_id": case_id, "version": 1, "created_at": "2026-10-15T00:00:00Z",
+def failure_case(case_id: str, trace_ref: str, expected: Optional[dict], *, status="CONFIRMED", deidentified=True,
+                 question_set: Optional[dict] = None, expected_kind: Optional[str] = None) -> dict:
+    c = {"pipeline_schema_version": "1.1" if (question_set or expected_kind) else "1.0", "case_id": case_id, "version": 1, "created_at": "2026-10-15T00:00:00Z",
          "source_release_id": "rel-0001", "runtime_contract_version": 1, "deidentified": deidentified,
          "deidentified_trace_ref": trace_ref, "failure_type": "UNCLASSIFIED", "detection_method": "HUMAN",
          "review_status": status}
     if expected is not None:
         c["expected"] = expected
+    if question_set is not None:
+        c["question_set"] = question_set
+    if expected_kind is not None:
+        c["expected_kind"] = expected_kind
     return c
 
 

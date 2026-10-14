@@ -10,12 +10,13 @@
 
 ## 남은 일
 - 이웃 영역의 읽기 SDK/메모리 구현이 나오면 `tests/doubles.py`를 그쪽으로 교체(설정 factory만 변경).
-- turn-engine 연동(CR-002): Directive를 `plan()`으로, 정답 구성 규칙 확인.
+- turn-engine 연동(원격이 생긴 뒤 다음 구간): Directive를 `plan()`으로. DialoguePlannerInput은 합성 또는 turn-engine 예시 사용(승인됨). 그때까지 hand-built 표시 유지.
 - LLM 생성기(같은 Protocol): 비결정 생성기의 재현성(응답 캐시), 호출 비용 보고.
 - O11 확정 후 평가셋 구성(합성·실제 비율, 지표, 임계치) 반영. 지금은 `split.ratios` 설정만 있다.
 - 감수 결과를 되먹이는 경로(감수 샘플에서 잘못된 라벨이 나오면 생성기/규칙 수정)는 사람 절차라 미정.
 - 컨테이너(D22): run-once 잡이라 이번 구간에서 Dockerfile을 만들지 않음. 필요 여부 확인.
-- 규칙 문서 6절(과거 증상 진술은 무관 vs 위험 신호) 충돌 조합은 만들지 않음. 규칙 쪽 확인 필요.
+- 과거 증상 진술(OUT_OF_SCOPE)과 현재 위험 진술(RISK_SIGNAL)을 별개 시나리오로 추가(충돌 아님, 헤드 확인).
+- 컨테이너: 서비스 없는 잡이라 Dockerfile 없이 requirements.lock 고정으로 승인됨.
 
-## 막힌 것 / 변경 요청
-CR-001 FailureCase 문항 세트 참조, CR-002 turn-engine, CR-003 affected_slots 형식, CR-004 ext 승격, CR-005 created_at/version.
+## 변경 요청
+CR-001~005 모두 헤드가 결정(2026-10-15, D43). 반영: FailureCase 1.1 필드 사용과 폴백, SlotRef 마지막 '.' 분할, boundary-contracts v1.1.0 고정과 패키지 스키마 사용.

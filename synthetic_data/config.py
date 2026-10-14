@@ -41,7 +41,6 @@ class JobConfig:
     style_guide_version: str
     turn_engine_version: Optional[str]
     survey_schema_dir: Path
-    boundary_schema_dir: Optional[Path]
     question_reader: AdapterSpec
     failure_store: Optional[AdapterSpec]
     question_sets: list
@@ -125,16 +124,13 @@ def parse_config(raw: dict, base_dir: Path) -> JobConfig:
     if seeds_on:
         if "failure_store" not in ad:
             raise ConfigError("seeds.enabled인데 adapters.failure_store가 없다")
-        if "question_set_id" not in sd:
-            raise ConfigError("seeds.enabled인데 seeds.question_set_id가 없다 (CR-001: FailureCase에 문항 세트 참조가 없다)")
-        if sd["question_set_id"] not in ids:
+        if sd.get("question_set_id") is not None and sd["question_set_id"] not in ids:
             raise ConfigError("seeds.question_set_id가 question_sets에 없다")
     return JobConfig(
         dataset_id=did, seed=seed, created_at=raw.get("created_at"), version=raw.get("version"),
         style_guide_version=str(raw.get("style_guide_version", "1")),
         turn_engine_version=raw.get("turn_engine_version"),
         survey_schema_dir=path(_req(raw, "survey_schema_dir", "")),
-        boundary_schema_dir=path(raw["boundary_schema_dir"]) if raw.get("boundary_schema_dir") else None,
         question_reader=_adapter(_req(ad, "question_reader", "adapters."), "adapters.question_reader"),
         failure_store=_adapter(ad["failure_store"], "adapters.failure_store") if "failure_store" in ad else None,
         question_sets=qsets, reviewed_only=bool(raw.get("reviewed_only", True)),

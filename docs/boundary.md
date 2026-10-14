@@ -37,11 +37,11 @@ store = FileDatasetStore(root, v)     # 또는 MemoryDatasetStore(v)
 | 소비 | 인터페이스 | 용도 | 영역 안의 형태 |
 | --- | --- | --- | --- |
 | 문항, 변경 분류 | I1 `QuestionReader` | `latest(reviewed_only)`, `list_versions`, `get_question_bank`(해시 재확인), `get_reviews`, `get_change`(REGENERATE_SAMPLES) | 설정의 `adapters.question_reader.factory`가 만든 객체. Protocol만 안다 |
-| 실패 사례, 비식별 trace | I7 `FailureStore` | `list_cases(review_status=CONFIRMED)`, `get_trace` | `adapters.failure_store.factory` |
+| 실패 사례, 비식별 trace | I7 `FailureStore`(`question_set`, `expected_kind` 사용, 없으면 폴백) | `list_cases(review_status=CONFIRMED)`, `get_trace` | `adapters.failure_store.factory` |
 | 정답 구성 규칙, 버전 | I8 turn-engine | 버전만(`ENGINE_VERSION`). 호출은 아직 없음(CR-002) | `import turn_engine`이 되면 사용, 아니면 설정 값 |
 
 - 이웃 코드를 가져오지 않는다. 의존은 boundary-contracts(Protocol, 오류, 해시), 문진 스키마(읽기 전용 파일), turn-engine(예정)뿐이다.
-- 지원 버전: 문진 스키마 정수 버전은 `CONTRACT_VERSION`과 정확히 일치해야 한다(현재 1, 다르면 `UNSUPPORTED_VERSION`). 경계 계약은 `pipeline_schema_version` MAJOR 1(쓰는 값 `1.0`). 다른 MAJOR는 `UNSUPPORTED_VERSION`이다. 쓸 때는 엄격하다(`additionalProperties: false`라 모르는 필드는 `INVALID_RECORD`). 저장된 파일은 해석하지 않고 바이트 그대로 돌려주므로 `ext`는 보존된다.
+- 지원 버전: 문진 스키마 정수 버전은 `CONTRACT_VERSION`과 정확히 일치해야 한다(현재 1, 다르면 `UNSUPPORTED_VERSION`). 경계 계약은 `pipeline_schema_version` MAJOR 1(쓰는 값 `1.1`, boundary-contracts v1.1.0). 다른 MAJOR는 `UNSUPPORTED_VERSION`이다. 쓸 때는 엄격하다(`additionalProperties: false`라 모르는 필드는 `INVALID_RECORD`). 저장된 파일은 해석하지 않고 바이트 그대로 돌려주므로 `ext`는 보존된다.
 - 시험용 대역은 `tests/doubles.py`(`FakeQuestionReader`, `FakeFailureStore`)에 있다. 소유 영역의 메모리 구현이 나오면 설정의 `factory` 문자열만 바꾼다.
 - 비식별되지 않은 실패 사례(`deidentified != true`)를 받으면 실행을 `INVALID_RECORD`로 거부한다.
 
@@ -71,4 +71,4 @@ store = FileDatasetStore(root, v)     # 또는 MemoryDatasetStore(v)
 
 ## 7. 건드리지 않는 것
 
-경계 계약과 문진 스키마를 수정하지 않는다. 문항 저장소와 실패 사례 저장소에 쓰지 않는다. 부족한 점은 `docs/change-requests/`(CR-001~005)에 있다.
+경계 계약과 문진 스키마를 수정하지 않는다. 문항 저장소와 실패 사례 저장소에 쓰지 않는다. 변경 요청 CR-001~005는 헤드가 결정했다(`docs/change-requests/`의 결정 절).

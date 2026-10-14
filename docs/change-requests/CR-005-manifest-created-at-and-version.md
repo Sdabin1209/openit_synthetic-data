@@ -13,3 +13,6 @@
 
 ## 제안
 `version` 형식을 Id 규칙으로 정한다. 재현성 기준(어떤 해시가 같아야 하는가)을 `dataset_digest`와 같은 방식으로 계약에 올릴지 판단해 달라.
+
+## 결정 (헤드)
+dataset_digest 방식 승인. version은 Id 규칙이고 저장소가 INVALID_RECORD로 강제. content_hash는 created_at을 포함(CONVENTIONS 10절).

@@ -71,17 +71,17 @@ def _find_ref(reader: QuestionReader, qid: str, version: str) -> dict:
 
 
 def _affected_questions(change: dict) -> Optional[set]:
-    """affected_slots(SlotRef 문자열)에서 문항 ID를 뽑는다. 직렬화 형식이 미정이라(CR-003) '<문항ID>.<슬롯ID>'로 가정하고,
-    비어 있으면 None(전체)."""
+    """affected_slots(SlotRef 문자열 '<question_id>.<slot_id>', CONVENTIONS 10절)에서 문항 ID를 뽑는다.
+    마지막 '.'에서 나눈다(문항 ID에는 '.'이 있을 수 있다). 비어 있으면 None(전체)."""
     if not change["affected_slots"]:
         return None
-    return {s.split(".")[0].split(":")[0] for s in change["affected_slots"]}
+    return {s.rsplit(".", 1)[0] for s in change["affected_slots"]}
 
 
 def run_job(cfg: JobConfig, *, question_reader: QuestionReader, store: DatasetStore,
             failure_store: Optional[FailureStore] = None, validators: Optional[Validators] = None,
             clock: Optional[Callable[[], str]] = None) -> JobResult:
-    v = validators or Validators(cfg.boundary_schema_dir, cfg.survey_schema_dir)
+    v = validators or Validators(cfg.survey_schema_dir)
     contract = v.runtime_contract_version
     te_version = resolve_turn_engine_version(cfg)
     cfg.work_dir.mkdir(parents=True, exist_ok=True)
@@ -132,15 +132,26 @@ def run_job(cfg: JobConfig, *, question_reader: QuestionReader, store: DatasetSt
             raise BoundaryError("FAILED_PRECONDITION", "seeds.enabled인데 failure_store가 없다")
         seeds, skipped = collect_seeds(failure_store, v)
         report["skipped_seeds"] += skipped
-        sctx = [c for c in ctxs if c.ref["id"] == cfg.seeds_question_set_id]
-        if sctx and sctx[0].usage == "TRAIN_POOL":
-            sctx_one = sorted(sctx, key=lambda c: c.ref["version"])[-1]
-            ss, skipped2, s5 = build_seed_samples(seeds, sctx_one, cfg, contract)
-            samples += ss
-            report["skipped_seeds"] += skipped2
-            gen_stats.update(s5)
-        else:
-            report["notes"].append("시드 문항 세트가 이번 실행에 없거나 HELD_OUT_EVAL이라 시드를 쓰지 않음")
+        pool = {(c.ref["id"], c.ref["version"], c.ref["content_hash"]): c for c in ctxs if c.usage == "TRAIN_POOL"}
+        fallback = sorted((c for c in pool.values() if c.ref["id"] == cfg.seeds_question_set_id),
+                          key=lambda c: c.ref["version"])
+        pairs = []
+        for sd in seeds:
+            if sd.question_set is not None:                       # 1.1 레코드: 수집 영역이 채운 값
+                ref = sd.question_set
+                c = pool.get((ref["id"], ref["version"], ref["content_hash"]))
+                why = "시드의 문항 세트가 이번 실행의 학습 풀에 없음"
+            else:                                                 # 1.0 레코드 폴백: 설정의 문항 세트
+                c = fallback[-1] if fallback else None
+                why = "시드에 문항 세트 참조가 없고 seeds.question_set_id도 없음"
+            if c is None:
+                report["skipped_seeds"].append({"case_id": sd.case_id, "reason": why})
+            else:
+                pairs.append((sd, c))
+        ss, skipped2, s5 = build_seed_samples(pairs, cfg, contract)
+        samples += ss
+        report["skipped_seeds"] += skipped2
+        gen_stats.update(s5)
 
     # 5. 품질 검사 + 중복 제거
     kept, dropped = [], Counter()
@@ -244,7 +255,7 @@ def build_from_config(config_path: Path, *, created_at: Optional[str] = None) ->
     cfg = load_config(config_path)
     if created_at:
         cfg.created_at = created_at
-    v = Validators(cfg.boundary_schema_dir, cfg.survey_schema_dir)
+    v = Validators(cfg.survey_schema_dir)
     reader = load_factory(cfg.question_reader)(**cfg.question_reader.kwargs)
     fstore = load_factory(cfg.failure_store)(**cfg.failure_store.kwargs) if cfg.failure_store else None
     store = FileDatasetStore(cfg.store_root, v) if cfg.store_kind == "file" else MemoryDatasetStore(v)

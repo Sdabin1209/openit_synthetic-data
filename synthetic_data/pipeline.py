@@ -80,11 +80,11 @@ def build_generator_samples(plans: list[GeneratorPlan], rgen: ResponseGenerator,
     return out, stats
 
 
-def build_seed_samples(seeds: list[Seed], ctx: QuestionSetContext, cfg: JobConfig, contract: int) -> tuple[list, list, Counter]:
+def build_seed_samples(pairs: list, cfg: JobConfig, contract: int) -> tuple[list, list, Counter]:
     """시드 사례를 FAILURE_CASE_SEED 샘플로. 파서 시드는 노이즈 변형도 만든다(원문이 발화에서 순서대로 찾아질 때만)."""
     out, skipped, stats = [], [], Counter()
-    qids = {q["question_id"] for q in ctx.bank["questions"]}
-    for s in seeds:
+    for s, ctx in pairs:
+        qids = {q["question_id"] for q in ctx.bank["questions"]}
         scen = "sd-" + short_hash(s.case_id)
         if s.role == "PARSER":
             used = {q["question_id"] for q in s.input["awaiting_questions"]}

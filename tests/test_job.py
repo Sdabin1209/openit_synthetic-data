@@ -267,3 +267,40 @@ def test_hashes_only_via_canonical():
     for p in src.rglob("*.py"):
         text = p.read_text(encoding="utf-8")
         assert "hashlib" not in text and "sha256(" not in text, p
+
+
+def _seed_store_v11(ref):
+    fs = doubles.make_failure_store(doubles.make_bank("main"))
+    base_p = fs.get_case("fc-p")
+    tr = fs.get_trace("tr-p")
+    fs.add(doubles.failure_case("fc-new", "tr-new", base_p["expected"], question_set=ref, expected_kind="PARSER"),
+           dict(tr, session_id="sess-new"))
+    return fs
+
+
+def test_seed_uses_failurecase_question_set_without_config_fallback(tmp_path, validators):
+    reader = doubles.make_question_reader()
+    ref = reader.latest("qs-main")
+    fs = _seed_store_v11(ref)
+    raw = make_cfg_raw(tmp_path, seeds={"enabled": True})          # question_set_id 없음
+    st = MemoryDatasetStore(validators)
+    cfg, res = run(raw, st, validators, reader=reader, fstore=fs)
+    m = st.get_manifest(res.dataset_id, res.version)
+    assert m["seed_case_ids"] == ["fc-new"]                         # 참조 없는 1.0 사례(fc-p, fc-g)는 건너뜀
+    rep = json.loads((cfg.work_dir / "report.json").read_text())
+    assert {s["case_id"] for s in rep["skipped_seeds"]} == {"fc-p", "fc-g"}
+
+
+def test_seed_question_set_not_in_run_is_skipped(tmp_path, validators):
+    reader = doubles.make_question_reader()
+    other = dict(reader.latest("qs-main"), content_hash="sha256:" + "3" * 64)
+    fs = _seed_store_v11(other)
+    cfg, res = run(make_cfg_raw(tmp_path), MemoryDatasetStore(validators), validators, reader=reader, fstore=fs)
+    rep = json.loads((cfg.work_dir / "report.json").read_text())
+    assert any(s["case_id"] == "fc-new" and "학습 풀" in s["reason"] for s in rep["skipped_seeds"])
+
+
+def test_affected_slots_split_at_last_dot():
+    from synthetic_data.job import _affected_questions
+    assert _affected_questions({"affected_slots": ["Q3b.sub.frequency", "Q1.status"]}) == {"Q3b.sub", "Q1"}
+    assert _affected_questions({"affected_slots": []}) is None

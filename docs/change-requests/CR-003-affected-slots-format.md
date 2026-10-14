@@ -11,3 +11,6 @@
 
 ## 제안
 형식을 정의한다. 예: `<question_id>/<repeat_key>/<slot_id>` 또는 JSON 객체 배열.
+
+## 결정 (헤드)
+`<question_id>.<slot_id>`, 읽을 때 마지막 `.`에서 나눈다(CONVENTIONS 10절). 반영 완료.

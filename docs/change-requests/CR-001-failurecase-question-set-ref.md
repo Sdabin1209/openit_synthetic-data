@@ -12,3 +12,6 @@
 
 ## 제안 (미정, 헤드 판단)
 `FailureCase`에 선택 필드 추가(MINOR): `question_set: ArtifactRef`, `expected_kind: "PARSER" | "GENERATOR"`.
+
+## 결정 (헤드, D43)
+`question_set`과 `expected_kind`를 FailureCase 1.1에 추가했다. 채워진 레코드는 그 값을 쓰고, 없는 1.0 레코드는 위 우회를 폴백으로 유지한다. 반영 완료.

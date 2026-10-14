@@ -20,6 +20,7 @@ class Seed:
     role: str            # PARSER | GENERATOR
     input: dict
     expected: dict
+    question_set: Optional[dict] = None   # FailureCase 1.1의 question_set. 1.0 레코드는 None
 
 
 def collect_seeds(store: FailureStore, v: Validators, *, page_size: int = 100) -> tuple[list[Seed], list[dict]]:
@@ -52,8 +53,17 @@ def _one(store: FailureStore, v: Validators, case: dict) -> tuple[Optional[Seed]
     trace = store.get_trace(case["deidentified_trace_ref"])
     if v.check_survey("TurnTrace", trace):
         return None, "trace가 TurnTrace 스키마를 위반"
-    if not v.check_survey("ParserOutput", exp) and trace.get("parser_input"):
-        return Seed(case["case_id"], case["version"], "PARSER", trace["parser_input"], exp), None
-    if not v.check_survey("GeneratorOutput", exp) and trace.get("generator_input"):
-        return Seed(case["case_id"], case["version"], "GENERATOR", trace["generator_input"], exp), None
-    return None, "expected의 종류(ParserOutput/GeneratorOutput)와 trace 입력이 맞지 않음"
+    kind = case.get("expected_kind")
+    qs = case.get("question_set")
+    if kind is None or kind not in ("PARSER", "GENERATOR"):        # 1.0 레코드나 모르는 값: expected의 형태로 판별
+        if not v.check_survey("ParserOutput", exp):
+            kind = "PARSER"
+        elif not v.check_survey("GeneratorOutput", exp):
+            kind = "GENERATOR"
+        else:
+            return None, "expected의 종류를 판별할 수 없음"
+    if kind == "PARSER" and not v.check_survey("ParserOutput", exp) and trace.get("parser_input"):
+        return Seed(case["case_id"], case["version"], "PARSER", trace["parser_input"], exp, qs), None
+    if kind == "GENERATOR" and not v.check_survey("GeneratorOutput", exp) and trace.get("generator_input"):
+        return Seed(case["case_id"], case["version"], "GENERATOR", trace["generator_input"], exp, qs), None
+    return None, "expected의 종류와 trace 입력이 맞지 않음"

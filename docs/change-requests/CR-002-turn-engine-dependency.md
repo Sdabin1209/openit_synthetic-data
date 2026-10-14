@@ -13,3 +13,6 @@
 
 ## 요청
 (1) turn-engine의 설치 방법과 버전 확정 시점. (2) 생성기 샘플의 Directive를 `plan()` 출력으로 만들 때 필요한 입력(`DialoguePlannerInput`)을 합성해도 되는지, 그 입력의 예시.
+
+## 결정 (헤드)
+turn-engine 연동은 원격이 생긴 뒤 다음 구간. 그때까지 파서 라벨은 규칙 4절 직접 구현, Directive는 hand-built 표시 유지. plan() 출력 사용과 DialoguePlannerInput 합성은 승인.

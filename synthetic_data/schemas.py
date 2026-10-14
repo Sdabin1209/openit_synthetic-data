@@ -1,4 +1,4 @@
-"""스키마 검증. 경계 계약 레코드는 boundary-contracts의 스키마로, 샘플의 input/expected는 문진 스키마로 따로 검증한다.
+"""스키마 검증. 경계 계약 레코드는 boundary_contracts.validator(패키지에 든 스키마)로, 샘플의 input/expected는 문진 스키마로 따로 검증한다.
 검증 실패는 BoundaryError(INVALID_RECORD)다."""
 from __future__ import annotations
 
@@ -7,15 +7,11 @@ import warnings
 from pathlib import Path
 from typing import Any, Optional
 
+import boundary_contracts
 import jsonschema
 from boundary_contracts.errors import BoundaryError
 
 warnings.filterwarnings("ignore", category=DeprecationWarning, module="jsonschema")
-
-
-def default_boundary_schema_dir() -> Path:
-    import boundary_contracts
-    return Path(boundary_contracts.__file__).resolve().parent.parent / "schemas"
 
 
 def _errors(validator, record) -> list[str]:
@@ -27,14 +23,11 @@ def _errors(validator, record) -> list[str]:
 
 
 class Validators:
-    """boundary_schema_dir: boundary-contracts의 schemas/. survey_schema_dir: 문진 스키마 디렉터리(CONTRACT_VERSION과 schemas/가 있는 곳)."""
+    """survey_schema_dir: 문진 스키마 디렉터리(CONTRACT_VERSION과 schemas/가 있는 곳)."""
 
-    def __init__(self, boundary_schema_dir: Optional[Path] = None, survey_schema_dir: Optional[Path] = None):
-        self.boundary_dir = Path(boundary_schema_dir) if boundary_schema_dir else default_boundary_schema_dir()
+    def __init__(self, survey_schema_dir: Optional[Path] = None):
         self.survey_dir = Path(survey_schema_dir) if survey_schema_dir else None
         self._cache: dict[tuple[str, str], Any] = {}
-        common_path = self.boundary_dir / "_common.schema.json"
-        self._common = json.loads(common_path.read_text(encoding="utf-8"))
 
     @property
     def runtime_contract_version(self) -> int:
@@ -48,14 +41,10 @@ class Validators:
     def _boundary(self, name: str):
         key = ("b", name)
         if key not in self._cache:
-            path = self.boundary_dir / f"{name}.schema.json"
-            if not path.exists():
-                raise BoundaryError("UNSUPPORTED_VERSION", f"경계 계약 스키마가 없다: {name}")
-            schema = json.loads(path.read_text(encoding="utf-8"))
-            base = "file://" + str(self.boundary_dir) + "/"
-            store = {base + "_common.schema.json": self._common}
-            resolver = jsonschema.RefResolver(base + f"{name}.schema.json", schema, store=store)
-            self._cache[key] = jsonschema.Draft202012Validator(schema, resolver=resolver)
+            try:
+                self._cache[key] = boundary_contracts.validator(name)
+            except KeyError as e:
+                raise BoundaryError("UNSUPPORTED_VERSION", f"경계 계약 스키마가 없다: {name}") from e
         return self._cache[key]
 
     def _survey(self, name: str):

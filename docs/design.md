@@ -23,11 +23,11 @@
 - 값은 문항 정의에서 온다(원칙 10: 규칙 본문은 기관 값을 적지 않는다). 수치는 단위의 `range`, 선택지는 `choices`/`choice_catalog`의 label·synonyms, 예/아니요는 `yes_no_map`.
 - 적용 조건이 안 맞는 종류는 만들지 않는다. 예: 안내 요청은 `guide_list`가 정확히 1개일 때만(발화로 안내 항목을 가를 수 없으면 정답이 불확실하므로), 무관 발화는 문항 이름·문장에 없는 주제만.
 - 변형 수(`scenarios.variants`)와 종류 목록(`scenarios.kinds`)은 설정이다.
-- 규칙 6의 "과거 증상 진술은 무관"과 "위험 신호는 그 의도로"가 위험 표현을 담은 과거 진술에서 충돌해 보여서 그 조합은 만들지 않는다(미정, 규칙 문서 쪽 확인이 필요하면 변경 요청으로).
+- 과거 증상 진술은 항상 OUT_OF_SCOPE, 현재 위험 진술은 RISK_SIGNAL이다(위험 감지는 코드의 위험 표현 대조가 따로 한다, 헤드 확인). 두 경우를 별개 시나리오로 추가할 수 있다(미구현).
 
 ## 3. 시드 수집 (`seeds.py`)
 
-I7 `FailureStore`로만 읽는다. `review_status=CONFIRMED`이고 `expected`가 있는 사례만 쓴다(소비자 규칙). `deidentified`가 true가 아니면 `BoundaryError(INVALID_RECORD)`로 **전체 실행을 거부**한다(브리프 5절). 그 밖의 건너뜀(trace 스키마 위반, 계약 버전 불일치, 종류 판별 불가, 문항이 지정 문항 세트에 없음)은 사유와 함께 보고서 `skipped_seeds`에 남는다. 문항 세트 참조 부재는 CR-001.
+I7 `FailureStore`로만 읽는다. `review_status=CONFIRMED`이고 `expected`가 있는 사례만 쓴다(소비자 규칙). `deidentified`가 true가 아니면 `BoundaryError(INVALID_RECORD)`로 **전체 실행을 거부**한다(브리프 5절). 그 밖의 건너뜀(trace 스키마 위반, 계약 버전 불일치, 종류 판별 불가, 문항이 지정 문항 세트에 없음)은 사유와 함께 보고서 `skipped_seeds`에 남는다. FailureCase 1.1의 `question_set`과 `expected_kind`가 있으면 그것을 쓴다(그 문항 세트가 이번 실행의 학습 풀에 있어야 함). 없는 1.0 레코드는 설정 `seeds.question_set_id`와 expected 형태 판별로 폴백한다(CR-001 결정).
 시드 샘플은 `origin=FAILURE_CASE_SEED`, `seed_case_id`를 갖고, 원문 정답을 그대로 쓴다. 파서 시드는 노이즈 변형도 만든다. 시드는 사람이 확정한 정답이라 품질 검사에서 문진 스키마 통과만 확인한다.
 
 ## 4. 정답 구성 (`labeler.py`, 규칙 `docs/rules/utterance_parser.md` 4절)
@@ -97,7 +97,7 @@ class ResponseGenerator(Protocol):   name; version; generate(plan: GeneratorPlan
 
 - `python -m synthetic_data run --config <파일>`: 설정 하나로 끝까지 돌고 종료한다(run-once). 새 문항 세트 버전이나 실패 사례가 생길 때 스케줄러가 같은 설정으로 부르면 된다(D39). 어댑터(문항 읽기, 실패 사례 읽기)는 설정의 `factory`(`module:function`)가 만든다. 이웃 영역의 메모리 구현이 나오면 설정만 바꾼다.
 - `reviewed_only`(기본 true): 버전을 지정하지 않으면 `latest(..., reviewed_only=True)`, 지정하면 `get_reviews`에서 APPROVED + `clinical_basis_approved`를 확인한다.
-- `regeneration.mode = affected_only`: 문항 세트마다 `get_change(ref)`를 읽어 `REGENERATE_SAMPLES`가 있으면 `affected_slots`의 문항으로 제한해 새 데이터셋 버전을 만든다. 없으면 그 문항 세트는 제외하고 모두 제외되면 `NOTHING_TO_DO`. `affected_slots` 형식은 CR-003.
+- `regeneration.mode = affected_only`: 문항 세트마다 `get_change(ref)`를 읽어 `REGENERATE_SAMPLES`가 있으면 `affected_slots`의 문항으로 제한해 새 데이터셋 버전을 만든다. 없으면 그 문항 세트는 제외하고 모두 제외되면 `NOTHING_TO_DO`. `affected_slots`는 `<question_id>.<slot_id>`이고 마지막 `.`에서 나눈다(CR-003 결정, CONVENTIONS 10절).
 - 출력: 작업 디렉터리의 `report.json`(건수, 건너뜀·버린 사유, 결과)과 `review_sample.jsonl`.
 
 ## 12. 데이터셋 저장소 (I2, `store/`)

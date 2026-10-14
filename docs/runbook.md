@@ -1,10 +1,18 @@
 # 런북: synthetic-data
 
+## 한 줄 실행 (GPU 서버 포함, 잡은 CPU만 쓴다)
+
+```bash
+. .venv/bin/activate && python -m synthetic_data run --config <설정.json>
+```
+(환경이 없으면 먼저 `python3 -m venv .venv && . .venv/bin/activate && pip install -r requirements.lock`.)
+
 ## 준비
 
 ```bash
 python3 -m venv .venv && . .venv/bin/activate
-pip install -e ../boundary-contracts -r requirements.lock pytest     # 의존 고정: requirements.lock
+pip install -r requirements.lock pytest                 # 배포: boundary-contracts v1.1.0 태그 고정
+pip install -e ../boundary-contracts                    # 개발: 작업 트리 사용(위 설치 뒤에 덮어쓴다)
 ```
 (배포에서는 boundary-contracts를 Git 태그로 고정한다.)
 
@@ -20,7 +28,7 @@ python -m pytest -q          # 적합성(파일·메모리 저장소), 잡 종�
 PYTHONPATH=tests python -m synthetic_data run --config configs/dev.job.json [--created-at 2026-10-15T00:00:00Z]
 ```
 - `configs/dev.job.json`은 이웃 영역 대역(`tests/doubles.py`)을 쓰는 개발용 설정이다. 운영 설정은 `adapters.*.factory`를 소유 영역의 읽기 SDK 공장으로 바꾼다.
-- 설정 필드: `dataset_id`, `seed`(정수), `created_at`(생략하면 실행 시각), `version`(생략하면 `v<digest 12자>`), `turn_engine_version`(turn-engine이 없을 때 필수), `survey_schema_dir`(문진 스키마 `schema` 디렉터리), `adapters`, `question_sets[{id, version?, usage: TRAIN_POOL|HELD_OUT_EVAL}]`, `reviewed_only`, `scenarios{variants, noise_variants, noise_types, kinds}`, `seeds{enabled, question_set_id}`, `generators{utterance, response}`, `split.ratios`(필수, O11 사용자 결정 전까지 예시 값만), `review.per_kind`, `regeneration.mode`(full|affected_only), `output{work_dir, store{kind: file|memory, root}}`. 상대 경로는 설정 파일 위치 기준이다.
+- 설정 필드: `dataset_id`, `seed`(정수), `created_at`(생략하면 실행 시각), `version`(생략하면 `v<digest 12자>`), `turn_engine_version`(turn-engine이 없을 때 필수), `survey_schema_dir`(문진 스키마 `schema` 디렉터리; 경계 스키마는 boundary_contracts 패키지에서 읽는다), `adapters`, `question_sets[{id, version?, usage: TRAIN_POOL|HELD_OUT_EVAL}]`, `reviewed_only`, `scenarios{variants, noise_variants, noise_types, kinds}`, `seeds{enabled, question_set_id?}`(question_set_id는 1.0 사례 폴백용), `generators{utterance, response}`, `split.ratios`(필수, O11 사용자 결정 전까지 예시 값만), `review.per_kind`, `regeneration.mode`(full|affected_only), `output{work_dir, store{kind: file|memory, root}}`. 상대 경로는 설정 파일 위치 기준이다.
 - 출력(표준 출력, JSON 한 줄): `status`(PUBLISHED, ALREADY_PUBLISHED, NOTHING_TO_DO), `version`, `content_hash`, `dataset_digest`, `counts`, `report_path`.
 - 종료 코드: 0 성공, 2 설정 오류, 3 경계 오류(재시도 불가), 75 경계 오류(재시도 가능, 스케줄러가 다시 실행).
 
@@ -48,4 +56,4 @@ PYTHONPATH=tests python -m synthetic_data run --config configs/dev.job.json [--c
 
 ## 컨테이너
 
-이 영역은 HTTP 서비스가 없는 run-once 잡이라 `/healthz`가 없다. 공통 규칙 D22의 컨테이너 항목(Dockerfile, 스모크)은 이번 구간에서 만들지 않았다(미정: 잡 이미지가 필요하면 다음 구간에서 추가).
+이 영역은 서비스가 없는 run-once 잡이라 Dockerfile 없이 `requirements.lock`으로 환경을 고정한다(헤드 승인, D22 (2)).
