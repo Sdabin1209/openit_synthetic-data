@@ -314,3 +314,13 @@ def test_reader_needs_no_survey_dir_but_publish_does(captured, tmp_path):
     with pytest.raises(BoundaryError) as e:
         st.publish(m, write_files(tmp_path, b))
     assert code(e) == "FAILED_PRECONDITION"
+
+
+def test_unsupported_pipeline_major(store, captured, tmp_path):
+    m, b = captured
+    m2 = copy.deepcopy(m)
+    m2["pipeline_schema_version"] = "2.0"
+    m2["content_hash"] = canonical.content_hash(m2)
+    with pytest.raises(BoundaryError) as e:
+        store.publish(m2, write_files(tmp_path, b))
+    assert code(e) == "UNSUPPORTED_VERSION"

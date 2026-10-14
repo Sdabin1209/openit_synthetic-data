@@ -40,7 +40,10 @@ class Validators:
     def runtime_contract_version(self) -> int:
         if self.survey_dir is None:
             raise BoundaryError("FAILED_PRECONDITION", "문진 스키마 디렉터리가 설정되지 않았다")
-        return int((self.survey_dir / "CONTRACT_VERSION").read_text().strip())
+        try:
+            return int((self.survey_dir / "CONTRACT_VERSION").read_text().strip())
+        except (OSError, ValueError) as e:
+            raise BoundaryError("UNSUPPORTED_VERSION", f"문진 스키마 CONTRACT_VERSION을 읽을 수 없다: {e}") from e
 
     def _boundary(self, name: str):
         key = ("b", name)
