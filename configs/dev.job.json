@@ -1,0 +1,25 @@
+{
+  "_comment": "개발용 설정. 이웃 영역의 읽기 SDK가 나오기 전에는 tests/doubles.py의 대역을 쓴다(PYTHONPATH=tests). split.ratios는 동작 확인용 자리 표시이며 평가셋 구성(O11)은 사용자 결정이다.",
+  "dataset_id": "ds-dev",
+  "seed": 20261015,
+  "created_at": "2026-10-15T00:00:00Z",
+  "style_guide_version": "1",
+  "turn_engine_version": "0.0.0-unpinned",
+  "survey_schema_dir": "../../survey-service/schema",
+  "adapters": {
+    "question_reader": {"factory": "doubles:make_question_reader"},
+    "failure_store": {"factory": "doubles:make_failure_store_factory"}
+  },
+  "question_sets": [
+    {"id": "qs-main", "usage": "TRAIN_POOL"},
+    {"id": "qs-unseen", "usage": "HELD_OUT_EVAL"}
+  ],
+  "reviewed_only": true,
+  "scenarios": {"variants": 3, "noise_variants": 2},
+  "seeds": {"enabled": true, "question_set_id": "qs-main"},
+  "generators": {"utterance": "rule", "response": "rule"},
+  "split": {"ratios": {"TRAIN": 0.8, "VALIDATION": 0.1, "EVAL": 0.1}},
+  "review": {"per_kind": 2},
+  "regeneration": {"mode": "full"},
+  "output": {"work_dir": "../work/dev", "store": {"kind": "file", "root": "../work/store"}}
+}

@@ -1,0 +1,85 @@
+"""스키마 검증. 경계 계약 레코드는 boundary-contracts의 스키마로, 샘플의 input/expected는 문진 스키마로 따로 검증한다.
+검증 실패는 BoundaryError(INVALID_RECORD)다."""
+from __future__ import annotations
+
+import json
+import warnings
+from pathlib import Path
+from typing import Any, Optional
+
+import jsonschema
+from boundary_contracts.errors import BoundaryError
+
+warnings.filterwarnings("ignore", category=DeprecationWarning, module="jsonschema")
+
+
+def default_boundary_schema_dir() -> Path:
+    import boundary_contracts
+    return Path(boundary_contracts.__file__).resolve().parent.parent / "schemas"
+
+
+def _errors(validator, record) -> list[str]:
+    out = []
+    for e in sorted(validator.iter_errors(record), key=lambda e: list(map(str, e.absolute_path))):
+        loc = "/".join(map(str, e.absolute_path)) or "(루트)"
+        out.append(f"{loc}: {e.message[:200]}")
+    return out
+
+
+class Validators:
+    """boundary_schema_dir: boundary-contracts의 schemas/. survey_schema_dir: 문진 스키마 디렉터리(CONTRACT_VERSION과 schemas/가 있는 곳)."""
+
+    def __init__(self, boundary_schema_dir: Optional[Path] = None, survey_schema_dir: Optional[Path] = None):
+        self.boundary_dir = Path(boundary_schema_dir) if boundary_schema_dir else default_boundary_schema_dir()
+        self.survey_dir = Path(survey_schema_dir) if survey_schema_dir else None
+        self._cache: dict[tuple[str, str], Any] = {}
+        common_path = self.boundary_dir / "_common.schema.json"
+        self._common = json.loads(common_path.read_text(encoding="utf-8"))
+
+    @property
+    def runtime_contract_version(self) -> int:
+        if self.survey_dir is None:
+            raise BoundaryError("FAILED_PRECONDITION", "문진 스키마 디렉터리가 설정되지 않았다")
+        return int((self.survey_dir / "CONTRACT_VERSION").read_text().strip())
+
+    def _boundary(self, name: str):
+        key = ("b", name)
+        if key not in self._cache:
+            path = self.boundary_dir / f"{name}.schema.json"
+            if not path.exists():
+                raise BoundaryError("UNSUPPORTED_VERSION", f"경계 계약 스키마가 없다: {name}")
+            schema = json.loads(path.read_text(encoding="utf-8"))
+            base = "file://" + str(self.boundary_dir) + "/"
+            store = {base + "_common.schema.json": self._common}
+            resolver = jsonschema.RefResolver(base + f"{name}.schema.json", schema, store=store)
+            self._cache[key] = jsonschema.Draft202012Validator(schema, resolver=resolver)
+        return self._cache[key]
+
+    def _survey(self, name: str):
+        key = ("s", name)
+        if key not in self._cache:
+            if self.survey_dir is None:
+                raise BoundaryError("FAILED_PRECONDITION", "문진 스키마 디렉터리가 설정되지 않았다")
+            path = self.survey_dir / "schemas" / f"{name}.json"
+            if not path.exists():
+                raise BoundaryError("UNSUPPORTED_VERSION", f"문진 스키마가 없다: {name}")
+            schema = json.loads(path.read_text(encoding="utf-8"))
+            schema.pop("$id", None)   # 상대 $id("standalone/...")가 '#/$defs' 참조 해석을 깨뜨린다
+            self._cache[key] = jsonschema.Draft202012Validator(schema)
+        return self._cache[key]
+
+    def check_boundary(self, name: str, record: Any) -> list[str]:
+        return _errors(self._boundary(name), record)
+
+    def check_survey(self, name: str, record: Any) -> list[str]:
+        return _errors(self._survey(name), record)
+
+    def boundary(self, name: str, record: Any, *, what: str = "") -> None:
+        errs = self.check_boundary(name, record)
+        if errs:
+            raise BoundaryError("INVALID_RECORD", f"{what or name}이(가) {name} 스키마를 위반한다: {errs[0]}", {"errors": errs[:10]})
+
+    def survey(self, name: str, record: Any, *, what: str = "") -> None:
+        errs = self.check_survey(name, record)
+        if errs:
+            raise BoundaryError("INVALID_RECORD", f"{what or name}이(가) 문진 스키마 {name}을 위반한다: {errs[0]}", {"errors": errs[:10]})

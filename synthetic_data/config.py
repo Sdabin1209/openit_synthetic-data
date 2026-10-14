@@ -1,0 +1,157 @@
+"""생성 잡 설정. 설정 파일(JSON) 하나가 잡의 모든 입력이다. 상대 경로는 설정 파일이 있는 디렉터리 기준이다.
+
+평가셋 구성·지표·임계치는 사용자 결정(O11)이라 코드에 기본값을 두지 않는다. split.ratios는 반드시 설정에 적어야 하고,
+저장소의 예시 설정에 있는 값은 동작 확인용 자리 표시이지 결정이 아니다."""
+from __future__ import annotations
+
+import json
+import re
+from dataclasses import dataclass, field
+from pathlib import Path
+from typing import Optional
+
+_ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:-]*$")
+USAGES = ("TRAIN_POOL", "HELD_OUT_EVAL")
+SPLITS = ("TRAIN", "VALIDATION", "EVAL")
+
+
+class ConfigError(ValueError):
+    """설정 오류(경계 호출이 아니므로 BoundaryError가 아니다)."""
+
+
+@dataclass
+class AdapterSpec:
+    factory: str                    # "module:function"
+    kwargs: dict = field(default_factory=dict)
+
+
+@dataclass
+class QuestionSetSpec:
+    id: str
+    version: Optional[str]
+    usage: str
+
+
+@dataclass
+class JobConfig:
+    dataset_id: str
+    seed: int
+    created_at: Optional[str]
+    version: Optional[str]
+    style_guide_version: str
+    turn_engine_version: Optional[str]
+    survey_schema_dir: Path
+    boundary_schema_dir: Optional[Path]
+    question_reader: AdapterSpec
+    failure_store: Optional[AdapterSpec]
+    question_sets: list
+    reviewed_only: bool
+    variants: int
+    noise_variants: int
+    noise_types: list
+    kinds: Optional[list]
+    seeds_enabled: bool
+    seeds_question_set_id: Optional[str]
+    utterance_generator: str
+    response_generator: str
+    ratios: dict
+    review_per_kind: int
+    regeneration_mode: str
+    work_dir: Path
+    store_kind: str
+    store_root: Optional[Path]
+    raw: dict = field(default_factory=dict)
+
+
+def _req(d: dict, key: str, where: str):
+    if key not in d:
+        raise ConfigError(f"설정에 {where}{key}이(가) 필요하다")
+    return d[key]
+
+
+def _adapter(d: dict, where: str) -> AdapterSpec:
+    f = _req(d, "factory", where + ".")
+    if ":" not in f:
+        raise ConfigError(f"{where}.factory는 'module:function' 형식이어야 한다")
+    return AdapterSpec(f, dict(d.get("kwargs", {})))
+
+
+def parse_config(raw: dict, base_dir: Path) -> JobConfig:
+    def path(s):
+        p = Path(s)
+        return p if p.is_absolute() else (base_dir / p).resolve()
+
+    did = _req(raw, "dataset_id", "")
+    if not _ID_RE.match(did) or len(did) > 128:
+        raise ConfigError("dataset_id 형식이 맞지 않는다")
+    seed = _req(raw, "seed", "")
+    if not isinstance(seed, int) or isinstance(seed, bool):
+        raise ConfigError("seed는 정수여야 한다")
+    ratios = _req(_req(raw, "split", ""), "ratios", "split.")
+    if set(ratios) != set(SPLITS) or any(not isinstance(x, (int, float)) or x < 0 for x in ratios.values()) or sum(ratios.values()) <= 0:
+        raise ConfigError("split.ratios는 TRAIN·VALIDATION·EVAL 세 키에 0 이상의 수를 적어야 하고 합이 0보다 커야 한다 (평가셋 구성은 O11, 사용자 결정)")
+    qsets = []
+    for q in _req(raw, "question_sets", ""):
+        usage = q.get("usage", "TRAIN_POOL")
+        if usage not in USAGES:
+            raise ConfigError(f"question_sets[].usage는 {USAGES} 중 하나여야 한다")
+        qsets.append(QuestionSetSpec(_req(q, "id", "question_sets[]."), q.get("version"), usage))
+    if not qsets:
+        raise ConfigError("question_sets가 비어 있다")
+    ids = {}
+    for q in qsets:
+        if ids.setdefault(q.id, q.usage) != q.usage:
+            raise ConfigError(f"같은 문항 세트 {q.id}를 TRAIN_POOL과 HELD_OUT_EVAL에 함께 쓸 수 없다")
+    ad = _req(raw, "adapters", "")
+    sc, sd = raw.get("scenarios", {}), raw.get("seeds", {})
+    out = _req(raw, "output", "")
+    store = _req(out, "store", "output.")
+    kind = _req(store, "kind", "output.store.")
+    if kind not in ("file", "memory"):
+        raise ConfigError("output.store.kind는 file 또는 memory")
+    if kind == "file" and "root" not in store:
+        raise ConfigError("file 저장소에는 output.store.root가 필요하다")
+    reg = raw.get("regeneration", {}).get("mode", "full")
+    if reg not in ("full", "affected_only"):
+        raise ConfigError("regeneration.mode는 full 또는 affected_only")
+    from .noise import NOISE_TYPES
+    nt = sc.get("noise_types", NOISE_TYPES)
+    if not set(nt) <= set(NOISE_TYPES):
+        raise ConfigError(f"알 수 없는 noise_types: {sorted(set(nt) - set(NOISE_TYPES))}")
+    variants = sc.get("variants", 2)
+    if not isinstance(variants, int) or variants < 1:
+        raise ConfigError("scenarios.variants는 1 이상의 정수")
+    seeds_on = bool(sd.get("enabled", False))
+    if seeds_on:
+        if "failure_store" not in ad:
+            raise ConfigError("seeds.enabled인데 adapters.failure_store가 없다")
+        if "question_set_id" not in sd:
+            raise ConfigError("seeds.enabled인데 seeds.question_set_id가 없다 (CR-001: FailureCase에 문항 세트 참조가 없다)")
+        if sd["question_set_id"] not in ids:
+            raise ConfigError("seeds.question_set_id가 question_sets에 없다")
+    return JobConfig(
+        dataset_id=did, seed=seed, created_at=raw.get("created_at"), version=raw.get("version"),
+        style_guide_version=str(raw.get("style_guide_version", "1")),
+        turn_engine_version=raw.get("turn_engine_version"),
+        survey_schema_dir=path(_req(raw, "survey_schema_dir", "")),
+        boundary_schema_dir=path(raw["boundary_schema_dir"]) if raw.get("boundary_schema_dir") else None,
+        question_reader=_adapter(_req(ad, "question_reader", "adapters."), "adapters.question_reader"),
+        failure_store=_adapter(ad["failure_store"], "adapters.failure_store") if "failure_store" in ad else None,
+        question_sets=qsets, reviewed_only=bool(raw.get("reviewed_only", True)),
+        variants=variants, noise_variants=int(sc.get("noise_variants", 1)), noise_types=list(nt),
+        kinds=sc.get("kinds"), seeds_enabled=seeds_on, seeds_question_set_id=sd.get("question_set_id"),
+        utterance_generator=raw.get("generators", {}).get("utterance", "rule"),
+        response_generator=raw.get("generators", {}).get("response", "rule"),
+        ratios={k: float(v) for k, v in ratios.items()},
+        review_per_kind=int(raw.get("review", {}).get("per_kind", 2)), regeneration_mode=reg,
+        work_dir=path(_req(out, "work_dir", "output.")), store_kind=kind,
+        store_root=path(store["root"]) if "root" in store else None, raw=raw)
+
+
+def load_config(config_path: Path) -> JobConfig:
+    p = Path(config_path).resolve()
+    try:
+        raw = json.loads(p.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as e:
+        raise ConfigError(f"설정 파일을 읽을 수 없다: {p}: {e}") from e
+    return parse_config(raw, p.parent)
