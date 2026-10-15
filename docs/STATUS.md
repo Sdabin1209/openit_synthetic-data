@@ -3,6 +3,7 @@
 마지막 갱신: 2026-10-15, 첫 구간.
 
 ## 한 일 (시험으로 확인)
+- (0.1.2) v1.2.0, I1·I7 HTTP 연결과 통합 시험, 오류 보고, GPU 호스트 runbook. 시험 92건.
 - docs/design.md, boundary.md, runbook.md, CHANGELOG.md.
 - I2 DatasetStore 파일·메모리 구현과 같은 적합성 시험(47건 통과, 전체 83건).
 - 규칙 기반 생성기로 시나리오 설계 -> 발화/응답 생성 -> 노이즈 -> 정답 -> 품질 -> 분할 -> 패키징 -> 게시가 끝까지 돈다(`configs/dev.job.json`, 이웃은 `tests/doubles.py` 대역).

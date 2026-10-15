@@ -1,5 +1,10 @@
 # 변경 이력
 
+## 0.1.2 (2026-10-15)
+- boundary-contracts v1.2.0, I1·I7을 HTTP 클라이언트로 연결(`synthetic_data.adapters`, base URL + 토큰 환경 변수 이름), 참조 서버 통합 시험.
+- 경계 호출 실패를 report.json의 `error`로 남김. 시드의 모르는 필드·열거값은 `notes`로 남기고 받아들임.
+- runbook: GPU 호스트 절차, 오류 보고 방식.
+
 ## 0.1.1 (2026-10-15)
 - boundary-contracts v1.1.0로 전환: 경계 스키마는 `boundary_contracts.validator`로 읽고(자체 경로 설정 `boundary_schema_dir` 삭제), 쓰는 `pipeline_schema_version`은 1.1.
 - 시드 수집: FailureCase 1.1의 `question_set`/`expected_kind`를 쓰고, 없는 1.0 레코드는 설정 문항 세트와 expected 형태 판별로 폴백.

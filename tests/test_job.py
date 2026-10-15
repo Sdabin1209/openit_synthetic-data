@@ -304,3 +304,16 @@ def test_affected_slots_split_at_last_dot():
     from synthetic_data.job import _affected_questions
     assert _affected_questions({"affected_slots": ["Q3b.sub.frequency", "Q1.status"]}) == {"Q3b.sub", "Q1"}
     assert _affected_questions({"affected_slots": []}) is None
+
+
+def test_labels_never_copied_from_contract_examples(published):
+    """boundary-contracts의 examples/ 정답 예시는 읽지도 복사하지도 않는다. 합성 정답은 라벨 기준 구현에서만 나온다."""
+    from synthetic_data.job import __file__ as _  # noqa
+    src = Path(__file__).resolve().parent.parent / "synthetic_data"
+    for p in src.rglob("*.py"):
+        assert "examples" not in p.read_text(encoding="utf-8"), p
+    st, res, m = published
+    for recs in read_all(st, m).values():
+        for r in recs:
+            if r["origin"] == "SYNTHETIC" and r["sample_id"].startswith("gs-"):
+                assert r["expected"]["is_fallback"] is False

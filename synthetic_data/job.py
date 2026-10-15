@@ -81,12 +81,21 @@ def _affected_questions(change: dict) -> Optional[set]:
 def run_job(cfg: JobConfig, *, question_reader: QuestionReader, store: DatasetStore,
             failure_store: Optional[FailureStore] = None, validators: Optional[Validators] = None,
             clock: Optional[Callable[[], str]] = None) -> JobResult:
+    """경계 호출이 실패하면 report.json의 `error`(BoundaryError 레코드)와 `stage`를 남기고 같은 예외를 다시 던진다."""
+    cfg.work_dir.mkdir(parents=True, exist_ok=True)
+    report: dict = {"job_version": __version__, "dataset_id": cfg.dataset_id, "notes": [], "dropped": {}, "skipped_seeds": []}
+    try:
+        return _run_job(cfg, question_reader, store, failure_store, validators, clock, report)
+    except BoundaryError as e:
+        report["error"] = e.to_record()
+        _write_report(cfg, report)
+        raise
+
+
+def _run_job(cfg, question_reader, store, failure_store, validators, clock, report) -> JobResult:
     v = validators or Validators(cfg.survey_schema_dir)
     contract = v.runtime_contract_version
     te_version = resolve_turn_engine_version(cfg)
-    cfg.work_dir.mkdir(parents=True, exist_ok=True)
-    report: dict = {"job_version": __version__, "dataset_id": cfg.dataset_id, "notes": [], "dropped": {}, "skipped_seeds": []}
-
     # 1. 문항 읽기 (I1)
     ctxs, qfilter = [], {}
     for spec in cfg.question_sets:
@@ -130,7 +139,7 @@ def run_job(cfg: JobConfig, *, question_reader: QuestionReader, store: DatasetSt
     if cfg.seeds_enabled:
         if failure_store is None:
             raise BoundaryError("FAILED_PRECONDITION", "seeds.enabled인데 failure_store가 없다")
-        seeds, skipped = collect_seeds(failure_store, v)
+        seeds, skipped = collect_seeds(failure_store, v, notes=report["notes"])
         report["skipped_seeds"] += skipped
         pool = {(c.ref["id"], c.ref["version"], c.ref["content_hash"]): c for c in ctxs if c.usage == "TRAIN_POOL"}
         fallback = sorted((c for c in pool.values() if c.ref["id"] == cfg.seeds_question_set_id),

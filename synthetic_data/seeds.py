@@ -7,6 +7,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Optional
 
+import boundary_contracts
 from boundary_contracts.errors import BoundaryError
 from boundary_contracts.sdk import FailureStore
 
@@ -23,12 +24,12 @@ class Seed:
     question_set: Optional[dict] = None   # FailureCase 1.1의 question_set. 1.0 레코드는 None
 
 
-def collect_seeds(store: FailureStore, v: Validators, *, page_size: int = 100) -> tuple[list[Seed], list[dict]]:
+def collect_seeds(store: FailureStore, v: Validators, *, page_size: int = 100, notes: Optional[list] = None) -> tuple[list[Seed], list[dict]]:
     seeds, skipped, cursor = [], [], None
     while True:
         items, cursor = store.list_cases(review_status="CONFIRMED", latest_only=True, cursor=cursor, limit=page_size)
         for case in items:
-            seed, why = _one(store, v, case)
+            seed, why = _one(store, v, case, notes)
             if seed:
                 seeds.append(seed)
             else:
@@ -39,10 +40,17 @@ def collect_seeds(store: FailureStore, v: Validators, *, page_size: int = 100) -
     return seeds, skipped
 
 
-def _one(store: FailureStore, v: Validators, case: dict) -> tuple[Optional[Seed], Optional[str]]:
+def _one(store: FailureStore, v: Validators, case: dict, notes: Optional[list] = None) -> tuple[Optional[Seed], Optional[str]]:
     if case.get("deidentified") is not True:
         raise BoundaryError("INVALID_RECORD", f"비식별되지 않은 실패 사례를 받았다: {case.get('case_id')}")
-    v.boundary("FailureCase", case, what=f"FailureCase {case.get('case_id')}")
+    # 읽기 모드(CONVENTIONS 1절): 형식은 I7 클라이언트가 이미 검증했다. 모르는 필드·열거값은 받아들이고 보고서에 남긴다.
+    if notes is not None:
+        known = set(boundary_contracts.load_schema("FailureCase")["properties"])
+        extra = sorted(set(case) - known)
+        if extra:
+            notes.append(f"{case['case_id']}: 모르는 필드 무시 {extra}")
+        if case.get("expected_kind") not in (None, "PARSER", "GENERATOR"):
+            notes.append(f"{case['case_id']}: 모르는 expected_kind {case['expected_kind']!r}, expected 형태로 판별")
     if case["runtime_contract_version"] != v.runtime_contract_version:
         return None, "runtime_contract_version 불일치"
     if case["review_status"] != "CONFIRMED":

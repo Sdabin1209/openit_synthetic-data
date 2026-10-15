@@ -7,11 +7,19 @@
 ```
 (환경이 없으면 먼저 `python3 -m venv .venv && . .venv/bin/activate && pip install -r requirements.lock`.)
 
+## GPU 호스트에서 돌리기 (D49)
+
+이 영역은 GPU 호스트에서 돌 가능성이 높고, I2 DatasetStore는 같은 호스트의 파일 저장소다(잡은 CPU만 쓴다). (1) 코드 전송: `rsync -a --exclude .venv --exclude work --exclude '.git' ./ <호스트>:<경로>/synthetic-data/` 후 호스트에서 `python3 -m venv .venv && . .venv/bin/activate && pip install -r requirements.lock`. (2) 설정의 `output.store`를 `{"kind":"file","root":"<데이터셋 루트>"}`로 두고 `output.work_dir`는 임시 경로로 둔다. 이웃 읽기는 `adapters.*.factory`를 `synthetic_data.adapters:http_question_reader`/`http_failure_store`, `kwargs`를 `{"base_url": "...", "token_env": "<토큰 환경 변수 이름>"}`로 하고 토큰은 실행 셸의 환경 변수로만 준다(파일과 리포지토리에 넣지 않는다). (3) 데이터셋은 `<데이터셋 루트>/<dataset_id>/<version>/{manifest.json, files/...}`에 생긴다. model-lab은 같은 호스트에서 `FileDatasetStore(<같은 루트>, Validators())`의 `get_manifest`/`open_file`로 같은 경로를 읽는다(읽기만 하면 문진 스키마 경로는 필요 없다). 게시는 임시 디렉터리 후 rename이라 읽는 쪽이 반쯤 쓴 버전을 보지 않는다.
+
+## 이웃 호출 오류가 보고서에 남는 방식
+
+I1·I7 클라이언트는 읽기 모드다. 같은 MAJOR의 모르는 필드와 모르는 열거값은 받아들인다(시드의 모르는 필드·`expected_kind`는 `report.json`의 `notes`에 남고, 열거값은 expected 형태로 판별). 그 밖은 잡을 중단하고 `report.json`의 `error`(BoundaryError 레코드)를 남긴 뒤 종료 코드로 끝난다: MAJOR 불일치 `UNSUPPORTED_VERSION`(3), 형식·해시 위반 `INTEGRITY_ERROR`(3), 토큰 `PERMISSION_DENIED`(3), 서버 불가·타임아웃 `UNAVAILABLE`(75, 스케줄러가 재시도). 중단 시 아무것도 게시하지 않는다. 토큰 환경 변수 누락은 설정 오류(2).
+
 ## 준비
 
 ```bash
 python3 -m venv .venv && . .venv/bin/activate
-pip install -r requirements.lock pytest                 # 배포: boundary-contracts v1.1.0 태그 고정
+pip install -r requirements.lock pytest                 # 배포: boundary-contracts v1.2.0 태그 고정
 pip install -e ../boundary-contracts                    # 개발: 작업 트리 사용(위 설치 뒤에 덮어쓴다)
 ```
 (배포에서는 boundary-contracts를 Git 태그로 고정한다.)
