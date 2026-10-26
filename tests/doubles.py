@@ -55,9 +55,9 @@ def make_bank(flavor: str = "main", *, wording: str = "") -> dict:
         ]
     else:
         qs = [
-            _q("U1", 1, "커피", "하루에 커피를 몇 잔 드세요?",
+            _q("Q11", 1, "커피", "하루에 커피를 몇 잔 드세요?",
                [_slot("cups", units=[{"name": "잔", "synonyms": [], "range": [1, 10], "convert_to": None}])]),
-            _q("U2", 2, "식사", "식사는 규칙적인가요?",
+            _q("Q12", 2, "식사", "식사는 규칙적인가요?",
                [_slot("regular", catalog=[
                    {"code": "REG", "label": "규칙적", "synonyms": ["꼬박꼬박"]},
                    {"code": "IRR", "label": "불규칙", "synonyms": ["들쭉날쭉"]}])]),
@@ -132,20 +132,6 @@ def make_question_reader(**_ignored) -> FakeQuestionReader:
 
 
 # ---------- 실패 사례 ----------
-def make_trace(case_id: str, *, parser_input=None, parser_output=None, generator_input=None, generator_output=None) -> dict:
-    keys = ["frontend_message", "intervention_decision", "orchestrator_input", "parser_input", "parser_output",
-            "normalizer_input", "normalizer_output", "judge_input", "judge_output", "record_writer_input",
-            "record_writer_output", "planner_input", "planner_output", "generator_input", "generator_output",
-            "frontend_input", "staff_console_input", "dispatch_input", "dispatch_output", "orchestrator_output",
-            "session_before", "session_after", "log_entry", "persistence_load_request", "persistence_load_result",
-            "persistence_commit_request", "persistence_commit_result"]
-    t = {k: None for k in keys}
-    t.update(session_id="sess-" + case_id, turn_id="t1", contract_version=1, turn_index=0,
-             parser_input=parser_input, parser_output=parser_output, generator_input=generator_input,
-             generator_output=generator_output)
-    return t
-
-
 class FakeFailureStore:
     """I7 FailureStore 대역."""
 
@@ -184,9 +170,10 @@ class FakeFailureStore:
         return copy.deepcopy(t)
 
 
-def failure_case(case_id: str, trace_ref: str, expected: Optional[dict], *, status="CONFIRMED", deidentified=True,
-                 question_set: Optional[dict] = None, expected_kind: Optional[str] = None) -> dict:
-    c = {"pipeline_schema_version": "1.1" if (question_set or expected_kind) else "1.0", "case_id": case_id, "version": 1, "created_at": "2026-10-15T00:00:00Z",
+def failure_case(case_id: str, trace_ref: str, expected, *, status="CONFIRMED", deidentified=True,
+                 question_set: Optional[dict] = None, expected_kind: Optional[str] = None,
+                 reviewed_input: Optional[dict] = None) -> dict:
+    c = {"pipeline_schema_version": "2.0", "case_id": case_id, "version": 1, "created_at": "2026-10-15T00:00:00Z",
          "source_release_id": "rel-0001", "runtime_contract_version": 1, "deidentified": deidentified,
          "deidentified_trace_ref": trace_ref, "failure_type": "UNCLASSIFIED", "detection_method": "HUMAN",
          "review_status": status}
@@ -196,25 +183,36 @@ def failure_case(case_id: str, trace_ref: str, expected: Optional[dict], *, stat
         c["question_set"] = question_set
     if expected_kind is not None:
         c["expected_kind"] = expected_kind
+    if reviewed_input is not None:
+        c["reviewed_input"] = reviewed_input
     return c
 
 
+# ---------- v2 샘플(손으로 지은 최소 내용. 라벨을 계약 예시에서 베끼지 않는다) ----------
+def a_input(utterance: str = "한 다섯 시간 정도 자요") -> dict:
+    return {"question_id": "Q3", "current_question": "하루에 몇 시간 주무세요?", "user_utterance": utterance, "state": {}}
+
+
+def a_expected(value=5) -> dict:
+    return {"values": [{"key": "Q3.hours", "value": value, "precision": "approximate", "status": "ANSWERED", "save": True}],
+            "action": "NEXT", "next_item": "Q4"}
+
+
+def b_input(user: str = "한 다섯 시간 정도 자요") -> dict:
+    return {"action": "NEXT", "topic": "수면 시간", "user_utterance": user, "known": "수면 5시간",
+            "next": {"type": "NEXT", "question_id": "Q4", "text": "일주일에 며칠, 하루 몇 분 운동하세요?"}}
+
+
+def b_expected() -> str:
+    return "다섯 시간 주무시는군요. 일주일에 며칠, 하루 몇 분 운동하세요?"
+
+
 def make_failure_store(bank: dict) -> FakeFailureStore:
-    """확정 사례 1건(파서)과 확정 사례 1건(생성기), 건너뛰어야 할 PENDING 1건."""
-    from synthetic_data import directives as dv, bank as bk
-    q = bank["questions"][2]   # Q3 수면
-    pin = {"utterance": "한 다섯 시간 정도 자요", "last_directive": None, "awaiting_questions": [q],
-           "question_names": bk.question_names(bank), "answered_slots": [], "guide_list": []}
-    pout = {"items": [{"item_no": 0, "target": bk.slot_ref(q, q["slots"][0]), "value": "다섯 시간", "source_text": "다섯 시간",
-                       "intent": "ANSWERED_INTENT", "progress_op": None, "guide_id": None}]}
-    m = dv.empty_materials()
-    m["question_sentences"] = [{"question_id": q["question_id"], "sentence": q["question_sentence"]}]
-    gin = {"directive": dv.directive("ASK_NEXT", bk.question_slot_refs(q), materials=m), "utterance": "네"}
-    gout = {"response_text": "알겠습니다. " + q["question_sentence"], "is_fallback": False}
+    """확정 사례 1건(LoRA-A)과 확정 사례 1건(LoRA-B), 건너뛰어야 할 PENDING 1건."""
     fs = FakeFailureStore()
-    fs.add(failure_case("fc-p", "tr-p", pout), make_trace("fc-p", parser_input=pin, parser_output=pout))
-    fs.add(failure_case("fc-g", "tr-g", gout), make_trace("fc-g", generator_input=gin, generator_output=gout))
-    fs.add(failure_case("fc-pending", "tr-x", None, status="PENDING"), make_trace("fc-pending"))
+    fs.add(failure_case("fc-a", "tr-a", a_expected(), expected_kind="LORA_A", reviewed_input=a_input()))
+    fs.add(failure_case("fc-b", "tr-b", b_expected(), expected_kind="LORA_B", reviewed_input=b_input()))
+    fs.add(failure_case("fc-pending", "tr-x", None, status="PENDING"))
     return fs
 
 

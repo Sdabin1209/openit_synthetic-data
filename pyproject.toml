@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "synthetic-data"
-version = "0.1.0"
+version = "0.2.0"
 requires-python = ">=3.10"
 description = "문진 시스템 합성 데이터 영역: LoRA-A/B 학습·검증·평가 데이터 생성 잡과 DatasetStore(I2)"
 dependencies = [

@@ -18,9 +18,9 @@ from .schemas import Validators
 class Seed:
     case_id: str
     version: int
-    role: str            # PARSER | GENERATOR
+    role: str            # LORA_A | LORA_B
     input: dict
-    expected: dict
+    expected: object     # LORA_A는 객체(ActionExtraction), LORA_B는 문자열(ResponseText)
     question_set: Optional[dict] = None   # FailureCase 1.1의 question_set. 1.0 레코드는 None
 
 
@@ -49,7 +49,7 @@ def _one(store: FailureStore, v: Validators, case: dict, notes: Optional[list] =
         extra = sorted(set(case) - known)
         if extra:
             notes.append(f"{case['case_id']}: 모르는 필드 무시 {extra}")
-        if case.get("expected_kind") not in (None, "PARSER", "GENERATOR"):
+        if case.get("expected_kind") not in (None, "LORA_A", "LORA_B"):
             notes.append(f"{case['case_id']}: 모르는 expected_kind {case['expected_kind']!r}, expected 형태로 판별")
     if case["runtime_contract_version"] != v.runtime_contract_version:
         return None, "runtime_contract_version 불일치"
@@ -58,20 +58,20 @@ def _one(store: FailureStore, v: Validators, case: dict, notes: Optional[list] =
     exp = case.get("expected")
     if not exp:
         return None, "expected 없음"
-    trace = store.get_trace(case["deidentified_trace_ref"])
-    if v.check_survey("TurnTrace", trace):
-        return None, "trace가 TurnTrace 스키마를 위반"
+    # 2.0.0: 시드의 입력은 검토자가 쓴 reviewed_input만 쓴다. v2의 비식별 trace 키(extract_*, response_* 등)는 survey-service가 정하며 아직 미정이라 trace에서는 입력을 꺼내지 않는다.
     kind = case.get("expected_kind")
     qs = case.get("question_set")
-    if kind is None or kind not in ("PARSER", "GENERATOR"):        # 1.0 레코드나 모르는 값: expected의 형태로 판별
-        if not v.check_survey("ParserOutput", exp):
-            kind = "PARSER"
-        elif not v.check_survey("GeneratorOutput", exp):
-            kind = "GENERATOR"
-        else:
+    if kind not in ("LORA_A", "LORA_B"):                 # 생략되었거나 모르는 값: expected의 형태로 판별(객체면 LORA_A, 문자열이면 LORA_B)
+        kind = "LORA_A" if isinstance(exp, dict) else "LORA_B" if isinstance(exp, str) else None
+        if kind is None:
             return None, "expected의 종류를 판별할 수 없음"
-    if kind == "PARSER" and not v.check_survey("ParserOutput", exp) and trace.get("parser_input"):
-        return Seed(case["case_id"], case["version"], "PARSER", trace["parser_input"], exp, qs), None
-    if kind == "GENERATOR" and not v.check_survey("GeneratorOutput", exp) and trace.get("generator_input"):
-        return Seed(case["case_id"], case["version"], "GENERATOR", trace["generator_input"], exp, qs), None
-    return None, "expected의 종류와 trace 입력이 맞지 않음"
+    inp = case.get("reviewed_input")
+    if not inp:
+        return None, "reviewed_input 없음(v2 trace 키는 미정이라 trace에서 입력을 만들지 않는다)"
+    if kind == "LORA_A":
+        if not isinstance(exp, dict) or v.check_boundary("ActionExtraction", exp) or v.check_boundary("ActionExtractionInput", inp):
+            return None, "expected 또는 reviewed_input이 ActionExtraction/ActionExtractionInput 스키마를 위반"
+    else:
+        if not isinstance(exp, str) or v.check_boundary("ResponseText", exp) or v.check_boundary("ResponseRequest", inp):
+            return None, "expected 또는 reviewed_input이 ResponseText/ResponseRequest 스키마를 위반"
+    return Seed(case["case_id"], case["version"], kind, inp, exp, qs), None

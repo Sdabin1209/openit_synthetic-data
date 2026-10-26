@@ -4,7 +4,7 @@
   - 매니페스트가 DatasetManifest 스키마를 통과하고 content_hash가 맞다(boundary_contracts.canonical).
   - 같은 (dataset_id, version)이 이미 있으면: 같은 content_hash면 기존 것을 돌려주고(멱등), 다르면 CONFLICT.
   - files의 키 집합 == manifest.files[].path 집합. 파일 해시, 줄 수(sample_count), 분할(split) 일치.
-  - 줄마다 ParserSample/GeneratorSample 스키마와 문진 스키마(input/expected)를 통과한다.
+  - 줄마다 ActionExtractionSample(role=LORA_A)/ResponseSample(role=LORA_B) 스키마를 통과한다(input/expected는 그 스키마가 ActionExtraction*·ResponseRequest·ResponseText로 검증한다, 2.0.0).
   - 평가(EVAL) 샘플의 scenario_id가 TRAIN·VALIDATION과 겹치면 INVALID_RECORD(TRAIN과 VALIDATION끼리도 마찬가지).
 """
 from __future__ import annotations
@@ -25,9 +25,7 @@ from .. import SUPPORTED_PIPELINE_MAJOR
 from ..schemas import Validators
 
 _ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:-]*$")
-_SAMPLE_SCHEMA = {"PARSER": "ParserSample", "GENERATOR": "GeneratorSample"}
-_SURVEY_SCHEMA = {"PARSER": ("UtteranceParserInput", "ParserOutput"),
-                  "GENERATOR": ("ResponseGeneratorInput", "GeneratorOutput")}
+_SAMPLE_SCHEMA = {"LORA_A": "ActionExtractionSample", "LORA_B": "ResponseSample"}
 
 
 def _inv(msg: str, **details) -> BoundaryError:
@@ -160,7 +158,6 @@ class DatasetStoreBase:
                      sample_ids: set, scenarios: dict) -> int:
         v = self.validators
         role, split, p = f["role"], f["split"], f["path"]
-        in_schema, out_schema = _SURVEY_SCHEMA[role]
         n = 0
         with open(path, "rb") as fh:
             for lineno, raw in enumerate(fh, 1):
@@ -177,17 +174,13 @@ class DatasetStoreBase:
                     raise BoundaryError("UNSUPPORTED_VERSION", f"{where}: 지원하지 않는 pipeline_schema_version")
                 if rec["split"] != split:
                     raise _inv(f"{where}: 샘플 split {rec['split']} != 파일 split {split}")
-                if rec["runtime_contract_version"] != manifest["runtime_contract_version"]:
-                    raise _inv(f"{where}: runtime_contract_version이 매니페스트와 다르다")
-                if _ref_key(rec["question_set"]) not in allowed:
+                if "question_set" in rec and _ref_key(rec["question_set"]) not in allowed:
                     raise _inv(f"{where}: question_set이 이 파일의 문항 세트에 없다")
                 if "seed_case_id" in rec and rec["seed_case_id"] not in seed_ids:
                     raise _inv(f"{where}: seed_case_id가 manifest.seed_case_ids에 없다")
                 if rec["sample_id"] in sample_ids:
                     raise _inv(f"{where}: sample_id 중복: {rec['sample_id']}")
                 sample_ids.add(rec["sample_id"])
-                v.survey(in_schema, rec["input"], what=f"{where} input")
-                v.survey(out_schema, rec["expected"], what=f"{where} expected")
                 scenarios[split].add(rec["scenario_id"])
                 n += 1
         return n

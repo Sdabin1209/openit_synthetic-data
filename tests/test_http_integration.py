@@ -14,7 +14,7 @@ TOK = "tok-reader"
 
 
 def review(ref):
-    return {"pipeline_schema_version": "1.0", "review_id": "rv-" + ref["id"], "question_set": ref,
+    return {"pipeline_schema_version": "2.0", "review_id": "rv-" + ref["id"], "question_set": ref,
             "reviewer_role": "clinical-reviewer", "decision": "APPROVED", "clinical_basis_approved": True,
             "reviewed_at": "2026-10-15T00:00:00Z"}
 
@@ -28,13 +28,12 @@ def make_server(case_mutations=()):
         srv.add_question_set(qid, bank, reviews=[review(ref)])
         refs[qid] = ref
     fs = doubles.make_failure_store(banks["qs-main"])
-    p, tr = fs.get_case("fc-p"), fs.get_trace("tr-p")
-    c = doubles.failure_case("fc-new", "tr-new", p["expected"], question_set=refs["qs-main"], expected_kind="PARSER")
+    p = fs.get_case("fc-a")
+    c = doubles.failure_case("fc-new", "tr-new", p["expected"], question_set=refs["qs-main"], expected_kind="LORA_A",
+                             reviewed_input=p["reviewed_input"])
     for m in case_mutations:
         m(c)
     srv.cases += [c, fs.get_case("fc-pending")]
-    srv.deid_traces["tr-new"] = dict(tr, session_id="sess-new")
-    srv.deid_traces["tr-x"] = fs.get_trace("tr-x")
     return srv
 
 
@@ -68,7 +67,7 @@ def test_job_over_http(tmp_path, monkeypatch, capsys):
 
 def test_major_mismatch_is_unsupported_version_in_report(tmp_path, monkeypatch, capsys):
     monkeypatch.setenv("SYN_TEST_TOKEN", TOK)
-    with make_server([lambda c: c.update(pipeline_schema_version="2.0")]) as srv:
+    with make_server([lambda c: c.update(pipeline_schema_version="1.3")]) as srv:
         assert main(["run", "--config", str(http_cfg(tmp_path, srv.url))]) == 3
     err = json.loads((tmp_path / "w" / "report.json").read_text())["error"]
     assert err["code"] == "UNSUPPORTED_VERSION" and err["retryable"] is False

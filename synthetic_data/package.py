@@ -31,7 +31,7 @@ def package(samples: list, ctxs: list[QuestionSetContext], cfg: JobConfig, *, st
     groups: dict[str, list] = {}
     meta: dict[str, tuple] = {}
     for s in samples:
-        role = "PARSER" if s["sample_id"].startswith("ps-") else "GENERATOR"
+        role = "LORA_A" if s["sample_id"].startswith("as-") else "LORA_B"
         unseen = s["split"] == "EVAL" and usage[s["question_set"]["id"]] == "HELD_OUT_EVAL"
         name = "eval_unseen" if unseen else s["split"].lower()
         path = f"{role.lower()}/{name}.jsonl"

@@ -20,7 +20,7 @@ from .config import JobConfig, load_config
 from .generators import load_response_generator, load_utterance_generator
 from .package import dumps_line, package
 from .pipeline import build_generator_samples, build_parser_samples, build_seed_samples
-from .quality import check_generator_sample, check_parser_sample
+from .quality import check_lora_a_sample, check_lora_b_sample
 from .rng import derive_int
 from .scenario import QuestionSetContext, design_generator_plans, design_parser_plans
 from .schemas import Validators
@@ -166,8 +166,8 @@ def _run_job(cfg, question_reader, store, failure_store, validators, clock, repo
     kept, dropped = [], Counter()
     for s in sorted(samples, key=lambda r: r["sample_id"]):
         bank = banks[(s["question_set"]["id"], s["question_set"]["version"])]
-        role = "PARSER" if s["sample_id"].startswith("ps-") else "GENERATOR"
-        reasons = (check_parser_sample if role == "PARSER" else check_generator_sample)(s, bank, v)
+        role = "LORA_A" if s["sample_id"].startswith("as-") else "LORA_B"
+        reasons = (check_lora_a_sample if role == "LORA_A" else check_lora_b_sample)(s, bank, v)
         if reasons:
             dropped.update(reasons)
             continue
@@ -189,6 +189,9 @@ def _run_job(cfg, question_reader, store, failure_store, validators, clock, repo
         else:
             final.append(seed_first[0])
             dropped["duplicate_input"] += len(group) - 1
+    if dropped.get("schema_sample") and not any(s["origin"] == "SYNTHETIC" for s in final):
+        report["notes"].append(f"합성 샘플 {dropped['schema_sample']}건이 모두 v2 스키마 위반으로 빠졌다: 생성기가 아직 v1 내용을 만든다"
+                               "(synthetic-data의 역할 결정 전, migration-2.0.0.md). 이 데이터셋에는 시드 샘플만 있다")
     report["dropped"] = dict(sorted(dropped.items()))
     report["generation"] = dict(sorted(gen_stats.items()))
     usage = {c.ref["id"]: c.usage for c in ctxs}
@@ -230,7 +233,7 @@ def _run_job(cfg, question_reader, store, failure_store, validators, clock, repo
 def _counts(final: list) -> dict:
     c = Counter()
     for s in final:
-        role = "parser" if s["sample_id"].startswith("ps-") else "generator"
+        role = "lora_a" if s["sample_id"].startswith("as-") else "lora_b"
         c[f"{role}.{s['split']}"] += 1
         c[f"origin.{s['origin']}"] += 1
         c[f"kind.{s['ext']['synthetic-data']['kind']}"] += 1

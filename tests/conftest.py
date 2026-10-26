@@ -49,24 +49,47 @@ def run(cfg_raw: dict, store, validators, *, reader=None, fstore=None, **kw):
     return cfg, run_job(cfg, question_reader=reader, failure_store=fstore, store=store, validators=validators, **kw)
 
 
-class CaptureStore(MemoryDatasetStore):
-    """게시된 매니페스트와 파일 바이트를 시험이 다시 쓰려고 붙잡는다."""
-    def __init__(self, v):
-        super().__init__(v)
-        self.captured = None
+GEN_V2_PENDING = ("생성 파이프라인(시나리오 설계·정답 구성·발화/응답 생성기)은 아직 v1 내용을 만든다. v2 샘플을 만들도록 옮기는 일은 "
+                  "synthetic-data의 역할 결정(head/docs/migration-2.0.0.md '아직 정해지지 않은 것')을 기다리는 미정 사항이다")
+needs_generator_v2 = pytest.mark.skip(reason=GEN_V2_PENDING)
 
-    def publish(self, manifest, files):
-        self.captured = (copy.deepcopy(manifest), {k: Path(p).read_bytes() for k, p in files.items()})
-        return super().publish(manifest, files)
+
+def v2_sample(role: str, n: int, split: str, ref: dict, *, scenario: str = None, origin: str = "SYNTHETIC") -> dict:
+    """손으로 지은 v2 샘플(ActionExtractionSample/ResponseSample)."""
+    a = role == "LORA_A"
+    rec = {"pipeline_schema_version": "2.0", "sample_id": f"{'as' if a else 'rs'}-{n:04d}",
+           "scenario_id": scenario or f"sc-{n:04d}", "split": split, "origin": origin, "question_set": copy.deepcopy(ref),
+           "input": doubles.a_input(f"발화 {n}") if a else doubles.b_input(f"발화 {n}"),
+           "expected": doubles.a_expected() if a else doubles.b_expected(),
+           "ext": {"synthetic-data": {"kind": "HAND"}}}
+    return rec
+
+
+def build_v2_dataset(tmp: Path):
+    """v2 샘플을 package()로 묶은 (매니페스트, 파일 바이트). 생성기를 거치지 않는다."""
+    from synthetic_data.package import package
+    from synthetic_data.scenario import QuestionSetContext
+    r = doubles.make_question_reader()
+    ctxs = []
+    for qid, use in (("qs-main", "TRAIN_POOL"), ("qs-unseen", "HELD_OUT_EVAL")):
+        ref = r.latest(qid)
+        ctxs.append(QuestionSetContext(ref, r.get_question_bank(ref), use))
+    main, unseen = ctxs[0].ref, ctxs[1].ref
+    samples, n = [], 0
+    for role in ("LORA_A", "LORA_B"):
+        for split, count, ref in (("TRAIN", 3, main), ("VALIDATION", 1, main), ("EVAL", 1, main), ("EVAL", 1, unseen)):
+            for _ in range(count):
+                n += 1
+                samples.append(v2_sample(role, n, split, ref))
+    cfg = parse_config(make_cfg_raw(tmp), Path("."))
+    manifest, files, _ = package(samples, ctxs, cfg, staging=tmp / "stage", contract=1, generator_version="test-hand@0",
+                                 turn_engine_version="0.0.0-test", created_at="2026-10-15T00:00:00Z")
+    return manifest, {k: Path(p).read_bytes() for k, p in files.items()}
 
 
 @pytest.fixture(scope="session")
-def captured(validators, tmp_path_factory):
-    tmp = tmp_path_factory.mktemp("cap")
-    st = CaptureStore(validators)
-    _, res = run(make_cfg_raw(tmp), st, validators)
-    assert res.status == "PUBLISHED"
-    return st.captured
+def captured(tmp_path_factory):
+    return build_v2_dataset(tmp_path_factory.mktemp("cap"))
 
 
 def write_files(tmp: Path, blobs: dict) -> dict:

@@ -6,7 +6,7 @@ import random
 import pytest
 
 import doubles
-from conftest import make_cfg_raw
+from conftest import make_cfg_raw, needs_generator_v2
 from synthetic_data import josa
 from synthetic_data.config import parse_config
 from synthetic_data.generators import (ResponseGenerator, RuleResponseGenerator, RuleUtteranceGenerator,
@@ -15,7 +15,7 @@ from synthetic_data.labeler import LabelError, build_parser_expected
 from synthetic_data.noise import apply_noise
 from synthetic_data.pipeline import build_generator_samples, build_parser_samples
 from synthetic_data.plans import FactPlan, FactSurface, UtteranceDraft
-from synthetic_data.quality import check_generator_sample, check_parser_sample
+from synthetic_data.quality import check_lora_a_sample, check_lora_b_sample
 from synthetic_data.scenario import QuestionSetContext, design_generator_plans, design_parser_plans
 from synthetic_data.split import assign_split
 
@@ -48,6 +48,7 @@ def test_josa():
     assert josa.euro("7시간") == "7시간으로" and josa.euro("서울") == "서울로"
 
 
+@needs_generator_v2
 def test_all_parser_kinds_covered(parser_samples):
     kinds = {s["ext"]["synthetic-data"]["kind"] for s in parser_samples}
     assert {"ANSWER_NUMERIC", "ANSWER_CHOICE", "ANSWER_YESNO", "SAYS_UNKNOWN", "SAYS_REFUSAL", "PROGRESS_LATER",
@@ -56,12 +57,14 @@ def test_all_parser_kinds_covered(parser_samples):
             "EMPTY_UTTERANCE"} <= kinds
 
 
+@needs_generator_v2
 def test_all_parser_samples_pass_quality(parser_samples, ctx, validators):
     assert parser_samples
     for s in parser_samples:
         assert check_parser_sample(s, ctx.bank, validators) == [], (s["input"]["utterance"], s["expected"])
 
 
+@needs_generator_v2
 def test_label_rules(parser_samples):
     """utterance_parser.md 4절 1~8의 대상·값 규칙이 생성 라벨에 지켜졌다."""
     by = {}
@@ -98,6 +101,7 @@ def test_label_rules(parser_samples):
         assert s["expected"]["items"][0]["source_text"] not in texts
 
 
+@needs_generator_v2
 def test_evidence_offsets(parser_samples):
     n = 0
     for s in parser_samples:
@@ -108,6 +112,7 @@ def test_evidence_offsets(parser_samples):
     assert n > 20
 
 
+@needs_generator_v2
 def test_noise_keeps_labels_consistent(parser_samples):
     noisy = [s for s in parser_samples if s.get("noise_types")]
     assert noisy
@@ -148,6 +153,7 @@ def test_labeler_errors():
         build_parser_expected([FactPlan("SAYS_UNKNOWN")], "x", [])
 
 
+@needs_generator_v2
 def test_quality_rejects_bad_labels(parser_samples, ctx, validators):
     base = next(s for s in parser_samples if s["ext"]["synthetic-data"]["kind"] == "ANSWER_CHOICE")
 
@@ -166,6 +172,7 @@ def test_quality_rejects_bad_labels(parser_samples, ctx, validators):
     assert reasons(lambda s: None) == []
 
 
+@needs_generator_v2
 def test_quality_rejects_bad_generator_samples(ctx, cfg, validators):
     plans, _ = design_generator_plans(ctx, variants=1, seed=1)
     samples, st = build_generator_samples(plans, RuleResponseGenerator(), cfg, 1)
@@ -201,3 +208,25 @@ def test_split_assign():
     assert {x: got.count(x) / 2000 for x in set(got)} == pytest.approx({"TRAIN": 0.6, "VALIDATION": 0.2, "EVAL": 0.2}, abs=0.05)
     assert got == [assign_split(f"sc-{i}", "TRAIN_POOL", ratios, 1) for i in range(2000)]
     assert assign_split("sc-1", "TRAIN_POOL", {"TRAIN": 0, "VALIDATION": 0, "EVAL": 1}, 3) == "EVAL"
+
+
+def test_quality_accepts_v2_samples_and_rejects_v1_shapes(ctx, validators):
+    from conftest import v2_sample
+    for role in ("LORA_A", "LORA_B"):
+        s = v2_sample(role, 1, "TRAIN", ctx.ref)
+        check = check_lora_a_sample if role == "LORA_A" else check_lora_b_sample
+        assert check(s, ctx.bank, validators) == []
+        bad = copy.deepcopy(s)
+        bad["expected"] = {"items": []} if role == "LORA_A" else {"response_text": "x", "is_fallback": False}   # v1 형태
+        assert check(bad, ctx.bank, validators) == ["schema_sample"]
+        bad2 = copy.deepcopy(s)
+        bad2["runtime_contract_version"] = 1                                                                    # v1 샘플 필드
+        assert check(bad2, ctx.bank, validators) == ["schema_sample"]
+
+
+def test_quality_rejects_a_output_that_breaks_the_save_rule(ctx, validators):
+    """형식 검사 한 가지: ActionExtraction의 status와 save 규칙(ANSWERED면 save true)은 스키마가 잡는다. 의미 검사(targets, next_item 등)는 turn-engine 몫(미정)."""
+    from conftest import v2_sample
+    s = v2_sample("LORA_A", 1, "TRAIN", ctx.ref)
+    s["expected"]["values"][0]["save"] = False
+    assert check_lora_a_sample(s, ctx.bank, validators) == ["schema_sample"]

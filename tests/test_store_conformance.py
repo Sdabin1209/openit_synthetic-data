@@ -95,7 +95,7 @@ def test_not_found(store, captured, tmp_path):
     assert code(e) == "NOT_FOUND"
     store.publish(m, write_files(tmp_path, b))
     with pytest.raises(BoundaryError) as e:
-        store.open_file(m["dataset_id"], m["version"], "parser/none.jsonl")
+        store.open_file(m["dataset_id"], m["version"], "lora_a/none.jsonl")
     assert code(e) == "NOT_FOUND"
     with pytest.raises(BoundaryError) as e:
         store.get_manifest(m["dataset_id"], "other")
@@ -132,7 +132,7 @@ def test_sample_count_mismatch(store, captured, tmp_path):
 
 def test_split_mismatch(store, captured, tmp_path):
     m, b = captured
-    ent = next(f for f in m["files"] if f["split"] == "TRAIN" and f["role"] == "PARSER")
+    ent = next(f for f in m["files"] if f["split"] == "TRAIN" and f["role"] == "LORA_A")
     def mb(blobs):
         recs = lines(blobs[ent["path"]])
         recs[0]["split"] = "VALIDATION"
@@ -145,8 +145,8 @@ def test_split_mismatch(store, captured, tmp_path):
 
 def test_eval_scenario_overlap_with_train_rejected(store, captured, tmp_path):
     m, b = captured
-    tr = next(f for f in m["files"] if f["split"] == "TRAIN" and f["role"] == "PARSER")
-    ev = next(f for f in m["files"] if f["split"] == "EVAL" and f["role"] == "PARSER" and "unseen" not in f["path"])
+    tr = next(f for f in m["files"] if f["split"] == "TRAIN" and f["role"] == "LORA_A")
+    ev = next(f for f in m["files"] if f["split"] == "EVAL" and f["role"] == "LORA_A" and "unseen" not in f["path"])
     train0 = lines(b[tr["path"]])[0]
     def mb(blobs):
         recs = lines(blobs[ev["path"]])
@@ -171,25 +171,25 @@ def test_invalid_sample_schema(store, captured, tmp_path):
     assert code(e) == "INVALID_RECORD"
 
 
-def test_expected_violates_survey_schema(store, captured, tmp_path):
+def test_expected_violates_sample_schema(store, captured, tmp_path):
     m, b = captured
-    ent = next(f for f in m["files"] if f["role"] == "PARSER" and f["split"] == "TRAIN")
+    ent = next(f for f in m["files"] if f["role"] == "LORA_A" and f["split"] == "TRAIN")
     def mb(blobs):
         recs = lines(blobs[ent["path"]])
-        recs[0]["expected"] = {"items": [{"item_no": 0}]}
+        recs[0]["expected"] = {"items": [{"item_no": 0}]}   # v1 형태
         blobs[ent["path"]] = dump(recs)
     m2, files = rebuild(m, b, tmp_path, mutate_blob=mb)
     with pytest.raises(BoundaryError) as e:
         store.publish(m2, files)
-    assert code(e) == "INVALID_RECORD" and "문진 스키마" in e.value.message
+    assert code(e) == "INVALID_RECORD" and "ActionExtractionSample" in e.value.message
 
 
-def test_input_violates_survey_schema(store, captured, tmp_path):
+def test_input_violates_sample_schema(store, captured, tmp_path):
     m, b = captured
-    ent = next(f for f in m["files"] if f["role"] == "GENERATOR" and f["split"] == "TRAIN")
+    ent = next(f for f in m["files"] if f["role"] == "LORA_B" and f["split"] == "TRAIN")
     def mb(blobs):
         recs = lines(blobs[ent["path"]])
-        recs[0]["input"] = {"directive": {}, "utterance": None}
+        recs[0]["input"] = {"directive": {}, "utterance": None}   # v1 형태
         blobs[ent["path"]] = dump(recs)
     m2, files = rebuild(m, b, tmp_path, mutate_blob=mb)
     with pytest.raises(BoundaryError) as e:
@@ -211,7 +211,7 @@ def test_files_keys_must_match(store, captured, tmp_path):
     m, b = captured
     files = write_files(tmp_path, b)
     extra = dict(files)
-    extra["parser/extra.jsonl"] = files[m["files"][0]["path"]]
+    extra["lora_a/extra.jsonl"] = files[m["files"][0]["path"]]
     for bad in (extra, {k: v for k, v in list(files.items())[1:]}):
         with pytest.raises(BoundaryError) as e:
             store.publish(m, bad)
@@ -319,8 +319,44 @@ def test_reader_needs_no_survey_dir_but_publish_does(captured, tmp_path):
 def test_unsupported_pipeline_major(store, captured, tmp_path):
     m, b = captured
     m2 = copy.deepcopy(m)
-    m2["pipeline_schema_version"] = "2.0"
+    m2["pipeline_schema_version"] = "1.3"
     m2["content_hash"] = canonical.content_hash(m2)
     with pytest.raises(BoundaryError) as e:
         store.publish(m2, write_files(tmp_path, b))
     assert code(e) == "UNSUPPORTED_VERSION"
+
+
+def test_v1_roles_and_samples_rejected(store, captured, tmp_path):
+    """2.0.0: PARSER/GENERATOR 역할은 매니페스트 스키마에서 거부되고, v1 샘플 필드(runtime_contract_version 등)는 샘플 스키마에서 거부된다."""
+    m, b = captured
+    m2 = copy.deepcopy(m)
+    m2["files"][0]["role"] = "PARSER"
+    m2["content_hash"] = canonical.content_hash(m2)
+    with pytest.raises(BoundaryError) as e:
+        store.publish(m2, write_files(tmp_path / "r", b))
+    assert code(e) == "INVALID_RECORD"
+    ent = m["files"][0]
+    def mb(blobs):
+        recs = lines(blobs[ent["path"]])
+        recs[0]["runtime_contract_version"] = 1
+        blobs[ent["path"]] = dump(recs)
+    m3, files = rebuild(m, b, tmp_path / "s", mutate_blob=mb)
+    with pytest.raises(BoundaryError) as e:
+        store.publish(m3, files)
+    assert code(e) == "INVALID_RECORD"
+
+
+def test_roles_cover_lora_a_and_b_with_matching_sample_schema(store, captured, tmp_path):
+    m, b = captured
+    assert {f["role"] for f in m["files"]} == {"LORA_A", "LORA_B"}
+    for f in m["files"]:
+        rec = lines(b[f["path"]])[0]
+        assert isinstance(rec["expected"], str) == (f["role"] == "LORA_B")   # ResponseText는 문자열, ActionExtraction은 객체
+    ent = next(f for f in m["files"] if f["role"] == "LORA_B" and f["split"] == "TRAIN")
+    def mb(blobs):                                     # LORA_B 파일에 LoRA-A 샘플을 넣으면 거부
+        a = next(f for f in m["files"] if f["role"] == "LORA_A" and f["split"] == "TRAIN")
+        blobs[ent["path"]] = blobs[a["path"]]
+    m2, files = rebuild(m, b, tmp_path / "x", mutate_blob=mb)
+    with pytest.raises(BoundaryError) as e:
+        store.publish(m2, files)
+    assert code(e) == "INVALID_RECORD"

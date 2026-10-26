@@ -19,17 +19,18 @@ EXT = "synthetic-data"
 
 
 def _record(role: str, sample_id: str, scenario_id: str, ref: dict, contract: int, origin: str, inp: dict,
-            expected: dict, ext: dict, *, seed_case_id: Optional[str] = None, noise: Optional[list] = None,
+            expected, ext: dict, *, seed_case_id: Optional[str] = None, noise: Optional[list] = None,
             style_guide_version: Optional[str] = None) -> dict:
+    """샘플 봉투(2.0.0): ActionExtractionSample/ResponseSample에는 runtime_contract_version, style_guide_version, noise_types가 없다.
+    contract·style_guide_version은 호출부 시그니처를 유지하려고 받기만 하고 쓰지 않는다. 노이즈 종류는 ext에 남긴다.
+    주의: 내용(inp, expected)은 아직 v1 생성기가 만든 v1 형식이라 v2 스키마를 통과하지 못한다(품질 검사에서 걸러진다, 생성기 이전은 미정)."""
+    if noise:
+        ext = {**ext, "noise_types": sorted(noise)}
     rec = {"pipeline_schema_version": PIPELINE_SCHEMA_VERSION, "sample_id": sample_id, "scenario_id": scenario_id,
-           "question_set": copy.deepcopy(ref), "runtime_contract_version": contract, "split": "TRAIN",
+           "question_set": copy.deepcopy(ref), "split": "TRAIN",
            "origin": origin, "input": inp, "expected": expected, "ext": {EXT: ext}}
-    if role == "GENERATOR":
-        rec["style_guide_version"] = style_guide_version
     if seed_case_id:
         rec["seed_case_id"] = seed_case_id
-    if noise:
-        rec["noise_types"] = sorted(noise)
     return rec
 
 
@@ -57,8 +58,8 @@ def build_parser_samples(plans: list[ParserPlan], ugen: UtteranceGenerator, cfg:
                 continue
             inp = copy.deepcopy(plan.base_input)
             inp["utterance"] = d.utterance
-            sid = "ps-" + short_hash(plan.scenario_id, plan.question_set["version"], tag)
-            out.append(_record("PARSER", sid, plan.scenario_id, plan.question_set, contract, "SYNTHETIC", inp, expected,
+            sid = "as-" + short_hash(plan.scenario_id, plan.question_set["version"], tag)
+            out.append(_record("LORA_A", sid, plan.scenario_id, plan.question_set, contract, "SYNTHETIC", inp, expected,
                                {"kind": plan.kind, "utterance_generator": f"{ugen.name}@{ugen.version}"}, noise=applied))
     return out, stats
 
@@ -70,10 +71,10 @@ def build_generator_samples(plans: list[GeneratorPlan], rgen: ResponseGenerator,
         if not text:
             stats["generator_returned_none"] += 1
             continue
-        sid = "gs-" + short_hash(plan.scenario_id, plan.question_set["version"])
+        sid = "rs-" + short_hash(plan.scenario_id, plan.question_set["version"])
         inp = {"directive": plan.directive, "utterance": plan.utterance}
-        out.append(_record("GENERATOR", sid, plan.scenario_id, plan.question_set, contract, "SYNTHETIC", inp,
-                           {"response_text": text, "is_fallback": False},
+        out.append(_record("LORA_B", sid, plan.scenario_id, plan.question_set, contract, "SYNTHETIC", inp,
+                           text,
                            {"kind": plan.kind, "response_generator": f"{rgen.name}@{rgen.version}",
                             "directive_source": "hand-built"},
                            style_guide_version=cfg.style_guide_version))
@@ -81,49 +82,28 @@ def build_generator_samples(plans: list[GeneratorPlan], rgen: ResponseGenerator,
 
 
 def build_seed_samples(pairs: list, cfg: JobConfig, contract: int) -> tuple[list, list, Counter]:
-    """시드 사례를 FAILURE_CASE_SEED 샘플로. 파서 시드는 노이즈 변형도 만든다(원문이 발화에서 순서대로 찾아질 때만)."""
+    """시드 사례를 FAILURE_CASE_SEED 샘플로(2.0.0). 시드의 입력은 FailureCase.reviewed_input(LoRA-A는 ActionExtractionInput, LoRA-B는 ResponseRequest)이다.
+    v1에 있던 노이즈 변형은 만들지 않는다(원문 위치 source_text가 v2 출력에 없다). 변형 방법은 미정이다."""
     out, skipped, stats = [], [], Counter()
     for s, ctx in pairs:
         qids = {q["question_id"] for q in ctx.bank["questions"]}
         scen = "sd-" + short_hash(s.case_id)
-        if s.role == "PARSER":
-            used = {q["question_id"] for q in s.input["awaiting_questions"]}
+        if s.role == "LORA_A":
+            used = {s.input["question_id"]}
         else:
-            used = {t["question_id"] for t in s.input["directive"]["targets"]}
+            nxt = s.input.get("next")
+            used = {nxt["question_id"]} if isinstance(nxt, dict) and "question_id" in nxt else set()
         if not used <= qids:
             skipped.append({"case_id": s.case_id, "reason": "시드의 문항이 지정한 문항 세트에 없음"})
             continue
-        if s.role == "GENERATOR":
-            out.append(_record("GENERATOR", "gs-" + short_hash(scen, ctx.ref["version"]), scen, ctx.ref, contract,
+        if s.role == "LORA_B":
+            out.append(_record("LORA_B", "rs-" + short_hash(scen, ctx.ref["version"]), scen, ctx.ref, contract,
                                "FAILURE_CASE_SEED", copy.deepcopy(s.input), copy.deepcopy(s.expected),
-                               {"kind": "SEED"}, seed_case_id=s.case_id, style_guide_version=cfg.style_guide_version))
-            stats["seed_generator"] += 1
+                               {"kind": "SEED"}, seed_case_id=s.case_id))
+            stats["seed_lora_b"] += 1
             continue
-        out.append(_record("PARSER", "ps-" + short_hash(scen, ctx.ref["version"], "clean"), scen, ctx.ref, contract,
+        out.append(_record("LORA_A", "as-" + short_hash(scen, ctx.ref["version"], "clean"), scen, ctx.ref, contract,
                            "FAILURE_CASE_SEED", copy.deepcopy(s.input), copy.deepcopy(s.expected), {"kind": "SEED"},
                            seed_case_id=s.case_id))
-        stats["seed_parser"] += 1
-        items = s.expected["items"]
-        if not items or not all(it.get("source_text") for it in items):
-            continue
-        base = UtteranceDraft(s.input["utterance"], [FactSurface(it["source_text"], it["value"] if isinstance(it["value"], str) else None) for it in items])
-        for i in range(cfg.noise_variants):
-            nrng = rng_for(cfg.seed, "seednoise", s.case_id, i)
-            nd, applied = apply_noise(base, choose_types(cfg.noise_types, nrng), nrng)
-            if not applied or any(f.value is not None and f.value not in f.source for f in nd.facts):
-                continue
-            exp = copy.deepcopy(s.expected)
-            ok = True
-            for it, f in zip(exp["items"], nd.facts):
-                it["source_text"] = f.source
-                if f.value is not None:
-                    it["value"] = f.value
-                if "evidence" in it:
-                    del it["evidence"]            # 위치가 바뀌므로 지운다(선택 필드)
-            inp = copy.deepcopy(s.input)
-            inp["utterance"] = nd.utterance
-            if ok:
-                out.append(_record("PARSER", "ps-" + short_hash(scen, ctx.ref["version"], f"n{i}"), scen, ctx.ref, contract,
-                                   "FAILURE_CASE_SEED", inp, exp, {"kind": "SEED"}, seed_case_id=s.case_id, noise=applied))
-                stats["seed_parser_noise"] += 1
+        stats["seed_lora_a"] += 1
     return out, skipped, stats
