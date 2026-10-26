@@ -1,6 +1,13 @@
 # STATUS (synthetic-data)
 
-마지막 갱신: 2026-10-15, 첫 구간.
+마지막 갱신: 2026-10-27, boundary-contracts v2.0.0 이전(브랜치 migrate-contracts-2.0.0, push 전).
+
+## 2.0.0 이전 (D74, D75)
+- 한 일: I2 DatasetStore, 품질 검사기, 시드 수집, 패키저를 v2 샘플(`ActionExtractionSample`/`ResponseSample`, 역할 `LORA_A`/`LORA_B`)로. requirements.lock v2.0.0. 시험 85건 통과, 15건 보류.
+- **막힌 것/미정**: 생성 파이프라인(scenario, labeler, generators, noise, plans, directives)은 v1 내용(ParserOutput 항목, Directive)을 만든다. 합성 샘플은 모두 v2 스키마에서 빠지고 시드 샘플만 데이터셋에 남는다(report.json notes에 기록). 지시서는 이 영역의 역할(데이터 생성은 학습 서버 파이프라인이 이미 함)을 사용자가 정할 일이라 했으므로 생성기를 v2로 다시 쓰지 않았다.
+- 보류한 시험 15건은 `tests/conftest.py`의 `needs_generator_v2` 표시(사유 포함). 생성기를 옮기거나 영역 역할이 바뀔 때 되살리거나 지운다.
+- v2 의미 검사(targets, next_item, 건너뛰기 순서, save)는 turn-engine `validate_extraction`이 나온 뒤 연결(미정).
+
 
 ## 한 일 (시험으로 확인)
 - (0.1.2) v1.2.0, I1·I7 HTTP 연결과 통합 시험, 오류 보고, GPU 호스트 runbook. 시험 92건.

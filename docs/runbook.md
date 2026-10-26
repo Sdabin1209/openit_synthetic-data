@@ -19,7 +19,7 @@ I1·I7 클라이언트는 읽기 모드다. 같은 MAJOR의 모르는 필드와 
 
 ```bash
 python3 -m venv .venv && . .venv/bin/activate
-pip install -r requirements.lock pytest                 # 배포: boundary-contracts v1.2.0 태그 고정
+pip install -r requirements.lock pytest                 # 배포: boundary-contracts v2.0.0 태그 고정
 pip install -e ../boundary-contracts                    # 개발: 작업 트리 사용(위 설치 뒤에 덮어쓴다)
 ```
 (배포에서는 boundary-contracts를 Git 태그로 고정한다.)

@@ -1,5 +1,14 @@
 # 변경 이력
 
+## 0.2.0 (2026-10-27, 브랜치 migrate-contracts-2.0.0, boundary-contracts v2.0.0; 제안 버전)
+- D74/D75 이전. 구조는 바꾸지 않고 v1 샘플 검증을 v2 샘플로 바꾼 최소 변경이다.
+- I2 DatasetStore: 역할 `LORA_A`/`LORA_B`, 샘플 스키마 `ActionExtractionSample`/`ResponseSample`, 문진 스키마 input/expected 검사 삭제, 샘플의 `runtime_contract_version` 검사 삭제(매니페스트 검사는 유지), `pipeline_schema_version` MAJOR 2.
+- 품질 검사기: 스키마 검사만 남김(`check_lora_a_sample`, `check_lora_b_sample`). v1 의미 검사 삭제(v2 의미 검사는 미정).
+- 시드: `FailureCase.expected_kind` `LORA_A`/`LORA_B`, 입력은 `reviewed_input`만 사용(trace 키 미정). v1 노이즈 변형 없음.
+- 샘플 ID 접두어 `as-`/`rs-`, 파일 경로 `lora_a/`, `lora_b/`.
+- **알려진 한계(미정)**: 시나리오·정답 구성·발화/응답 생성기는 여전히 v1 내용을 만들어 합성 샘플은 모두 품질 검사에서 빠진다(보고서 `notes`에 남음). 생성기 이전은 영역 역할 결정 뒤.
+- requirements.lock을 boundary-contracts v2.0.0 태그로. 시험 85건 통과, 15건 보류(생성기 v2 대기).
+
 ## 0.1.2 (2026-10-15)
 - boundary-contracts v1.2.0, I1·I7을 HTTP 클라이언트로 연결(`synthetic_data.adapters`, base URL + 토큰 환경 변수 이름), 참조 서버 통합 시험.
 - 경계 호출 실패를 report.json의 `error`로 남김. 시드의 모르는 필드·열거값은 `notes`로 남기고 받아들임.
