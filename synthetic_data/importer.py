@@ -1,0 +1,356 @@
+"""게시기(import) 모드: 데이터셋 담당이 학습 서버에서 만든 최종 학습 데이터를 '그대로 가져와' 검증하고 게시한다(재생성 없음).
+
+입력 디렉터리에 lora_{a,b}_{train,val,test}.jsonl 6개가 있어야 한다. 각 행의 형태는 **추정**이다(boundary-contracts V2_DRAFT가 학습 서버에서
+읽은 형태로 적은 것이며, 이 리포는 실제 파일을 받은 적이 없다):
+  {"messages":[{"role":"system",..},{"role":"user","content":<입력 JSON 문자열>},{"role":"assistant","content":<A는 출력 JSON 문자열, B는 응답 문장>}],
+   "scenario_id":..., "split":..., "human_review":...}
+형식이 다르면 그 행은 사유(record_*)와 함께 집계되고, 허용치를 넘으면 게시하지 않는다.
+
+흐름: 읽기 -> 행 단위 검증(boundary-contracts v2 스키마) -> 건수·사유 집계 -> 허용치 판정 -> (통과 시) 샘플 JSONL로 쓰고 DatasetManifest 게시.
+같은 입력(파일 바이트)과 같은 설정이면 같은 dataset_digest와 같은 version이 나오고, 이미 게시돼 있으면 ALREADY_PUBLISHED다(멱등)."""
+from __future__ import annotations
+
+import json
+import tempfile
+from collections import Counter
+from dataclasses import dataclass, field
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Callable, Optional
+
+from boundary_contracts import canonical
+from boundary_contracts.errors import BoundaryError
+
+from . import PIPELINE_SCHEMA_VERSION, __version__
+from .config import ConfigError, _ID_RE
+from .package import EXT, dumps_line
+from .schemas import Validators
+from .store import FileDatasetStore, MemoryDatasetStore
+from .store.base import DatasetStoreBase
+
+SPLIT_OF_FILE = {"train": "TRAIN", "val": "VALIDATION", "test": "EVAL"}
+ROLES = (("a", "LORA_A"), ("b", "LORA_B"))
+INPUT_FILES = [(f"lora_{r}_{s}.jsonl", role, split) for r, role in ROLES for s, split in SPLIT_OF_FILE.items()]
+_IN_SCHEMA = {"LORA_A": "ActionExtractionInput", "LORA_B": "ResponseRequest"}
+_OUT_SCHEMA = {"LORA_A": "ActionExtraction", "LORA_B": "ResponseText"}
+_SAMPLE_SCHEMA = {"LORA_A": "ActionExtractionSample", "LORA_B": "ResponseSample"}
+_ROLE_DIR = {"LORA_A": "lora_a", "LORA_B": "lora_b"}
+_ID_PREFIX = {"LORA_A": "as", "LORA_B": "rs"}
+_SPLIT_FILE = {"TRAIN": "train", "VALIDATION": "validation", "EVAL": "eval"}
+IMPORT_GENERATOR_PREFIX = "external-import"
+
+
+class InputError(ConfigError):
+    """입력 디렉터리나 파일 문제(종료 코드 2)."""
+
+
+@dataclass
+class ImportConfig:
+    dataset_id: str
+    input_dir: Path
+    survey_schema_dir: Path
+    question_sets: list            # ArtifactRef 목록. 외부 데이터에는 문항 세트 출처가 없어 설정으로 받는다(CR-006)
+    source_label: str              # 데이터 출처 표시(예: 데이터셋 담당이 정한 버전 이름). generator_version에 들어간다
+    turn_engine_version: str
+    max_invalid_rows: int
+    max_invalid_rate: float
+    version: Optional[str]
+    created_at: Optional[str]
+    work_dir: Path
+    store_kind: str
+    store_root: Optional[Path]
+
+
+def parse_import_config(raw: dict, base_dir: Path) -> ImportConfig:
+    def path(s):
+        p = Path(s)
+        return p if p.is_absolute() else (base_dir / p).resolve()
+
+    def req(d, k, where=""):
+        if k not in d:
+            raise ConfigError(f"설정에 {where}{k}이(가) 필요하다")
+        return d[k]
+
+    did = req(raw, "dataset_id")
+    if not isinstance(did, str) or not _ID_RE.match(did) or len(did) > 128:
+        raise ConfigError("dataset_id 형식이 맞지 않는다")
+    qs = req(raw, "question_sets")
+    if not isinstance(qs, list) or not qs:
+        raise ConfigError("question_sets는 ArtifactRef({id, version, content_hash}) 1개 이상의 목록이어야 한다 (CR-006)")
+    for r in qs:
+        if not isinstance(r, dict) or set(r) != {"id", "version", "content_hash"}:
+            raise ConfigError("question_sets[]는 id, version, content_hash 세 키만 가진 객체여야 한다")
+    label = req(raw, "source_label")
+    if not isinstance(label, str) or not label.strip():
+        raise ConfigError("source_label은 비어 있지 않은 문자열이어야 한다")
+    tol = req(raw, "tolerance")
+    mr, mx = req(tol, "max_invalid_rows", "tolerance."), req(tol, "max_invalid_rate", "tolerance.")
+    if not isinstance(mr, int) or isinstance(mr, bool) or mr < 0:
+        raise ConfigError("tolerance.max_invalid_rows는 0 이상의 정수")
+    if not isinstance(mx, (int, float)) or isinstance(mx, bool) or not 0 <= mx <= 1:
+        raise ConfigError("tolerance.max_invalid_rate는 0 이상 1 이하의 수")
+    out = req(raw, "output")
+    store = req(out, "store", "output.")
+    kind = req(store, "kind", "output.store.")
+    if kind not in ("file", "memory"):
+        raise ConfigError("output.store.kind는 file 또는 memory")
+    if kind == "file" and "root" not in store:
+        raise ConfigError("file 저장소에는 output.store.root가 필요하다")
+    return ImportConfig(
+        dataset_id=did, input_dir=path(req(raw, "input_dir")), survey_schema_dir=path(req(raw, "survey_schema_dir")),
+        question_sets=qs, source_label=label.strip(), turn_engine_version=str(req(raw, "turn_engine_version")),
+        max_invalid_rows=mr, max_invalid_rate=float(mx), version=raw.get("version"), created_at=raw.get("created_at"),
+        work_dir=path(req(out, "work_dir", "output.")), store_kind=kind,
+        store_root=path(store["root"]) if "root" in store else None)
+
+
+def load_import_config(config_path: Path) -> ImportConfig:
+    p = Path(config_path).resolve()
+    try:
+        raw = json.loads(p.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as e:
+        raise ConfigError(f"설정 파일을 읽을 수 없다: {p}: {e}") from e
+    if not isinstance(raw, dict):
+        raise ConfigError("설정 파일의 최상위는 객체여야 한다")
+    return parse_import_config(raw, p.parent)
+
+
+@dataclass
+class ImportResult:
+    status: str                      # PUBLISHED | ALREADY_PUBLISHED | REJECTED
+    dataset_id: str
+    version: Optional[str] = None
+    content_hash: Optional[str] = None
+    dataset_digest: Optional[str] = None
+    counts: dict = field(default_factory=dict)
+    rejected_reasons: list = field(default_factory=list)
+    report_path: Optional[str] = None
+
+
+def validate_row(raw: bytes, role: str, split: str, lineno: int, v: Validators) -> tuple[Optional[dict], list[str]]:
+    """한 행을 검증한다. (샘플 레코드 또는 None, 사유 목록). 사유는 '<단계>:<위치와 메시지>' 형태이고 행 내용은 담지 않는다."""
+    if not raw.strip():
+        return None, ["record_blank: 빈 줄"]
+    try:
+        row = json.loads(raw.decode("utf-8"))
+    except UnicodeDecodeError:
+        return None, ["record_encoding: UTF-8이 아니다"]
+    except json.JSONDecodeError as e:
+        return None, [f"record_json: JSON이 아니다({e.msg})"]
+    if not isinstance(row, dict):
+        return None, ["record_shape: 행이 객체가 아니다"]
+    msgs = row.get("messages")
+    if (not isinstance(msgs, list) or len(msgs) != 3 or not all(isinstance(m, dict) for m in msgs)
+            or [m.get("role") for m in msgs] != ["system", "user", "assistant"]
+            or not all(isinstance(m.get("content"), str) for m in msgs)):
+        return None, ["record_shape: messages가 [system,user,assistant] 각각 문자열 content를 가진 3개가 아니다"]
+    reasons: list[str] = []
+    try:
+        user = json.loads(msgs[1]["content"])
+    except json.JSONDecodeError:
+        user = None
+        reasons.append("record_user_json: user 내용이 JSON이 아니다")
+    if role == "LORA_A":
+        try:
+            out = json.loads(msgs[2]["content"])
+        except json.JSONDecodeError:
+            out = None
+            reasons.append("record_assistant_json: LoRA-A assistant 내용이 JSON이 아니다")
+    else:
+        out = msgs[2]["content"]
+    if user is not None:
+        reasons += [f"input_schema: {m}" for m in _short_list(v, _IN_SCHEMA[role], user)]
+    if out is not None:
+        reasons += [f"output_schema: {m}" for m in _short_list(v, _OUT_SCHEMA[role], out)]
+    sid = row.get("scenario_id")
+    if not isinstance(sid, str):
+        reasons.append("row_scenario_id: scenario_id가 문자열이 아니다")
+    if reasons:
+        return None, reasons
+    rec = {"pipeline_schema_version": PIPELINE_SCHEMA_VERSION, "sample_id": f"{_ID_PREFIX[role]}-{_SPLIT_FILE[split]}-{lineno:06d}",
+           "scenario_id": sid, "split": split, "origin": "SYNTHETIC", "input": user, "expected": out}
+    if "human_review" in row:
+        rec["human_review"] = row["human_review"]
+    errs = v.check_boundary(_SAMPLE_SCHEMA[role], rec)
+    if errs:
+        return None, [f"sample_schema: {e[:120]}" for e in errs[:3]]
+    return rec, []
+
+
+def _short_list(v: Validators, name: str, inst) -> list[str]:
+    return [e[:120] for e in v.check_boundary(name, inst)[:3]]
+
+
+def _read_input(cfg: ImportConfig) -> dict:
+    d = cfg.input_dir
+    if not d.is_dir():
+        raise InputError(f"입력 디렉터리가 없다: {d}")
+    blobs, missing = {}, []
+    for name, _, _ in INPUT_FILES:
+        p = d / name
+        if not p.is_file():
+            missing.append(name)
+            continue
+        try:
+            blobs[name] = p.read_bytes()
+        except OSError as e:
+            raise InputError(f"입력 파일을 읽을 수 없다: {p}: {e}") from e
+    if missing:
+        raise InputError(f"입력 파일이 없다: {', '.join(missing)} (필요: {', '.join(n for n, _, _ in INPUT_FILES)})")
+    return blobs
+
+
+def run_import(cfg: ImportConfig, *, store: DatasetStoreBase, validators: Optional[Validators] = None,
+               clock: Optional[Callable[[], str]] = None) -> ImportResult:
+    cfg.work_dir.mkdir(parents=True, exist_ok=True)
+    report: dict = {"job_version": __version__, "mode": "import", "dataset_id": cfg.dataset_id, "notes": [],
+                    "format_assumption": "행 형식은 추정(V2_DRAFT 기록)이다. 실제 파일로 확인한 적 없음",
+                    "tolerance": {"max_invalid_rows": cfg.max_invalid_rows, "max_invalid_rate": cfg.max_invalid_rate}}
+    try:
+        return _run_import(cfg, store, validators, clock, report)
+    except BoundaryError as e:
+        report["error"] = e.to_record()
+        _write(cfg, report)
+        raise
+
+
+def _run_import(cfg, store, validators, clock, report) -> ImportResult:
+    v = validators or Validators(cfg.survey_schema_dir)
+    contract = v.runtime_contract_version
+    blobs = _read_input(cfg)
+    hashes = {n: canonical.file_hash(cfg.input_dir / n) for n in blobs}
+
+    inputs, reasons_by_file, first_at = {}, {}, {}
+    valid: dict[str, list] = {}
+    total = bad = 0
+    row_splits: dict[str, Counter] = {}
+    for name, role, split in INPUT_FILES:
+        data = blobs[name]
+        lines = data.split(b"\n")
+        if lines and lines[-1] == b"":
+            lines.pop()
+        recs, reasons = [], Counter()
+        for i, raw in enumerate(lines, 1):
+            rec, why = validate_row(raw.rstrip(b"\r"), role, split, i, v)
+            if rec is None:
+                for w in why:
+                    reasons[w] += 1
+                    first_at.setdefault((name, w), i)
+            else:
+                recs.append(rec)
+        row_splits[name] = Counter(r.get("split") for r in _peek_splits(lines))
+        inputs[name] = {"sha256": hashes[name],
+                        "rows": len(lines), "valid": len(recs), "invalid": len(lines) - len(recs)}
+        reasons_by_file[name] = dict(sorted(reasons.items()))
+        valid[name] = recs
+        total += len(lines)
+        bad += len(lines) - len(recs)
+    report["inputs"] = inputs
+    report["total_rows"], report["valid_rows"], report["invalid_rows"] = total, total - bad, bad
+    report["invalid_reasons_by_file"] = reasons_by_file
+    # 같은 사유가 여러 파일에 있으면 합산한다(위 딕셔너리 합성은 마지막 값만 남으므로 다시 센다)
+    agg = Counter()
+    for rs in reasons_by_file.values():
+        agg.update(rs)
+    report["invalid_reasons_total"] = dict(sorted(agg.items()))
+    report["first_invalid_line"] = {f"{k[0]} | {k[1]}": ln for k, ln in sorted(first_at.items())}
+    report["row_split_field_values"] = {k: dict(sorted((str(a), b) for a, b in c.items())) for k, c in row_splits.items()}
+
+    rejected = []
+    if total == 0:
+        rejected.append("입력이 비어 있다(총 0행)")
+    rate = (bad / total) if total else 1.0
+    if bad > cfg.max_invalid_rows:
+        rejected.append(f"검증 실패 행 {bad}건이 허용 건수 {cfg.max_invalid_rows}를 넘는다")
+    if rate > cfg.max_invalid_rate:
+        rejected.append(f"검증 실패율 {bad}/{total}={rate:.6f}이 허용 비율 {cfg.max_invalid_rate}를 넘는다")
+    for name, recs in valid.items():
+        if not recs:
+            rejected.append(f"{name}: 통과한 행이 0건이다")
+    if not rejected:
+        sc: dict[str, set] = {"TRAIN": set(), "VALIDATION": set(), "EVAL": set()}
+        for name, role, split in INPUT_FILES:
+            sc[split].update(r["scenario_id"] for r in valid[name])
+        for a, b in (("EVAL", "TRAIN"), ("EVAL", "VALIDATION"), ("TRAIN", "VALIDATION")):
+            both = sc[a] & sc[b]
+            if both:
+                rejected.append(f"같은 scenario_id가 {a}와 {b}에 걸친다({len(both)}건, 예: {sorted(both)[:3]})")
+    counts = {"rows_total": total, "rows_valid": total - bad, "rows_invalid": bad}
+    for name, _, _ in INPUT_FILES:
+        counts[f"{name}.valid"] = inputs[name]["valid"]
+    if rejected:
+        report["result"] = {"status": "REJECTED", "reasons": rejected}
+        res = ImportResult("REJECTED", cfg.dataset_id, counts=counts, rejected_reasons=rejected)
+        res.report_path = _write(cfg, report)
+        return res
+
+    created_at = cfg.created_at or (clock() if clock else datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"))
+    with tempfile.TemporaryDirectory(prefix="dsimport-", dir=cfg.work_dir) as td:
+        staging = Path(td) / "files"
+        entries, files = [], {}
+        for name, role, split in INPUT_FILES:
+            rel = f"{_ROLE_DIR[role]}/{_SPLIT_FILE[split]}.jsonl"
+            p = staging / rel
+            p.parent.mkdir(parents=True, exist_ok=True)
+            with open(p, "w", encoding="utf-8", newline="\n") as fh:
+                for r in valid[name]:
+                    fh.write(dumps_line(r))
+            entries.append({"path": rel, "role": role, "split": split, "sample_count": len(valid[name]),
+                            "content_hash": canonical.file_hash(p)})
+            files[rel] = p
+        entries.sort(key=lambda e: e["path"])
+        qsets = sorted(cfg.question_sets, key=lambda r: (r["id"], r["version"], r["content_hash"]))
+        gv = f"{IMPORT_GENERATOR_PREFIX}:{cfg.source_label}@importer-{__version__}"
+        digest = canonical.sha256_hash({
+            "inputs": {k: inputs[k]["sha256"] for k in sorted(inputs)},
+            "files": [[e["path"], e["content_hash"]] for e in entries], "question_sets": qsets,
+            "runtime_contract_version": contract, "generator_version": gv, "turn_engine_version": cfg.turn_engine_version})
+        manifest = {
+            "pipeline_schema_version": PIPELINE_SCHEMA_VERSION, "dataset_id": cfg.dataset_id,
+            "version": cfg.version or ("v" + digest[7:19]), "created_at": created_at, "runtime_contract_version": contract,
+            "question_sets": qsets, "generator_version": gv, "seed_case_ids": [], "turn_engine_version": cfg.turn_engine_version,
+            "scenario_disjoint_across_splits": True, "files": entries,
+            "ext": {EXT: {"dataset_digest": digest, "import": {
+                "inputs": inputs, "rows_total": total, "rows_valid": total - bad, "rows_invalid": bad,
+                "invalid_reasons": report["invalid_reasons_total"],
+                "tolerance": report["tolerance"]}}}}
+        manifest["content_hash"] = canonical.content_hash(manifest)
+        res = ImportResult("PUBLISHED", cfg.dataset_id, manifest["version"], None, digest, counts)
+        if cfg.version is None:
+            try:
+                ex = store.get_manifest(cfg.dataset_id, manifest["version"])
+                if ex.get("ext", {}).get(EXT, {}).get("dataset_digest") == digest:
+                    res.status, res.content_hash = "ALREADY_PUBLISHED", ex["content_hash"]
+            except BoundaryError as e:
+                if e.code != "NOT_FOUND":
+                    raise
+        if res.status == "PUBLISHED":
+            res.content_hash = store.publish(manifest, files)["content_hash"]
+    report["dataset_digest"] = digest
+    report["result"] = {"status": res.status, "version": res.version, "content_hash": res.content_hash}
+    res.report_path = _write(cfg, report)
+    return res
+
+
+def _peek_splits(lines):
+    for raw in lines:
+        try:
+            r = json.loads(raw)
+            yield {"split": r.get("split")} if isinstance(r, dict) else {"split": None}
+        except (ValueError, UnicodeDecodeError):
+            yield {"split": None}
+
+
+def _write(cfg: ImportConfig, report: dict) -> str:
+    p = cfg.work_dir / "import_report.json"
+    p.write_text(json.dumps(report, ensure_ascii=False, sort_keys=True, indent=2) + "\n", encoding="utf-8")
+    return str(p)
+
+
+def import_from_config(config_path: Path, *, created_at: Optional[str] = None) -> ImportResult:
+    cfg = load_import_config(config_path)
+    if created_at:
+        cfg.created_at = created_at
+    v = Validators(cfg.survey_schema_dir)
+    store = FileDatasetStore(cfg.store_root, v) if cfg.store_kind == "file" else MemoryDatasetStore(v)
+    return run_import(cfg, store=store, validators=v)
