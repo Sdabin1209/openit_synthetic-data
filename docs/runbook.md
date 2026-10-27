@@ -11,6 +11,17 @@
 
 이 영역은 GPU 호스트에서 돌 가능성이 높고, I2 DatasetStore는 같은 호스트의 파일 저장소다(잡은 CPU만 쓴다). (1) 코드 전송: `rsync -a --exclude .venv --exclude work --exclude '.git' ./ <호스트>:<경로>/synthetic-data/` 후 호스트에서 `python3 -m venv .venv && . .venv/bin/activate && pip install -r requirements.lock`. (2) 설정의 `output.store`를 `{"kind":"file","root":"<데이터셋 루트>"}`로 두고 `output.work_dir`는 임시 경로로 둔다. 이웃 읽기는 `adapters.*.factory`를 `synthetic_data.adapters:http_question_reader`/`http_failure_store`, `kwargs`를 `{"base_url": "...", "token_env": "<토큰 환경 변수 이름>"}`로 하고 토큰은 실행 셸의 환경 변수로만 준다(파일과 리포지토리에 넣지 않는다). (3) 데이터셋은 `<데이터셋 루트>/<dataset_id>/<version>/{manifest.json, files/...}`에 생긴다. model-lab은 같은 호스트에서 `FileDatasetStore(<같은 루트>, Validators())`의 `get_manifest`/`open_file`로 같은 경로를 읽는다(읽기만 하면 문진 스키마 경로는 필요 없다). 게시는 임시 디렉터리 후 rename이라 읽는 쪽이 반쯤 쓴 버전을 보지 않는다.
 
+## 게시기(import) 실행 (G02 방향)
+
+```bash
+python -m synthetic_data import --config configs/import.example.json [--created-at 2026-10-27T00:00:00Z]
+```
+- 입력 디렉터리(`input_dir`)에 `lora_{a,b}_{train,val,test}.jsonl` 6개를 둔다. 파일을 가져오는 일은 이 영역 밖이다(학습 서버에는 접속하지 않는다).
+- 출력은 JSON 한 줄(`status`: PUBLISHED / ALREADY_PUBLISHED / REJECTED). 종료 코드 0, 2(설정·입력 파일 없음), 3·75(경계 오류), 4(허용치 초과 등으로 게시 안 함).
+- 결과 확인: `<work_dir>/import_report.json`(`invalid_reasons_by_file`, `inputs`의 sha256·건수). 예시 설정의 문항 세트 해시는 자리 표시이므로 실제 값으로 바꿔야 한다.
+- REJECTED면 보고서의 사유를 데이터셋 담당에게 넘긴다. 이 영역이 데이터를 고치지 않는다.
+- 실제 데이터로 돌린 적 없음. 형식은 추정(docs/design.md 부록 A).
+
 ## 이웃 호출 오류가 보고서에 남는 방식
 
 I1·I7 클라이언트는 읽기 모드다. 같은 MAJOR의 모르는 필드와 모르는 열거값은 받아들인다(시드의 모르는 필드·`expected_kind`는 `report.json`의 `notes`에 남고, 열거값은 expected 형태로 판별). 그 밖은 잡을 중단하고 `report.json`의 `error`(BoundaryError 레코드)를 남긴 뒤 종료 코드로 끝난다: MAJOR 불일치 `UNSUPPORTED_VERSION`(3), 형식·해시 위반 `INTEGRITY_ERROR`(3), 토큰 `PERMISSION_DENIED`(3), 서버 불가·타임아웃 `UNAVAILABLE`(75, 스케줄러가 재시도). 중단 시 아무것도 게시하지 않는다. 토큰 환경 변수 누락은 설정 오류(2).

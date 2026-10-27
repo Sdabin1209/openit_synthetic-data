@@ -1,5 +1,8 @@
 # 변경 이력
 
+## 0.3.0 (제안 버전, 미적용: pyproject는 올리지 않음)
+- 게시기(import) 모드 추가(`python -m synthetic_data import --config`, G02 방향). 외부 학습 데이터 jsonl 6개를 v2 스키마로 행 단위 검증하고 허용치 안에서 게시. 종료 코드 4 추가. 시험 `tests/test_import.py`(가짜 입력). 실제 데이터로는 시험하지 않음. CR-006.
+
 ## 0.2.2 (2026-10-27, boundary-contracts v2.0.2; 제안 버전)
 - D84: 이웃 호출 토큰을 `boundary_contracts.read_secret`으로 읽는다(`NAME_FILE` 경로 우선, 없으면 `NAME` 환경 변수). 환경 변수 평문 노출(`docker exec env`/`inspect`)을 없앤다. boundary-contracts 태그를 v2.0.2로. 비밀 값이 로그·보고서·산출물에 나오지 않는 시험 추가. 이 영역의 비밀은 이웃 호출 토큰 둘(I1 읽기, I7 실패 사례 저장소)뿐이다.
 

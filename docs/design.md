@@ -106,3 +106,20 @@ class ResponseGenerator(Protocol):   name; version; generate(plan: GeneratorPlan
 - 메모리 구현(`MemoryDatasetStore`): 같은 베이스 클래스(`store/base.py`)를 쓰므로 검증·오류·멱등성이 같다. 적합성 시험(`tests/test_store_conformance.py`)을 둘 다 통과한다.
 - 게시 검증 순서: 매니페스트 스키마 -> pipeline 버전 -> content_hash -> (이미 있으면 멱등/CONFLICT) -> 문진 스키마 정수 버전 -> files 키 일치 -> 파일 복사 후 해시 -> 줄마다 스키마·분할·문항 세트·시드 ID -> sample_count -> 분할 간 시나리오 분리. 어느 하나라도 실패하면 아무것도 저장되지 않는다.
 - 읽기: `get_manifest`는 content_hash를 다시 확인하고, `open_file`은 파일 해시를 다시 확인한다(`INTEGRITY_ERROR`).
+
+## 부록 A. 게시기(import) 모드 (G02 방향, 코드: `synthetic_data/importer.py`)
+
+사용자 결정: 데이터셋 담당이 서버에서 만든 최종 학습 데이터를 재생성 없이 가져와 검증하고 게시한다. 정본은 데이터셋 담당의 파이프라인이다. 아래 1~12절의 생성 파이프라인(v1 내용)은 이 모드와 무관하며 쓰지 않는다.
+
+**확인한 것(시험으로)**: 이 리포가 직접 만든 가짜 행으로 아래 동작이 돈다(`tests/test_import.py`).
+**확인하지 못한 것**: 실제 데이터 파일로 게시한 적이 없다. 행 형식은 **추정**이다. 근거는 `../boundary-contracts/V2_DRAFT.md`가 학습 서버 파일을 읽고 적은 기록(`{human_review, messages[system,user,assistant], scenario_id, split}`, user는 입력 JSON 문자열, assistant는 A는 출력 JSON 문자열/B는 응답 문장)뿐이며, 이 영역은 그 파일을 본 적이 없다. 실제 형식이 다르면 해당 행이 `record_*` 사유로 집계되고 허용치를 넘으면 게시되지 않는다.
+
+흐름: 입력 디렉터리에서 `lora_{a,b}_{train,val,test}.jsonl` 6개를 읽는다(하나라도 없으면 종료 코드 2, 어느 파일인지 적음; train→TRAIN, val→VALIDATION, test→EVAL) -> 파일 바이트의 sha256 -> 행 검증 -> 건수·사유 집계 -> 허용치 판정 -> 통과 행만 `lora_a|b/{train,validation,eval}.jsonl`(샘플 스키마)로 쓰고 DatasetManifest 게시.
+
+행 검증: JSON/구조(`record_blank`, `record_encoding`, `record_json`, `record_shape`, `record_user_json`, `record_assistant_json`) -> user를 `ActionExtractionInput`/`ResponseRequest`, assistant를 `ActionExtraction`/`ResponseText`로(`input_schema`, `output_schema`) -> 샘플로 조립해 `ActionExtractionSample`/`ResponseSample`로(`sample_schema`). `sample_id`는 `as|rs-<분할>-<줄 번호>`(입력이 같으면 같음). `human_review`는 값 그대로 싣는다. 행의 `split` 값 형식을 모르므로 파일 이름으로 분할을 정하고 행의 값은 집계만 한다(`row_split_field_values`).
+
+허용치: 설정 `tolerance.max_invalid_rows`와 `max_invalid_rate`를 둘 다 지켜야 한다(예시 값 0 = 하나라도 틀리면 게시 안 함). 그 밖에 총 0행, 통과 행이 0건인 파일, 분할 사이 `scenario_id` 겹침도 게시 안 함. 게시하지 않으면 상태 `REJECTED`, 종료 코드 4, 보고서 `import_report.json`에 파일별·사유별 건수와 사유별 첫 줄 번호를 남긴다. 행 내용은 보고서에 넣지 않는다. 허용치 안에서 게시해도 버린 건수와 사유는 매니페스트 `ext["synthetic-data"].import`에 남는다.
+
+멱등: 같은 입력 바이트와 설정이면 같은 `dataset_digest`와 `version`이고 이미 있으면 `ALREADY_PUBLISHED`(`created_at`을 고정하면 content_hash도 같음).
+
+미정/한계: 의미 검사 미수행, 문항 세트 출처 설정 의존, `pending` 행 처리 정책 -> `change-requests/CR-006-import-external-dataset.md`.

@@ -4,7 +4,12 @@
 
 **버전 표기(사실)**: `pyproject.toml`의 version은 0.2.0이고, `docs/CHANGELOG.md`는 0.2.1과 0.2.2를 '제안 버전'으로 적었다. pyproject는 올리지 않았으므로 두 값이 어긋난다. 어느 쪽이 맞는지는 헤드 결정 사항이며 이 문서에서 정하지 않는다.
 
-**시험 개수(2026-10-27 `pytest --collect-only -q`로 확인)**: 수집 104건. 이 중 `@needs_generator_v2`(skip 표시)가 15건(tests/test_job.py 8, tests/test_units.py 7)이라 실행 대상은 104-15=89건이다. 아래 '85건 통과, 15건 보류'는 0.2.0 시점 수치이고, 그 뒤 D84 커밋(b1edd31)이 시험 4건(tests/test_http_integration.py)을 더해 85+4=89로 맞는다. 89건이 지금 실제로 통과하는지는 이번에 시험을 돌리지 않아 **미확인**이다.
+**시험 개수(게시기 추가 전 기록)**: 수집 104건. 이 중 `@needs_generator_v2`(skip 표시)가 15건(tests/test_job.py 8, tests/test_units.py 7)이라 실행 대상은 104-15=89건이다. 아래 '85건 통과, 15건 보류'는 0.2.0 시점 수치이고, 그 뒤 D84 커밋(b1edd31)이 시험 4건(tests/test_http_integration.py)을 더해 85+4=89로 맞는다. 89건이 지금 실제로 통과하는지는 이번에 시험을 돌리지 않아 **미확인**이다.
+
+## G02 방향 반영: 게시기(import) 모드 (2026-10-27)
+- 한 일: 사용자 결정(데이터셋 담당의 최종 학습 데이터를 그대로 가져와 검증 후 게시, 재생성 없음)에 따라 `synthetic_data/importer.py`, CLI `import`, `configs/import.example.json`, `tests/test_import.py`(가짜 입력 17건) 추가. 설계는 docs/design.md 부록 A. `pytest -q` 결과 106 passed, 15 skipped.
+- 재사용: 검증기(`schemas.Validators`), 해시(`boundary_contracts.canonical`), 패키징 직렬화(`dumps_line`), I2 `publish`와 멱등 규칙, run-once/종료 코드/보고서 틀, 설정 파싱 방식. 버리는 것(import에서 안 씀): 시나리오 설계, 발화/응답 생성기, 노이즈, 정답 구성, 시드 수집, 중복 제거, 분할(`scenario.py`, `generators/`, `noise.py`, `labeler.py`, `plans.py`, `directives.py`, `seeds.py`, `split.py`, `pipeline.py`, `job.py`). 보류 시험 15건과 이 코드의 최종 처분(삭제 여부)은 헤드 결정.
+- 막힌 것/안 한 것: 실제 파일로 게시한 적 없음(행 형식은 계약 리포 V2_DRAFT의 기록에서 추정). v2 의미 검사 없음. 문항 세트 출처·`pending` 행 정책은 CR-006. Dockerfile 스모크는 해당 없음(서비스 아님, 승인된 사항).
 
 ## 2.0.0 이전 (D74, D75)
 - 한 일: I2 DatasetStore, 품질 검사기, 시드 수집, 패키저를 v2 샘플(`ActionExtractionSample`/`ResponseSample`, 역할 `LORA_A`/`LORA_B`)로. requirements.lock v2.0.0(당시). 시험 85건 통과, 15건 보류(당시 수치. 현재는 위 시험 개수 참고).
