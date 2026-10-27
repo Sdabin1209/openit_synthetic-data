@@ -67,7 +67,7 @@ PYTHONPATH=tests python -m synthetic_data run --config configs/dev.job.json [--c
 ## 4. 현재 상태
 
 확인된 것(근거 문서의 진술이며 이번에 시험을 다시 돌려 확인하지는 않았음):
-- v2 이전(D74/D75) 후 시험 85건 통과, 15건 보류(생성기 v2 대기, `tests/conftest.py`의 `needs_generator_v2`) (docs/STATUS.md, CHANGELOG 0.2.0).
+- v2 이전(D74/D75) 시점에 시험 85건 통과, 15건 보류(생성기 v2 대기, `tests/conftest.py`의 `needs_generator_v2`)였다(CHANGELOG 0.2.0). 현재 수집은 104건, 그중 skip 15건이고 D84가 시험 4건을 더해 실행 대상은 89건이다(수집·표시 개수는 확인, 통과 여부는 미확인). 버전은 pyproject 0.2.0, CHANGELOG는 0.2.2(제안)로 어긋나 있다(docs/STATUS.md).
 - I2 파일·메모리 구현이 같은 적합성 시험을 통과, 같은 입력과 시드는 같은 `dataset_digest`(docs/STATUS.md).
 - D84(NAME_FILE)와 boundary-contracts v2.0.2 반영, 비밀이 산출물에 안 나오는 시험 추가(CHANGELOG 0.2.2, 제안 버전).
 - 변경 요청 CR-001~005는 헤드가 결정(docs/STATUS.md).

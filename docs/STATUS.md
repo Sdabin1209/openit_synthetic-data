@@ -1,9 +1,13 @@
 # STATUS (synthetic-data)
 
-마지막 갱신: 2026-10-27, boundary-contracts v2.0.1로 태그 갱신(2.0.0 이전은 브랜치 migrate-contracts-2.0.0, push 전).
+마지막 갱신: 2026-10-27. 현재 의존은 boundary-contracts v2.0.2(requirements.lock, 커밋 b1edd31, D84). 2.0.0 이전은 브랜치 migrate-contracts-2.0.0, push 전.
+
+**버전 표기(사실)**: `pyproject.toml`의 version은 0.2.0이고, `docs/CHANGELOG.md`는 0.2.1과 0.2.2를 '제안 버전'으로 적었다. pyproject는 올리지 않았으므로 두 값이 어긋난다. 어느 쪽이 맞는지는 헤드 결정 사항이며 이 문서에서 정하지 않는다.
+
+**시험 개수(2026-10-27 `pytest --collect-only -q`로 확인)**: 수집 104건. 이 중 `@needs_generator_v2`(skip 표시)가 15건(tests/test_job.py 8, tests/test_units.py 7)이라 실행 대상은 104-15=89건이다. 아래 '85건 통과, 15건 보류'는 0.2.0 시점 수치이고, 그 뒤 D84 커밋(b1edd31)이 시험 4건(tests/test_http_integration.py)을 더해 85+4=89로 맞는다. 89건이 지금 실제로 통과하는지는 이번에 시험을 돌리지 않아 **미확인**이다.
 
 ## 2.0.0 이전 (D74, D75)
-- 한 일: I2 DatasetStore, 품질 검사기, 시드 수집, 패키저를 v2 샘플(`ActionExtractionSample`/`ResponseSample`, 역할 `LORA_A`/`LORA_B`)로. requirements.lock v2.0.0. 시험 85건 통과, 15건 보류.
+- 한 일: I2 DatasetStore, 품질 검사기, 시드 수집, 패키저를 v2 샘플(`ActionExtractionSample`/`ResponseSample`, 역할 `LORA_A`/`LORA_B`)로. requirements.lock v2.0.0(당시). 시험 85건 통과, 15건 보류(당시 수치. 현재는 위 시험 개수 참고).
 - **막힌 것/미정**: 생성 파이프라인(scenario, labeler, generators, noise, plans, directives)은 v1 내용(ParserOutput 항목, Directive)을 만든다. 합성 샘플은 모두 v2 스키마에서 빠지고 시드 샘플만 데이터셋에 남는다(report.json notes에 기록). 지시서는 이 영역의 역할(데이터 생성은 학습 서버 파이프라인이 이미 함)을 사용자가 정할 일이라 했으므로 생성기를 v2로 다시 쓰지 않았다.
 - 보류한 시험 15건은 `tests/conftest.py`의 `needs_generator_v2` 표시(사유 포함). 생성기를 옮기거나 영역 역할이 바뀔 때 되살리거나 지운다.
 - v2 의미 검사(targets, next_item, 건너뛰기 순서, save)는 turn-engine `validate_extraction`이 나온 뒤 연결(미정).
