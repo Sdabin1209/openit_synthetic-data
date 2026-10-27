@@ -1,6 +1,6 @@
 # STATUS (synthetic-data)
 
-마지막 갱신: 2026-10-27, boundary-contracts v2.0.0 이전(브랜치 migrate-contracts-2.0.0, push 전).
+마지막 갱신: 2026-10-27, boundary-contracts v2.0.1로 태그 갱신(2.0.0 이전은 브랜치 migrate-contracts-2.0.0, push 전).
 
 ## 2.0.0 이전 (D74, D75)
 - 한 일: I2 DatasetStore, 품질 검사기, 시드 수집, 패키저를 v2 샘플(`ActionExtractionSample`/`ResponseSample`, 역할 `LORA_A`/`LORA_B`)로. requirements.lock v2.0.0. 시험 85건 통과, 15건 보류.
