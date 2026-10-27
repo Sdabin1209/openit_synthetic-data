@@ -1,4 +1,4 @@
-"""설정의 adapters.*.factory가 가리키는 HTTP 어댑터 공장(진입점). 토큰은 환경 변수 이름으로 받아 여기서만 읽는다.
+"""설정의 adapters.*.factory가 가리키는 HTTP 어댑터 공장(진입점). 토큰은 비밀 이름(token_env)으로 받아 read_secret으로 여기서만 읽는다(NAME_FILE 경로 우선, 없으면 NAME 환경 변수).
 
 설정 예: {"factory": "synthetic_data.adapters:http_question_reader",
           "kwargs": {"base_url": "http://question-authoring:8080", "token_env": "QUESTION_READER_TOKEN", "timeout": 10}}
@@ -6,17 +6,19 @@
 INTEGRITY_ERROR로 올라온다(잡이 report.json의 error에 남기고 종료 코드 3 또는 75로 끝난다)."""
 from __future__ import annotations
 
-import os
-
+from boundary_contracts import SecretError, read_secret
 from boundary_contracts.clients import HttpFailureStore, HttpQuestionReader
 
 from .config import ConfigError
 
 
 def _token(token_env: str) -> str:
-    tok = os.environ.get(token_env)
+    try:
+        tok = read_secret(token_env)
+    except SecretError as e:
+        raise ConfigError(str(e)) from None  # 메시지에 값은 없다(이름·경로만)
     if not tok:
-        raise ConfigError(f"토큰 환경 변수 {token_env}이(가) 비어 있다")
+        raise ConfigError(f"토큰 {token_env}이(가) 없다: {token_env}_FILE(파일 경로) 또는 {token_env}(개발용)를 설정한다")
     return tok
 
 

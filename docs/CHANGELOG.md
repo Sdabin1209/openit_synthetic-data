@@ -1,5 +1,8 @@
 # 변경 이력
 
+## 0.2.2 (2026-10-27, boundary-contracts v2.0.2; 제안 버전)
+- D84: 이웃 호출 토큰을 `boundary_contracts.read_secret`으로 읽는다(`NAME_FILE` 경로 우선, 없으면 `NAME` 환경 변수). 환경 변수 평문 노출(`docker exec env`/`inspect`)을 없앤다. boundary-contracts 태그를 v2.0.2로. 비밀 값이 로그·보고서·산출물에 나오지 않는 시험 추가. 이 영역의 비밀은 이웃 호출 토큰 둘(I1 읽기, I7 실패 사례 저장소)뿐이다.
+
 ## 0.2.1 (2026-10-27, boundary-contracts v2.0.1; 제안 버전)
 - boundary-contracts 의존 태그를 v2.0.0에서 v2.0.1로(requirements.lock, runbook, boundary.md). v2.0.1은 ActionExtraction properties 순서만 사전순으로 바꾼 PATCH라 코드 변경 없음. model-runtime 의존은 없다.
 

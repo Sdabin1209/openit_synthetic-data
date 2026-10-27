@@ -19,7 +19,7 @@ I1·I7 클라이언트는 읽기 모드다. 같은 MAJOR의 모르는 필드와 
 
 ```bash
 python3 -m venv .venv && . .venv/bin/activate
-pip install -r requirements.lock pytest                 # 배포: boundary-contracts v2.0.1 태그 고정
+pip install -r requirements.lock pytest                 # 배포: boundary-contracts v2.0.2 태그 고정
 pip install -e ../boundary-contracts                    # 개발: 작업 트리 사용(위 설치 뒤에 덮어쓴다)
 ```
 (배포에서는 boundary-contracts를 Git 태그로 고정한다.)
@@ -65,3 +65,13 @@ PYTHONPATH=tests python -m synthetic_data run --config configs/dev.job.json [--c
 ## 컨테이너
 
 이 영역은 서비스가 없는 run-once 잡이라 Dockerfile 없이 `requirements.lock`으로 환경을 고정한다(헤드 승인, D22 (2)).
+
+## 비밀은 NAME_FILE로 (D84)
+
+이웃 호출 토큰은 환경 변수 값으로 넘기지 않는다(`docker exec env`·`inspect`에 평문이 보인다). 설정 어댑터의 `token_env`는 비밀 **이름**이고, `boundary_contracts.read_secret(NAME)`이 `NAME_FILE`(파일 경로, 컨테이너에서는 시크릿 마운트 `/run/secrets/...`)을 먼저 읽고, 없을 때만 `NAME` 환경 변수(개발용)를 쓴다.
+
+```bash
+QUESTION_READER_TOKEN_FILE=/run/secrets/question_reader_token   # 배포
+QUESTION_READER_TOKEN=...                                       # 개발만
+```
+파일을 못 읽거나 비어 있거나 둘 다 없으면 설정 오류(종료 코드 2)이며, 메시지에는 이름과 경로만 있고 값은 없다.

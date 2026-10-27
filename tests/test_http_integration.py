@@ -93,3 +93,49 @@ def test_wrong_token_is_permission_denied(tmp_path, monkeypatch):
     with make_server() as srv:
         assert main(["run", "--config", str(http_cfg(tmp_path, srv.url))]) == 3
     assert json.loads((tmp_path / "w" / "report.json").read_text())["error"]["code"] == "PERMISSION_DENIED"
+
+
+# --- D84: 비밀은 NAME_FILE로 읽고, 값이 어디에도 새지 않는다 ---
+
+def _tree_text(root):
+    return "\n".join(p.read_text(errors="ignore") for p in root.rglob("*") if p.is_file())
+
+
+def test_token_from_file_succeeds_and_never_leaks(tmp_path, monkeypatch, capsys):
+    f = tmp_path / "tok"
+    f.write_text(TOK + "\n")
+    monkeypatch.delenv("SYN_TEST_TOKEN", raising=False)
+    monkeypatch.setenv("SYN_TEST_TOKEN_FILE", str(f))
+    with make_server() as srv:
+        assert main(["run", "--config", str(http_cfg(tmp_path, srv.url))]) == 0
+    cap = capsys.readouterr()
+    assert TOK not in cap.out + cap.err
+    assert TOK not in _tree_text(tmp_path / "w") + _tree_text(tmp_path / "st")
+
+
+def test_file_takes_precedence_over_env(tmp_path, monkeypatch):
+    f = tmp_path / "tok"
+    f.write_text(TOK)
+    monkeypatch.setenv("SYN_TEST_TOKEN", "wrong")
+    monkeypatch.setenv("SYN_TEST_TOKEN_FILE", str(f))
+    with make_server() as srv:
+        assert main(["run", "--config", str(http_cfg(tmp_path, srv.url))]) == 0
+
+
+def test_unreadable_secret_file_is_config_error_without_value(tmp_path, monkeypatch, capsys):
+    monkeypatch.setenv("SYN_TEST_TOKEN", "SECRET-ENV-VALUE-123")      # 파일 지정이 우선이므로 쓰이지 않는다
+    monkeypatch.setenv("SYN_TEST_TOKEN_FILE", str(tmp_path / "missing"))
+    with make_server() as srv:
+        assert main(["run", "--config", str(http_cfg(tmp_path, srv.url))]) == 2
+    cap = capsys.readouterr()
+    rep = (tmp_path / "w" / "report.json")
+    text = cap.out + cap.err + (rep.read_text() if rep.exists() else "")
+    assert "SECRET-ENV-VALUE-123" not in text
+
+
+def test_wrong_token_value_not_in_report_or_output(tmp_path, monkeypatch, capsys):
+    monkeypatch.setenv("SYN_TEST_TOKEN", "WRONG-SECRET-XYZ")
+    with make_server() as srv:
+        assert main(["run", "--config", str(http_cfg(tmp_path, srv.url))]) == 3
+    cap = capsys.readouterr()
+    assert "WRONG-SECRET-XYZ" not in cap.out + cap.err + _tree_text(tmp_path / "w")
