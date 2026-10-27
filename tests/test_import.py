@@ -211,12 +211,12 @@ def test_cross_split_duplicate_utterance_rejected(tmp_path, validators):
     write_input(tmp_path / "in", mutate=leak)
     store = MemoryDatasetStore(validators)
     res = run_import(cfg_for(tmp_path), store=store, validators=validators)
-    assert res.status == "REJECTED" and "중복 발화" in res.rejected_reasons[0]
+    assert res.status == "REJECTED" and "같은 입력" in res.rejected_reasons[0]
     r = report(tmp_path)
-    assert r["cross_split_duplicate_utterances"]["EVAL~TRAIN"] == 1 and store.list_versions("ds-imp") == []
+    assert r["cross_split_duplicate_inputs"]["EVAL~TRAIN"] == 1 and store.list_versions("ds-imp") == []
     assert "담배" not in json.dumps(r, ensure_ascii=False)                    # 발화 본문은 보고서에 없다
     ok = run_import(cfg_for(tmp_path, tolerance={"max_invalid_rows": 0, "max_invalid_rate": 0,
-                                                  "max_cross_split_duplicate_utterances": 1}),
+                                                  "max_cross_split_duplicate_inputs": 1}),
                     store=store, validators=validators)
     assert ok.status == "PUBLISHED"
 
@@ -322,3 +322,31 @@ def test_pii_patterns_are_fast_on_adversarial_text():
     t = time.time()
     pii_kinds(rec)
     assert time.time() - t < 1.0
+
+
+def test_same_utterance_same_question_different_state_is_reported_not_rejected(tmp_path, validators):
+    """실측(C1 데이터)에서 나온 모양: 발화·문항은 같고 state만 다른 LoRA-A 행은 참고 건수로만 센다."""
+    def diff_state(name, lines):
+        if name == "lora_a_train.jsonl":
+            lines[0] = set_utt(row("LORA_A", 1, "sc-t-x"), "네 맞아요")
+        if name == "lora_a_test.jsonl":
+            r = set_utt(row("LORA_A", 2, "sc-e-x"), "네 맞아요")
+            u = json.loads(r["messages"][1]["content"]); u["state"] = {"Q3.hours": {"value": 5, "status": "ANSWERED"}}
+            r["messages"][1]["content"] = json.dumps(u, ensure_ascii=False)
+            lines[0] = r
+        return lines
+    write_input(tmp_path / "in", mutate=diff_state)
+    res = run_import(cfg_for(tmp_path), store=MemoryDatasetStore(validators), validators=validators)
+    r = report(tmp_path)
+    assert res.status == "PUBLISHED" and r["cross_split_duplicate_utterances"]["EVAL~TRAIN"] == 1
+    assert r["cross_split_duplicate_inputs"]["EVAL~TRAIN"] == 0
+
+
+@pytest.mark.skipif(not __import__("os").environ.get("SD_REFERENCE_DATA_DIR"), reason="SD_REFERENCE_DATA_DIR(실제 파일 경로)가 없다")
+def test_real_reference_data_if_provided(tmp_path, validators):
+    """선택 시험: 실제 파일 6개를 읽기 전용으로 검증한다. 데이터는 리포에 없고 건수 기대값은 C1 빌드의 것이다."""
+    import os
+    cfg = cfg_for(tmp_path, input_dir=os.environ["SD_REFERENCE_DATA_DIR"])
+    res = run_import(cfg, store=MemoryDatasetStore(validators), validators=validators)
+    r = report(tmp_path)
+    assert r["invalid_rows"] == 0 and r["total_rows"] == res.counts["rows_total"]

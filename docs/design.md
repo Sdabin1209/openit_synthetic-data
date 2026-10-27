@@ -112,7 +112,7 @@ class ResponseGenerator(Protocol):   name; version; generate(plan: GeneratorPlan
 사용자 결정: 데이터셋 담당이 서버에서 만든 최종 학습 데이터를 재생성 없이 가져와 검증하고 게시한다. 정본은 데이터셋 담당의 파이프라인이다. 아래 1~12절의 생성 파이프라인(v1 내용)은 이 모드와 무관하며 쓰지 않는다.
 
 **확인한 것(시험으로)**: 이 리포가 직접 만든 가짜 행으로 아래 동작이 돈다(`tests/test_import.py`).
-**확인하지 못한 것**: 실제 데이터 파일로 게시한 적이 없다. 행 형식은 **추정**이다. 근거는 `../boundary-contracts/V2_DRAFT.md`가 학습 서버 파일을 읽고 적은 기록(`{human_review, messages[system,user,assistant], scenario_id, split}`, user는 입력 JSON 문자열, assistant는 A는 출력 JSON 문자열/B는 응답 문장)뿐이며, 이 영역은 그 파일을 본 적이 없다. 실제 형식이 다르면 해당 행이 `record_*` 사유로 집계되고 허용치를 넘으면 게시되지 않는다.
+**실제 데이터로 확인한 것(2026-10-28)**: 데이터셋 담당의 C1 최종 파일 6개(64,459행, 읽기 전용 참조 사본)로 게시기를 처음 돌렸다. 행 형식 추정은 맞았다(키는 human_review, messages, scenario_id, split뿐). 결과 표는 부록 B. **확인하지 못한 것**: 다른 빌드, 의미 검사, 운영 저장소 게시. 아래 '추정' 문장은 처음 근거를 남긴 기록이다. 처음 행 형식은 **추정**이었다. 근거는 `../boundary-contracts/V2_DRAFT.md`가 학습 서버 파일을 읽고 적은 기록(`{human_review, messages[system,user,assistant], scenario_id, split}`, user는 입력 JSON 문자열, assistant는 A는 출력 JSON 문자열/B는 응답 문장)뿐이며, 이 영역은 그 파일을 본 적이 없다. 실제 형식이 다르면 해당 행이 `record_*` 사유로 집계되고 허용치를 넘으면 게시되지 않는다.
 
 흐름: 입력 디렉터리에서 `lora_{a,b}_{train,val,test}.jsonl` 6개를 읽는다(하나라도 없으면 종료 코드 2, 어느 파일인지 적음; train→TRAIN, val→VALIDATION, test→EVAL) -> 파일 바이트의 sha256 -> 행 검증 -> 건수·사유 집계 -> 허용치 판정 -> 통과 행만 `lora_a|b/{train,validation,eval}.jsonl`(샘플 스키마)로 쓰고 DatasetManifest 게시.
 
@@ -123,7 +123,7 @@ class ResponseGenerator(Protocol):   name; version; generate(plan: GeneratorPlan
 멱등: 같은 입력 바이트와 설정이면 같은 `dataset_digest`와 `version`이고 이미 있으면 `ALREADY_PUBLISHED`(`created_at`을 고정하면 content_hash도 같음).
 
 점검 반영(2026-10-28; 점검 문서 head/docs/audit/...는 이 영역 규칙상 읽지 않았고 코디네이터가 전한 항목 설명만 근거로 했다):
-- 중복 발화(SD-3): 정규화한 발화(NFKC, 소문자, 공백·구두점·기호 제거)+맥락(A는 question_id, B는 action·다음 문항) 해시가 TRAIN/VALIDATION/EVAL 사이에 겹치면 건수를 세어 `tolerance.max_cross_split_duplicate_utterances`(기본 0)를 넘으면 거부. 발화 본문은 보고서에 없다.
+- 중복 발화(SD-3): 정규화한 발화(NFKC, 소문자, 공백·구두점·기호 제거)+맥락(A는 question_id, B는 action·다음 문항) 해시가 TRAIN/VALIDATION/EVAL 사이에 겹치면 건수를 세어 `tolerance.max_cross_split_duplicate_inputs`(기본 0)를 넘으면 거부. 발화 본문은 보고서에 없다.
 - 값 비노출(SD-1): 거부 사유는 `<단계>: <경로>#<스키마 키워드>` 코드뿐. 보고서·매니페스트·결과·오류 레코드에 입력 값이 없다(행의 `split` 필드도 값 없이 개수만).
 - 멱등(SD-4): version을 지정해도 입력 digest가 같으면 `created_at`이 달라도 ALREADY_PUBLISHED. digest가 다르면 CONFLICT.
 - pending(SD-2): `pending_policy` = report(기본, 싣고 건수만 보고) / exclude / reject. **정책 값은 사용자 결정이며 기본값은 결정이 아니다.** `origin`은 SYNTHETIC 고정(입력에 정보 없음, 가정)이며 설정 `origin`은 SYNTHETIC만 받는다. 보고서·매니페스트에 `origin_assumed`, `deid_attested: false`(비식별 확인은 게시기가 하지 않음).
@@ -131,3 +131,24 @@ class ResponseGenerator(Protocol):   name; version; generate(plan: GeneratorPlan
 - 의미 검사(SD-7): 수행하지 않음(`semantic_checks.performed=false`). 요청 CR-006. 생성 경로 제거 제안 CR-007.
 
 미정/한계: 의미 검사 미수행, 문항 세트 출처 설정 의존, `pending` 행 처리 정책 -> `change-requests/CR-006-import-external-dataset.md`.
+
+## 부록 B. 실제 데이터 첫 실행 결과 (실측(2026-10-28, C1 빌드 2026-10-27, 읽기 전용 참조 사본 6개 64,459행))
+
+입력: `reference/openit-server/data/final/lora_{a,b}_{train,val,test}.jsonl`(읽기 전용, 리포 밖). 게시 결과 저장소와 보고서는 리포 밖 임시 폴더에 두고 지웠다. 설정의 `question_sets`는 자리 표시 해시를 썼다(CR-006 미해결).
+
+| 항목 | 값 (분모) |
+|---|---|
+| 행 수 | A: train 25,700 / val 3,221 / test 3,249, B: train 25,794 / val 3,233 / test 3,262, 합 64,459 |
+| 스키마 검증 통과/실패 | 64,459 / 0 (분모 64,459, 사유별 실패 없음) |
+| 행 키 | 전 행이 human_review, messages, scenario_id, split 네 키뿐 |
+| 행의 split 값 | 파일마다 단일 값(train/val/test)이고 파일 이름과 일치 |
+| human_review 분포 | auto_only 64,459 (pending 0) |
+| pii_suspect (이메일·전화·주민번호 형태) | 0행 |
+| 같은 발화+문항 중복(참고) | A: EVAL~TRAIN 3, TRAIN~VALIDATION 5, EVAL~VALIDATION 0 / B: 0. 모두 state가 달라 입력·정답이 달랐다 |
+| 같은 입력 중복(허용치 판정) | 세 쌍 모두 0 -> 기본 허용치 0으로 통과 |
+| 게시 | PUBLISHED, version `v1309e4c9bea3`, dataset_digest `sha256:1309e4c9bea39ea0f4ef5c42bebc90fce1f7be7676e7e0cf0378144e52ba371b`, 매니페스트 content_hash `sha256:a41e16923ddc5e1fe4ac3a0101603c573ac2860d7dd762e765d29d13acde1d79` |
+| 입력 sha256 | 보고서 `inputs`와 매니페스트 ext에 6개 기록(예: lora_a_train `sha256:94d96013...ca122c`) |
+| 재실행(created_at만 다르게) | ALREADY_PUBLISHED, 같은 content_hash |
+| 소요 | 약 30초(1회) |
+
+처음 정의(발화+문항)의 중복 키로는 8건이 걸려 기본 허용치 0에서 REJECTED였고, 원인 확인 뒤 엄격 키로 바꿨다(ADR 0004). 의미 검사는 하지 않았다(`semantic_checks.performed=false`). 문항 세트는 자리 표시라 이 게시 결과는 운영용이 아니다.

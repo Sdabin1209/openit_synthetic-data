@@ -1,5 +1,5 @@
 {
-  "_comment": "게시기(import) 설정 예시. question_sets의 content_hash는 자리 표시이며 실제 값이 아니다. 실제 데이터로 게시한 적 없다. 행 형식은 추정(docs/design.md 부록 A).",
+  "_comment": "게시기(import) 설정 예시. question_sets의 content_hash는 자리 표시이며 실제 값이 아니다. 행 형식은 C1 실제 파일로 확인(docs/design.md 부록 B).",
   "dataset_id": "ds-import-example",
   "input_dir": "../work/import-input",
   "survey_schema_dir": "../../survey-service/schema",

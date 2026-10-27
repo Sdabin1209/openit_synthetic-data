@@ -1,7 +1,6 @@
 """게시기(import) 모드: 데이터셋 담당이 학습 서버에서 만든 최종 학습 데이터를 '그대로 가져와' 검증하고 게시한다(재생성 없음).
 
-입력 디렉터리에 lora_{a,b}_{train,val,test}.jsonl 6개가 있어야 한다. 각 행의 형태는 **추정**이다(boundary-contracts V2_DRAFT가 학습 서버에서
-읽은 형태로 적은 것이며, 이 리포는 실제 파일을 받은 적이 없다):
+입력 디렉터리에 lora_{a,b}_{train,val,test}.jsonl 6개가 있어야 한다. 각 행의 형태는 실제 C1 파일 6개(64,459행)로 확인했다(2026-10-28, docs/design.md 부록 A. 처음에는 boundary-contracts V2_DRAFT의 기록에서 추정했다):
   {"messages":[{"role":"system",..},{"role":"user","content":<입력 JSON 문자열>},{"role":"assistant","content":<A는 출력 JSON 문자열, B는 응답 문장>}],
    "scenario_id":..., "split":..., "human_review":...}
 형식이 다르면 그 행은 사유(record_*)와 함께 집계되고, 허용치를 넘으면 게시하지 않는다.
@@ -30,7 +29,7 @@ from .schemas import Validators
 from .store import FileDatasetStore, MemoryDatasetStore
 from .store.base import DatasetStoreBase
 
-# 왜: 매니페스트가 파일 단위로 분할을 요구하고 행의 split 값 형식은 미확인이라 파일 이름으로 정한다(docs/adr/0002). 파일 이름은 V2_DRAFT 기록의 추정.
+# 왜: 매니페스트가 파일 단위로 분할을 요구하고 행의 split 값(실측: train/val/test, 파일 이름과 일치)이 파일 이름과 같은 정보라 파일 이름으로 정한다(docs/adr/0002). 파일 이름은 V2_DRAFT 기록의 추정.
 SPLIT_OF_FILE = {"train": "TRAIN", "val": "VALIDATION", "test": "EVAL"}
 ROLES = (("a", "LORA_A"), ("b", "LORA_B"))
 INPUT_FILES = [(f"lora_{r}_{s}.jsonl", role, split) for r, role in ROLES for s, split in SPLIT_OF_FILE.items()]
@@ -60,6 +59,15 @@ def normalize_utterance(text: str) -> str:
     """공백·구두점·기호를 지우고 NFKC·소문자로 맞춘 발화(중복 발화 검사용, SD-3)."""
     t = unicodedata.normalize("NFKC", text).lower()
     return "".join(c for c in t if unicodedata.category(c)[0] not in _PUNCT)
+
+
+def input_key(role: str, inp: dict) -> Optional[str]:
+    """엄격한 키: 정규화한 발화 + 입력의 나머지 전부(A는 문항·상태, B는 action·known·next 등). 같은 입력이면 같다.
+    왜(실측 2026-10-28, docs/adr/0004): 실제 C1 데이터에서 발화+문항만 보면 LoRA-A 8건이 겹쳤지만 모두 state가 달라 입력도 정답도 달랐다."""
+    u = normalize_utterance(str(inp.get("user_utterance", "")))
+    if not u:
+        return None
+    return canonical.sha256_hash([role, u, {k: v for k, v in inp.items() if k != "user_utterance"}])
 
 
 def utterance_key(role: str, inp: dict) -> Optional[str]:
@@ -129,9 +137,9 @@ def parse_import_config(raw: dict, base_dir: Path) -> ImportConfig:
         raise ConfigError("tolerance.max_invalid_rows는 0 이상의 정수")
     if not isinstance(mx, (int, float)) or isinstance(mx, bool) or not 0 <= mx <= 1:
         raise ConfigError("tolerance.max_invalid_rate는 0 이상 1 이하의 수")
-    mc = tol.get("max_cross_split_duplicate_utterances", 0)
+    mc = tol.get("max_cross_split_duplicate_inputs", 0)
     if not isinstance(mc, int) or isinstance(mc, bool) or mc < 0:
-        raise ConfigError("tolerance.max_cross_split_duplicate_utterances는 0 이상의 정수(기본 0)")
+        raise ConfigError("tolerance.max_cross_split_duplicate_inputs는 0 이상의 정수(기본 0)")
     mp = tol.get("max_pii_suspect_rows")
     if mp is not None and (not isinstance(mp, int) or isinstance(mp, bool) or mp < 0):
         raise ConfigError("tolerance.max_pii_suspect_rows는 0 이상의 정수 또는 생략(생략 = 경고만)")
@@ -252,7 +260,7 @@ def run_import(cfg: ImportConfig, *, store: DatasetStoreBase, validators: Option
                clock: Optional[Callable[[], str]] = None) -> ImportResult:
     cfg.work_dir.mkdir(parents=True, exist_ok=True)
     report: dict = {"job_version": __version__, "mode": "import", "dataset_id": cfg.dataset_id, "notes": [],
-                    "format_assumption": "행 형식은 추정(V2_DRAFT 기록)이다. 실제 파일로 확인한 적 없음",
+                    "format_assumption": "행 형식은 C1 빌드 실제 파일로 확인(docs/design.md 부록 A). 다른 빌드는 이 보고서의 invalid 건수로 확인",
                     "tolerance": {"max_invalid_rows": cfg.max_invalid_rows, "max_invalid_rate": cfg.max_invalid_rate}}
     try:
         return _run_import(cfg, store, validators, clock, report)
@@ -350,19 +358,26 @@ def _run_import(cfg, store, validators, clock, report) -> ImportResult:
     report["pending_excluded"] = excluded_pending
     if not rejected:
         keys: dict[str, dict] = {"TRAIN": {}, "VALIDATION": {}, "EVAL": {}}
+        skeys: dict[str, dict] = {"TRAIN": {}, "VALIDATION": {}, "EVAL": {}}
         for name, role, split in INPUT_FILES:
             for r in valid[name]:
                 k = utterance_key(role, r["input"])
                 if k:
                     keys[split].setdefault(k, 0)
                     keys[split][k] += 1
+                k2 = input_key(role, r["input"])
+                if k2:
+                    skeys[split].setdefault(k2, 0)
         dup = {}
         for a, b in (("EVAL", "TRAIN"), ("EVAL", "VALIDATION"), ("TRAIN", "VALIDATION")):
             dup[f"{a}~{b}"] = len(set(keys[a]) & set(keys[b]))
-        report["cross_split_duplicate_utterances"] = dup
+        report["cross_split_duplicate_utterances"] = dup        # 참고(발화+맥락): 허용치 판정에 쓰지 않는다
+        sdup = {f"{a}~{b}": len(set(skeys[a]) & set(skeys[b])) for a, b in (("EVAL", "TRAIN"), ("EVAL", "VALIDATION"), ("TRAIN", "VALIDATION"))}
+        report["cross_split_duplicate_inputs"] = sdup           # 허용치 판정: 같은 입력
+        dup = sdup
         worst = max(dup.values())
         if worst > cfg.max_cross_split_duplicates:
-            rejected.append(f"분할 사이 중복 발화(정규화한 발화+맥락 해시)가 허용 {cfg.max_cross_split_duplicates}건을 넘는다: {dup}")
+            rejected.append(f"분할 사이 같은 입력(정규화한 발화+입력 나머지 해시)이 허용 {cfg.max_cross_split_duplicates}건을 넘는다: {dup}")
     if not rejected:
         sc: dict[str, set] = {"TRAIN": set(), "VALIDATION": set(), "EVAL": set()}
         for name, role, split in INPUT_FILES:
@@ -416,6 +431,7 @@ def _run_import(cfg, store, validators, clock, report) -> ImportResult:
                 "deid_attested": False, "semantic_checks_performed": False,
                 "pii_suspect_rows": report["pii_suspect"]["rows_total"],
                 "cross_split_duplicate_utterances": report["cross_split_duplicate_utterances"],
+                "cross_split_duplicate_inputs": report["cross_split_duplicate_inputs"],
                 "tolerance": report["tolerance"]}}}}
         manifest["content_hash"] = canonical.content_hash(manifest)
         res = ImportResult("PUBLISHED", cfg.dataset_id, manifest["version"], None, digest, counts)
