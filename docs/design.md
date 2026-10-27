@@ -122,4 +122,12 @@ class ResponseGenerator(Protocol):   name; version; generate(plan: GeneratorPlan
 
 멱등: 같은 입력 바이트와 설정이면 같은 `dataset_digest`와 `version`이고 이미 있으면 `ALREADY_PUBLISHED`(`created_at`을 고정하면 content_hash도 같음).
 
+점검 반영(2026-10-28; 점검 문서 head/docs/audit/...는 이 영역 규칙상 읽지 않았고 코디네이터가 전한 항목 설명만 근거로 했다):
+- 중복 발화(SD-3): 정규화한 발화(NFKC, 소문자, 공백·구두점·기호 제거)+맥락(A는 question_id, B는 action·다음 문항) 해시가 TRAIN/VALIDATION/EVAL 사이에 겹치면 건수를 세어 `tolerance.max_cross_split_duplicate_utterances`(기본 0)를 넘으면 거부. 발화 본문은 보고서에 없다.
+- 값 비노출(SD-1): 거부 사유는 `<단계>: <경로>#<스키마 키워드>` 코드뿐. 보고서·매니페스트·결과·오류 레코드에 입력 값이 없다(행의 `split` 필드도 값 없이 개수만).
+- 멱등(SD-4): version을 지정해도 입력 digest가 같으면 `created_at`이 달라도 ALREADY_PUBLISHED. digest가 다르면 CONFLICT.
+- pending(SD-2): `pending_policy` = report(기본, 싣고 건수만 보고) / exclude / reject. **정책 값은 사용자 결정이며 기본값은 결정이 아니다.** `origin`은 SYNTHETIC 고정(입력에 정보 없음, 가정)이며 설정 `origin`은 SYNTHETIC만 받는다. 보고서·매니페스트에 `origin_assumed`, `deid_attested: false`(비식별 확인은 게시기가 하지 않음).
+- 의심 패턴: 이메일·휴대전화·유선전화·주민번호 형태를 행 수로만 센다(`pii_suspect`). 수량자에 상한을 둔 정규식과 행당 20,000자 제한으로 ReDoS를 막았다(시험 있음). 기본은 경고, `tolerance.max_pii_suspect_rows`를 정하면 거부. 비식별 확인이 아니다.
+- 의미 검사(SD-7): 수행하지 않음(`semantic_checks.performed=false`). 요청 CR-006. 생성 경로 제거 제안 CR-007.
+
 미정/한계: 의미 검사 미수행, 문항 세트 출처 설정 의존, `pending` 행 처리 정책 -> `change-requests/CR-006-import-external-dataset.md`.

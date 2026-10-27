@@ -1,6 +1,7 @@
 # 변경 이력
 
 ## 0.3.0 (제안 버전, 미적용: pyproject는 올리지 않음)
+- 점검 반영: 중복 발화 거부, 사유에서 입력 값 제거, version 지정 재실행 멱등, pending 정책, origin/비식별 미확인 명시, 의심 패턴 건수, 의미 검사 한계 명시(CR-006), 생성 경로 제거 제안(CR-007).
 - 게시기(import) 모드 추가(`python -m synthetic_data import --config`, G02 방향). 외부 학습 데이터 jsonl 6개를 v2 스키마로 행 단위 검증하고 허용치 안에서 게시. 종료 코드 4 추가. 시험 `tests/test_import.py`(가짜 입력). 실제 데이터로는 시험하지 않음. CR-006.
 
 ## 0.2.2 (2026-10-27, boundary-contracts v2.0.2; 제안 버전)

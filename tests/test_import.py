@@ -64,7 +64,10 @@ def test_publishes_valid_input(tmp_path, validators):
     assert {f["role"] for f in m["files"]} == {"LORA_A", "LORA_B"}
     imp = m["ext"]["synthetic-data"]["import"]
     assert all(v["sha256"].startswith("sha256:") for v in imp["inputs"].values()) and imp["rows_valid"] == 18
-    assert report(tmp_path)["row_split_field_values"]["lora_a_train.jsonl"] == {"x": 3}
+    r = report(tmp_path)
+    assert r["row_split_field"]["lora_a_train.jsonl"] == {"absent": 0, "distinct_values": 1}      # 값은 적지 않는다
+    assert r["deid_attested"] is False and r["origin_assumed"] == "SYNTHETIC" and r["semantic_checks"]["performed"] is False
+    assert m["ext"]["synthetic-data"]["import"]["deid_attested"] is False
 
 
 def test_idempotent(tmp_path, validators):
@@ -187,3 +190,135 @@ def test_cli_exit_codes(tmp_path):
     assert json.loads(run().stdout)["status"] == "ALREADY_PUBLISHED"
     (tmp_path / "in" / "lora_a_test.jsonl").unlink()
     assert run().returncode == 2
+
+
+# ---- 점검 반영(SD-1~SD-4, SD-7, 의심 패턴) ----
+def set_utt(r, text):
+    u = json.loads(r["messages"][1]["content"])
+    u["user_utterance"] = text
+    r["messages"][1]["content"] = json.dumps(u, ensure_ascii=False)
+    return r
+
+
+def test_cross_split_duplicate_utterance_rejected(tmp_path, validators):
+    """SD-3: scenario_id가 달라도 공백·구두점만 다른 같은 발화가 TRAIN과 EVAL에 있으면 거부한다."""
+    def leak(name, lines):
+        if name == "lora_a_train.jsonl":
+            lines[0] = set_utt(row("LORA_A", 1, "sc-t-x"), "저는 하루에 담배를 한 갑 피워요.")
+        if name == "lora_a_test.jsonl":
+            lines[0] = set_utt(row("LORA_A", 2, "sc-e-x"), "저는  하루에 담배를 한 갑 피워요")
+        return lines
+    write_input(tmp_path / "in", mutate=leak)
+    store = MemoryDatasetStore(validators)
+    res = run_import(cfg_for(tmp_path), store=store, validators=validators)
+    assert res.status == "REJECTED" and "중복 발화" in res.rejected_reasons[0]
+    r = report(tmp_path)
+    assert r["cross_split_duplicate_utterances"]["EVAL~TRAIN"] == 1 and store.list_versions("ds-imp") == []
+    assert "담배" not in json.dumps(r, ensure_ascii=False)                    # 발화 본문은 보고서에 없다
+    ok = run_import(cfg_for(tmp_path, tolerance={"max_invalid_rows": 0, "max_invalid_rate": 0,
+                                                  "max_cross_split_duplicate_utterances": 1}),
+                    store=store, validators=validators)
+    assert ok.status == "PUBLISHED"
+
+
+def test_other_question_same_utterance_is_not_a_leak(tmp_path, validators):
+    def same(name, lines):
+        if name == "lora_a_train.jsonl":
+            lines[0] = set_utt(row("LORA_A", 1, "sc-t-x"), "네")
+        if name == "lora_a_test.jsonl":
+            r = set_utt(row("LORA_A", 2, "sc-e-x"), "네")
+            u = json.loads(r["messages"][1]["content"]); u["question_id"] = "Q4"
+            r["messages"][1]["content"] = json.dumps(u, ensure_ascii=False)
+            lines[0] = r
+        return lines
+    write_input(tmp_path / "in", mutate=same)
+    assert run_import(cfg_for(tmp_path), store=MemoryDatasetStore(validators), validators=validators).status == "PUBLISHED"
+
+
+SECRET = "홍길동SECRET010-9999-8888"
+
+
+def test_no_input_values_in_reasons_report_or_manifest(tmp_path, validators):
+    """SD-1: 위반한 값(이름·전화번호가 든 가짜 값)이 사유·보고서·불변 매니페스트에 섞이지 않는다."""
+    def leak(name, lines):
+        if name == "lora_a_train.jsonl":
+            bad = row("LORA_A", 91, "sc-bad", human_review=SECRET)
+            bad["messages"][2]["content"] = json.dumps({"action": SECRET, "values": [{"key": SECRET}], "next_item": 5}, ensure_ascii=False)
+            u = json.loads(bad["messages"][1]["content"]); u["extra_" + "field"] = SECRET; u["state"] = {"a": SECRET}
+            bad["messages"][1]["content"] = json.dumps(u, ensure_ascii=False)
+            lines = lines + [bad, "{" + SECRET]
+        return lines
+    write_input(tmp_path / "in", mutate=leak)
+    store = MemoryDatasetStore(validators)
+    res = run_import(cfg_for(tmp_path, tolerance={"max_invalid_rows": 5, "max_invalid_rate": 0.5}), store=store, validators=validators)
+    assert res.status == "PUBLISHED"
+    blob = (tmp_path / "work" / "import_report.json").read_text(encoding="utf-8")
+    blob += json.dumps(store.get_manifest("ds-imp", res.version), ensure_ascii=False) + json.dumps(res.__dict__, ensure_ascii=False)
+    assert SECRET not in blob and "홍길동" not in blob and "9999" not in blob
+    assert any(k.startswith("output_schema: ") and "#" in k for k in report(tmp_path)["invalid_reasons_total"])
+
+
+def test_version_pinned_rerun_with_other_created_at_is_idempotent(tmp_path, validators):
+    """SD-4"""
+    write_input(tmp_path / "in")
+    store = MemoryDatasetStore(validators)
+    a = run_import(cfg_for(tmp_path, version="v-pin"), store=store, validators=validators)
+    b = run_import(cfg_for(tmp_path, version="v-pin", created_at="2026-12-01T00:00:00Z"), store=store, validators=validators)
+    assert a.status == "PUBLISHED" and b.status == "ALREADY_PUBLISHED" and a.content_hash == b.content_hash
+    write_input(tmp_path / "in", per_file=4)
+    from boundary_contracts.errors import BoundaryError
+    with pytest.raises(BoundaryError) as e:
+        run_import(cfg_for(tmp_path, version="v-pin"), store=store, validators=validators)
+    assert e.value.code == "CONFLICT"
+
+
+def _with_pending(name, lines):
+    if name in ("lora_a_train.jsonl", "lora_b_train.jsonl"):
+        lines[0]["human_review"] = "pending"
+    return lines
+
+
+def test_pending_policies(tmp_path, validators):
+    """SD-2: 기본은 보고만(싣는다), exclude는 뺀다, reject는 거부한다."""
+    write_input(tmp_path / "in", mutate=_with_pending)
+    st = MemoryDatasetStore(validators)
+    d = run_import(cfg_for(tmp_path), store=st, validators=validators)
+    assert d.status == "PUBLISHED" and report(tmp_path)["pending_rows"] == 2 and report(tmp_path)["pending_excluded"] == 0
+    assert report(tmp_path)["human_review_counts"] == {"auto_only": 16, "pending": 2}
+    ex = run_import(cfg_for(tmp_path, pending_policy="exclude"), store=MemoryDatasetStore(validators), validators=validators)
+    assert ex.status == "PUBLISHED" and report(tmp_path)["pending_excluded"] == 2 and ex.dataset_digest != d.dataset_digest
+    assert run_import(cfg_for(tmp_path, pending_policy="reject"), store=MemoryDatasetStore(validators), validators=validators).status == "REJECTED"
+    with pytest.raises(ConfigError):
+        cfg_for(tmp_path, pending_policy="drop")
+    with pytest.raises(ConfigError):
+        cfg_for(tmp_path, origin="FAILURE_CASE_SEED")
+
+
+def test_pii_suspect_counts_without_values(tmp_path, validators):
+    """비식별 의심 패턴은 건수만 센다. 기본은 경고, 허용치를 정하면 거부한다."""
+    def pii(name, lines):
+        if name == "lora_a_train.jsonl":
+            lines[0] = set_utt(row("LORA_A", 1, "sc-t-p"), "연락처는 010-1234-5678 입니다")
+            lines[1] = set_utt(row("LORA_A", 2, "sc-t-q"), "메일 a.b@example.com 로 주세요")
+        if name == "lora_b_train.jsonl":
+            lines[0] = set_utt(row("LORA_B", 3, "sc-t-r"), "901231-1234567")
+        return lines
+    write_input(tmp_path / "in", mutate=pii)
+    res = run_import(cfg_for(tmp_path), store=MemoryDatasetStore(validators), validators=validators)
+    assert res.status == "PUBLISHED"
+    r = report(tmp_path)
+    assert r["pii_suspect"]["rows_total"] == 3 and r["pii_suspect"]["rows_by_kind"] == {"email": 1, "phone_mobile": 1, "rrn": 1}
+    assert "1234-5678" not in json.dumps(r) and r["deid_attested"] is False
+    rej = run_import(cfg_for(tmp_path, tolerance={"max_invalid_rows": 0, "max_invalid_rate": 0, "max_pii_suspect_rows": 2}),
+                     store=MemoryDatasetStore(validators), validators=validators)
+    assert rej.status == "REJECTED"
+
+
+def test_pii_patterns_are_fast_on_adversarial_text():
+    import time
+    from synthetic_data.importer import pii_kinds
+    evil = "a" * 19000 + "@" + "1" * 900 + "0" + "-" * 90
+    rec = {"input": {"user_utterance": evil}, "expected": evil}
+    t = time.time()
+    pii_kinds(rec)
+    assert time.time() - t < 1.0

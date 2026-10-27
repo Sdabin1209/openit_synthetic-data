@@ -63,6 +63,15 @@ class Validators:
     def check_boundary(self, name: str, record: Any) -> list[str]:
         return _errors(self._boundary(name), record)
 
+    def check_boundary_codes(self, name: str, record: Any) -> list[str]:
+        """위반을 '<경로>#<스키마 키워드>' 코드로만 돌려준다. 메시지(입력 값이 섞임)와 값은 담지 않는다. 배열 번호는 *로 바꾼다."""
+        import re
+        out = set()
+        for e in self._boundary(name).iter_errors(record):
+            path = re.sub(r"/\d+", "/*", "/".join(map(str, e.absolute_path))) or "(루트)"
+            out.add(f"{path}#{e.validator}")
+        return sorted(out)
+
     def check_survey(self, name: str, record: Any) -> list[str]:
         return _errors(self._survey(name), record)
 

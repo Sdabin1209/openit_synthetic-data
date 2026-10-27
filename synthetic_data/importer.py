@@ -11,7 +11,9 @@
 from __future__ import annotations
 
 import json
+import re
 import tempfile
+import unicodedata
 from collections import Counter
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
@@ -38,6 +40,37 @@ _ROLE_DIR = {"LORA_A": "lora_a", "LORA_B": "lora_b"}
 _ID_PREFIX = {"LORA_A": "as", "LORA_B": "rs"}
 _SPLIT_FILE = {"TRAIN": "train", "VALIDATION": "validation", "EVAL": "eval"}
 IMPORT_GENERATOR_PREFIX = "external-import"
+PENDING_POLICIES = ("report", "exclude", "reject")
+# 의심 패턴(경고 전용, 비식별 확인이 아니다). 수량자는 모두 상한이 있고 중첩하지 않아 ReDoS에 안전하다. 행당 검사 길이도 제한한다.
+PII_PATTERNS = {
+    "email": re.compile(r"[A-Za-z0-9._%+-]{1,64}@[A-Za-z0-9-]{1,63}(?:\.[A-Za-z0-9-]{1,63}){1,4}"),
+    "phone_mobile": re.compile(r"(?<!\d)01[016789][-. ]?\d{3,4}[-. ]?\d{4}(?!\d)"),
+    "phone_landline": re.compile(r"(?<!\d)0(?:2|[3-6]\d)[-. ]\d{3,4}[-. ]\d{4}(?!\d)"),
+    "rrn": re.compile(r"(?<!\d)\d{6}[- ]?[1-4]\d{6}(?!\d)"),
+}
+PII_SCAN_LIMIT = 20000
+_PUNCT = {"P", "S", "Z", "C"}
+
+
+def normalize_utterance(text: str) -> str:
+    """공백·구두점·기호를 지우고 NFKC·소문자로 맞춘 발화(중복 발화 검사용, SD-3)."""
+    t = unicodedata.normalize("NFKC", text).lower()
+    return "".join(c for c in t if unicodedata.category(c)[0] not in _PUNCT)
+
+
+def utterance_key(role: str, inp: dict) -> Optional[str]:
+    """같은 입력인지 보는 키: 정규화한 발화 + 맥락(A는 문항 ID, B는 action과 다음 문항). 발화가 비면 None."""
+    u = normalize_utterance(str(inp.get("user_utterance", "")))
+    if not u:
+        return None
+    ctx = [inp.get("question_id")] if role == "LORA_A" else [inp.get("action"), (inp.get("next") or {}).get("question_id")]
+    return canonical.sha256_hash([role, u, ctx])
+
+
+def pii_kinds(rec: dict) -> list[str]:
+    text = (json.dumps(rec["input"], ensure_ascii=False) + " " + (rec["expected"] if isinstance(rec["expected"], str)
+            else json.dumps(rec["expected"], ensure_ascii=False)))[:PII_SCAN_LIMIT]
+    return [k for k, rx in PII_PATTERNS.items() if rx.search(text)]
 
 
 class InputError(ConfigError):
@@ -57,6 +90,9 @@ class ImportConfig:
     version: Optional[str]
     created_at: Optional[str]
     work_dir: Path
+    max_cross_split_duplicates: int
+    max_pii_suspect_rows: Optional[int]
+    pending_policy: str
     store_kind: str
     store_root: Optional[Path]
 
@@ -89,6 +125,17 @@ def parse_import_config(raw: dict, base_dir: Path) -> ImportConfig:
         raise ConfigError("tolerance.max_invalid_rows는 0 이상의 정수")
     if not isinstance(mx, (int, float)) or isinstance(mx, bool) or not 0 <= mx <= 1:
         raise ConfigError("tolerance.max_invalid_rate는 0 이상 1 이하의 수")
+    mc = tol.get("max_cross_split_duplicate_utterances", 0)
+    if not isinstance(mc, int) or isinstance(mc, bool) or mc < 0:
+        raise ConfigError("tolerance.max_cross_split_duplicate_utterances는 0 이상의 정수(기본 0)")
+    mp = tol.get("max_pii_suspect_rows")
+    if mp is not None and (not isinstance(mp, int) or isinstance(mp, bool) or mp < 0):
+        raise ConfigError("tolerance.max_pii_suspect_rows는 0 이상의 정수 또는 생략(생략 = 경고만)")
+    pp = raw.get("pending_policy", "report")
+    if pp not in PENDING_POLICIES:
+        raise ConfigError(f"pending_policy는 {PENDING_POLICIES} 중 하나(기본 report: 보고만). 정책 값은 사용자 결정")
+    if raw.get("origin", "SYNTHETIC") != "SYNTHETIC":
+        raise ConfigError("origin은 SYNTHETIC만 지원한다(FAILURE_CASE_SEED는 seed_case_id가 필요해 외부 데이터에 맞지 않는다)")
     out = req(raw, "output")
     store = req(out, "store", "output.")
     kind = req(store, "kind", "output.store.")
@@ -100,7 +147,8 @@ def parse_import_config(raw: dict, base_dir: Path) -> ImportConfig:
         dataset_id=did, input_dir=path(req(raw, "input_dir")), survey_schema_dir=path(req(raw, "survey_schema_dir")),
         question_sets=qs, source_label=label.strip(), turn_engine_version=str(req(raw, "turn_engine_version")),
         max_invalid_rows=mr, max_invalid_rate=float(mx), version=raw.get("version"), created_at=raw.get("created_at"),
-        work_dir=path(req(out, "work_dir", "output.")), store_kind=kind,
+        work_dir=path(req(out, "work_dir", "output.")), max_cross_split_duplicates=mc,
+        max_pii_suspect_rows=mp, pending_policy=pp, store_kind=kind,
         store_root=path(store["root"]) if "root" in store else None)
 
 
@@ -128,7 +176,7 @@ class ImportResult:
 
 
 def validate_row(raw: bytes, role: str, split: str, lineno: int, v: Validators) -> tuple[Optional[dict], list[str]]:
-    """한 행을 검증한다. (샘플 레코드 또는 None, 사유 목록). 사유는 '<단계>:<위치와 메시지>' 형태이고 행 내용은 담지 않는다."""
+    """한 행을 검증한다. (샘플 레코드 또는 None, 사유 목록). 사유는 '<단계>: <경로>#<스키마 키워드>' 코드뿐이고 입력 값(행 내용, 스키마 메시지)은 담지 않는다(SD-1)."""
     if not raw.strip():
         return None, ["record_blank: 빈 줄"]
     try:
@@ -159,9 +207,9 @@ def validate_row(raw: bytes, role: str, split: str, lineno: int, v: Validators) 
     else:
         out = msgs[2]["content"]
     if user is not None:
-        reasons += [f"input_schema: {m}" for m in _short_list(v, _IN_SCHEMA[role], user)]
+        reasons += [f"input_schema: {m}" for m in v.check_boundary_codes(_IN_SCHEMA[role], user)[:3]]
     if out is not None:
-        reasons += [f"output_schema: {m}" for m in _short_list(v, _OUT_SCHEMA[role], out)]
+        reasons += [f"output_schema: {m}" for m in v.check_boundary_codes(_OUT_SCHEMA[role], out)[:3]]
     sid = row.get("scenario_id")
     if not isinstance(sid, str):
         reasons.append("row_scenario_id: scenario_id가 문자열이 아니다")
@@ -171,14 +219,10 @@ def validate_row(raw: bytes, role: str, split: str, lineno: int, v: Validators) 
            "scenario_id": sid, "split": split, "origin": "SYNTHETIC", "input": user, "expected": out}
     if "human_review" in row:
         rec["human_review"] = row["human_review"]
-    errs = v.check_boundary(_SAMPLE_SCHEMA[role], rec)
+    errs = v.check_boundary_codes(_SAMPLE_SCHEMA[role], rec)
     if errs:
-        return None, [f"sample_schema: {e[:120]}" for e in errs[:3]]
+        return None, [f"sample_schema: {e}" for e in errs[:3]]
     return rec, []
-
-
-def _short_list(v: Validators, name: str, inst) -> list[str]:
-    return [e[:120] for e in v.check_boundary(name, inst)[:3]]
 
 
 def _read_input(cfg: ImportConfig) -> dict:
@@ -223,7 +267,8 @@ def _run_import(cfg, store, validators, clock, report) -> ImportResult:
     inputs, reasons_by_file, first_at = {}, {}, {}
     valid: dict[str, list] = {}
     total = bad = 0
-    row_splits: dict[str, Counter] = {}
+    row_splits: dict = {}
+    hr, pending_n, pii_rows, pii_kind_rows = Counter(), Counter(), Counter(), Counter()
     for name, role, split in INPUT_FILES:
         data = blobs[name]
         lines = data.split(b"\n")
@@ -238,7 +283,16 @@ def _run_import(cfg, store, validators, clock, report) -> ImportResult:
                     first_at.setdefault((name, w), i)
             else:
                 recs.append(rec)
-        row_splits[name] = Counter(r.get("split") for r in _peek_splits(lines))
+        sp = [x["split"] for x in _peek_splits(lines)]
+        row_splits[name] = {"absent": sum(1 for x in sp if x is None), "distinct_values": len({str(x) for x in sp if x is not None})}
+        for r in recs:
+            hr[r.get("human_review", "(없음)")] += 1
+            if r.get("human_review") == "pending":
+                pending_n[name] += 1
+            ks = pii_kinds(r)
+            if ks:
+                pii_rows[name] += 1
+            pii_kind_rows.update(ks)
         inputs[name] = {"sha256": hashes[name],
                         "rows": len(lines), "valid": len(recs), "invalid": len(lines) - len(recs)}
         reasons_by_file[name] = dict(sorted(reasons.items()))
@@ -254,7 +308,15 @@ def _run_import(cfg, store, validators, clock, report) -> ImportResult:
         agg.update(rs)
     report["invalid_reasons_total"] = dict(sorted(agg.items()))
     report["first_invalid_line"] = {f"{k[0]} | {k[1]}": ln for k, ln in sorted(first_at.items())}
-    report["row_split_field_values"] = {k: dict(sorted((str(a), b) for a, b in c.items())) for k, c in row_splits.items()}
+    report["row_split_field"] = row_splits      # 행의 split 필드는 값을 적지 않고 개수만 센다(값 형식 미확인)
+    report["human_review_counts"] = dict(sorted(hr.items()))
+    report["pending_policy"] = cfg.pending_policy
+    report["origin_assumed"] = "SYNTHETIC"      # 모든 행에 고정. 입력에 origin 정보가 없다(가정)
+    report["deid_attested"] = False             # 비식별 확인은 이 게시기가 하지 않는다. 아래 pii는 의심 패턴 경고일 뿐이다
+    report["deid_note"] = "비식별 확인 주체는 데이터셋 담당이다. 게시기는 확인하지 않았고 패턴 경고만 센다"
+    report["semantic_checks"] = {"performed": False, "reason": "v2 의미 검사(targets, next_item, 건너뛰기 순서, save)는 패키지에 없다(CR-006). 스키마 검증만 했다"}
+    report["pii_suspect"] = {"rows_by_file": dict(sorted(pii_rows.items())), "rows_by_kind": dict(sorted(pii_kind_rows.items())),
+                             "rows_total": sum(pii_rows.values()), "patterns": sorted(PII_PATTERNS)}
 
     rejected = []
     if total == 0:
@@ -267,6 +329,36 @@ def _run_import(cfg, store, validators, clock, report) -> ImportResult:
     for name, recs in valid.items():
         if not recs:
             rejected.append(f"{name}: 통과한 행이 0건이다")
+    npend = sum(pending_n.values())
+    excluded_pending = 0
+    if npend and cfg.pending_policy == "reject":
+        rejected.append(f"human_review가 pending인 행이 {npend}건 있다(pending_policy=reject)")
+    if cfg.max_pii_suspect_rows is not None and sum(pii_rows.values()) > cfg.max_pii_suspect_rows:
+        rejected.append(f"개인정보 의심 패턴 행 {sum(pii_rows.values())}건이 허용 {cfg.max_pii_suspect_rows}를 넘는다")
+    if npend and cfg.pending_policy == "exclude" and not rejected:
+        for name in valid:
+            valid[name] = [r for r in valid[name] if r.get("human_review") != "pending"]
+        excluded_pending = npend
+        for name, recs in valid.items():
+            if not recs:
+                rejected.append(f"{name}: pending 제외 뒤 행이 0건이다")
+    report["pending_rows"] = npend
+    report["pending_excluded"] = excluded_pending
+    if not rejected:
+        keys: dict[str, dict] = {"TRAIN": {}, "VALIDATION": {}, "EVAL": {}}
+        for name, role, split in INPUT_FILES:
+            for r in valid[name]:
+                k = utterance_key(role, r["input"])
+                if k:
+                    keys[split].setdefault(k, 0)
+                    keys[split][k] += 1
+        dup = {}
+        for a, b in (("EVAL", "TRAIN"), ("EVAL", "VALIDATION"), ("TRAIN", "VALIDATION")):
+            dup[f"{a}~{b}"] = len(set(keys[a]) & set(keys[b]))
+        report["cross_split_duplicate_utterances"] = dup
+        worst = max(dup.values())
+        if worst > cfg.max_cross_split_duplicates:
+            rejected.append(f"분할 사이 중복 발화(정규화한 발화+맥락 해시)가 허용 {cfg.max_cross_split_duplicates}건을 넘는다: {dup}")
     if not rejected:
         sc: dict[str, set] = {"TRAIN": set(), "VALIDATION": set(), "EVAL": set()}
         for name, role, split in INPUT_FILES:
@@ -274,7 +366,7 @@ def _run_import(cfg, store, validators, clock, report) -> ImportResult:
         for a, b in (("EVAL", "TRAIN"), ("EVAL", "VALIDATION"), ("TRAIN", "VALIDATION")):
             both = sc[a] & sc[b]
             if both:
-                rejected.append(f"같은 scenario_id가 {a}와 {b}에 걸친다({len(both)}건, 예: {sorted(both)[:3]})")
+                rejected.append(f"같은 scenario_id가 {a}와 {b}에 걸친다({len(both)}건)")
     counts = {"rows_total": total, "rows_valid": total - bad, "rows_invalid": bad}
     for name, _, _ in INPUT_FILES:
         counts[f"{name}.valid"] = inputs[name]["valid"]
@@ -304,7 +396,8 @@ def _run_import(cfg, store, validators, clock, report) -> ImportResult:
         digest = canonical.sha256_hash({
             "inputs": {k: inputs[k]["sha256"] for k in sorted(inputs)},
             "files": [[e["path"], e["content_hash"]] for e in entries], "question_sets": qsets,
-            "runtime_contract_version": contract, "generator_version": gv, "turn_engine_version": cfg.turn_engine_version})
+            "runtime_contract_version": contract, "generator_version": gv, "turn_engine_version": cfg.turn_engine_version,
+            "pending_policy": cfg.pending_policy})
         manifest = {
             "pipeline_schema_version": PIPELINE_SCHEMA_VERSION, "dataset_id": cfg.dataset_id,
             "version": cfg.version or ("v" + digest[7:19]), "created_at": created_at, "runtime_contract_version": contract,
@@ -313,17 +406,21 @@ def _run_import(cfg, store, validators, clock, report) -> ImportResult:
             "ext": {EXT: {"dataset_digest": digest, "import": {
                 "inputs": inputs, "rows_total": total, "rows_valid": total - bad, "rows_invalid": bad,
                 "invalid_reasons": report["invalid_reasons_total"],
+                "human_review_counts": report["human_review_counts"], "pending_policy": cfg.pending_policy,
+                "pending_excluded": excluded_pending, "origin_assumed": "SYNTHETIC",
+                "deid_attested": False, "semantic_checks_performed": False,
+                "pii_suspect_rows": report["pii_suspect"]["rows_total"],
+                "cross_split_duplicate_utterances": report["cross_split_duplicate_utterances"],
                 "tolerance": report["tolerance"]}}}}
         manifest["content_hash"] = canonical.content_hash(manifest)
         res = ImportResult("PUBLISHED", cfg.dataset_id, manifest["version"], None, digest, counts)
-        if cfg.version is None:
-            try:
-                ex = store.get_manifest(cfg.dataset_id, manifest["version"])
-                if ex.get("ext", {}).get(EXT, {}).get("dataset_digest") == digest:
-                    res.status, res.content_hash = "ALREADY_PUBLISHED", ex["content_hash"]
-            except BoundaryError as e:
-                if e.code != "NOT_FOUND":
-                    raise
+        try:   # version을 지정했어도 입력 digest가 같으면 created_at이 달라도 이미 게시된 것으로 본다(SD-4)
+            ex = store.get_manifest(cfg.dataset_id, manifest["version"])
+            if ex.get("ext", {}).get(EXT, {}).get("dataset_digest") == digest:
+                res.status, res.content_hash = "ALREADY_PUBLISHED", ex["content_hash"]
+        except BoundaryError as e:
+            if e.code != "NOT_FOUND":
+                raise
         if res.status == "PUBLISHED":
             res.content_hash = store.publish(manifest, files)["content_hash"]
     report["dataset_digest"] = digest

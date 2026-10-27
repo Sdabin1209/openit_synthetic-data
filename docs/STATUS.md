@@ -9,6 +9,7 @@
 ## G02 방향 반영: 게시기(import) 모드 (2026-10-27)
 - 한 일: 사용자 결정(데이터셋 담당의 최종 학습 데이터를 그대로 가져와 검증 후 게시, 재생성 없음)에 따라 `synthetic_data/importer.py`, CLI `import`, `configs/import.example.json`, `tests/test_import.py`(가짜 입력 17건) 추가. 설계는 docs/design.md 부록 A. `pytest -q` 결과 106 passed, 15 skipped.
 - 재사용: 검증기(`schemas.Validators`), 해시(`boundary_contracts.canonical`), 패키징 직렬화(`dumps_line`), I2 `publish`와 멱등 규칙, run-once/종료 코드/보고서 틀, 설정 파싱 방식. 버리는 것(import에서 안 씀): 시나리오 설계, 발화/응답 생성기, 노이즈, 정답 구성, 시드 수집, 중복 제거, 분할(`scenario.py`, `generators/`, `noise.py`, `labeler.py`, `plans.py`, `directives.py`, `seeds.py`, `split.py`, `pipeline.py`, `job.py`). 보류 시험 15건과 이 코드의 최종 처분(삭제 여부)은 헤드 결정.
+- 점검 반영(2026-10-28): 중복 발화 거부, 값 비노출, version 지정 멱등, pending 정책, 의심 패턴 건수 추가. 시험 113 passed, 15 skipped. 생성 경로 제거 제안은 CR-007.
 - 막힌 것/안 한 것: 실제 파일로 게시한 적 없음(행 형식은 계약 리포 V2_DRAFT의 기록에서 추정). v2 의미 검사 없음. 문항 세트 출처·`pending` 행 정책은 CR-006. Dockerfile 스모크는 해당 없음(서비스 아님, 승인된 사항).
 
 ## 2.0.0 이전 (D74, D75)

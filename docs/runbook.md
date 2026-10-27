@@ -19,6 +19,7 @@ python -m synthetic_data import --config configs/import.example.json [--created-
 - 입력 디렉터리(`input_dir`)에 `lora_{a,b}_{train,val,test}.jsonl` 6개를 둔다. 파일을 가져오는 일은 이 영역 밖이다(학습 서버에는 접속하지 않는다).
 - 출력은 JSON 한 줄(`status`: PUBLISHED / ALREADY_PUBLISHED / REJECTED). 종료 코드 0, 2(설정·입력 파일 없음), 3·75(경계 오류), 4(허용치 초과 등으로 게시 안 함).
 - 결과 확인: `<work_dir>/import_report.json`(`invalid_reasons_by_file`, `inputs`의 sha256·건수). 예시 설정의 문항 세트 해시는 자리 표시이므로 실제 값으로 바꿔야 한다.
+- 설정 선택 항목: `tolerance.max_cross_split_duplicate_utterances`(기본 0), `tolerance.max_pii_suspect_rows`(생략 = 경고만), `pending_policy`(report/exclude/reject, 기본 report, 값은 사용자 결정). 보고서의 `deid_attested`는 항상 false(비식별 확인은 게시기가 하지 않음), `semantic_checks.performed`는 false.
 - REJECTED면 보고서의 사유를 데이터셋 담당에게 넘긴다. 이 영역이 데이터를 고치지 않는다.
 - 실제 데이터로 돌린 적 없음. 형식은 추정(docs/design.md 부록 A).
 
