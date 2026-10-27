@@ -30,6 +30,7 @@ from .schemas import Validators
 from .store import FileDatasetStore, MemoryDatasetStore
 from .store.base import DatasetStoreBase
 
+# 왜: 매니페스트가 파일 단위로 분할을 요구하고 행의 split 값 형식은 미확인이라 파일 이름으로 정한다(docs/adr/0002). 파일 이름은 V2_DRAFT 기록의 추정.
 SPLIT_OF_FILE = {"train": "TRAIN", "val": "VALIDATION", "test": "EVAL"}
 ROLES = (("a", "LORA_A"), ("b", "LORA_B"))
 INPUT_FILES = [(f"lora_{r}_{s}.jsonl", role, split) for r, role in ROLES for s, split in SPLIT_OF_FILE.items()]
@@ -40,7 +41,9 @@ _ROLE_DIR = {"LORA_A": "lora_a", "LORA_B": "lora_b"}
 _ID_PREFIX = {"LORA_A": "as", "LORA_B": "rs"}
 _SPLIT_FILE = {"TRAIN": "train", "VALIDATION": "validation", "EVAL": "eval"}
 IMPORT_GENERATOR_PREFIX = "external-import"
+# 왜: pending을 걸러낼지는 사용자 결정이라 기본 report(보고만)다. 기본값은 정책이 아니다(docs/adr/0005).
 PENDING_POLICIES = ("report", "exclude", "reject")
+# 왜/근거: docs/adr/0007. 형식 패턴이라 식별자 전부를 못 잡는다. 수량자 상한은 ReDoS 방지(OWASP 권고), 값은 형식 길이에서 온 것이며 측정 안 함.
 # 의심 패턴(경고 전용, 비식별 확인이 아니다). 수량자는 모두 상한이 있고 중첩하지 않아 ReDoS에 안전하다. 행당 검사 길이도 제한한다.
 PII_PATTERNS = {
     "email": re.compile(r"[A-Za-z0-9._%+-]{1,64}@[A-Za-z0-9-]{1,63}(?:\.[A-Za-z0-9-]{1,63}){1,4}"),
@@ -48,11 +51,12 @@ PII_PATTERNS = {
     "phone_landline": re.compile(r"(?<!\d)0(?:2|[3-6]\d)[-. ]\d{3,4}[-. ]\d{4}(?!\d)"),
     "rrn": re.compile(r"(?<!\d)\d{6}[- ]?[1-4]\d{6}(?!\d)"),
 }
-PII_SCAN_LIMIT = 20000
-_PUNCT = {"P", "S", "Z", "C"}
+PII_SCAN_LIMIT = 20000   # 근거 기록 없음: 행당 상한. 실제 데이터의 최대 길이를 측정하지 않았다(docs/adr/0007)
+_PUNCT = {"P", "S", "Z", "C"}   # 유니코드 General Category(UAX #44): 구두점·기호·구분자·제어. 근거 docs/adr/0004
 
 
 def normalize_utterance(text: str) -> str:
+    # 왜 NFKC: 전각/반각 등 호환 문자를 같은 글자로 합치는 유니코드 표준(UAX #15). 실제 데이터의 효과는 측정 안 함(docs/adr/0004)
     """공백·구두점·기호를 지우고 NFKC·소문자로 맞춘 발화(중복 발화 검사용, SD-3)."""
     t = unicodedata.normalize("NFKC", text).lower()
     return "".join(c for c in t if unicodedata.category(c)[0] not in _PUNCT)
@@ -398,6 +402,7 @@ def _run_import(cfg, store, validators, clock, report) -> ImportResult:
             "files": [[e["path"], e["content_hash"]] for e in entries], "question_sets": qsets,
             "runtime_contract_version": contract, "generator_version": gv, "turn_engine_version": cfg.turn_engine_version,
             "pending_policy": cfg.pending_policy})
+        # 왜 digest 앞 12자리: 근거 기록 없음(package.py와 같은 규칙, docs/adr/0006)
         manifest = {
             "pipeline_schema_version": PIPELINE_SCHEMA_VERSION, "dataset_id": cfg.dataset_id,
             "version": cfg.version or ("v" + digest[7:19]), "created_at": created_at, "runtime_contract_version": contract,
