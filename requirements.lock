@@ -9,3 +9,4 @@ pluggy==1.6.0
 Pygments==2.21.0
 pyrsistent==0.20.0
 pytest==9.1.1
+waitress==3.0.2

@@ -1,5 +1,9 @@
 # 변경 이력
 
+## 미배포 (2026-10-29, 단위 4a, D111)
+- 변경: I2 서버를 `http.server` 직접 구현에서 WSGI 앱 + waitress 3.0.2로 옮겼다(ADR 0017). 지운 자체 코드: 헤더 마감 래퍼, 연결 상한 서버, 본문 drain, Content-Length 직접 검사.
+- 동작 변화: 본문 상한 초과는 413(text/plain), 연결 상한 초과는 503이 아니라 대기, 헤더 총 마감 없음, 인증 전에 본문을 받는다, 긴 요청 줄은 401/431. 환경 변수 `DATASET_STORE_HEADER_DEADLINE`은 없어졌다. 추가: `DATASET_STORE_THREADS`, `DATASET_STORE_DRAIN_GRACE`.
+
 ## 미배포 (2026-10-29, 단위 3)
 - 의존: boundary-contracts v2.2.1, 문진 스키마 survey-schema-v1.1.0.
 - 변경: `run`·`import` 설정을 계약 스키마로 검사한다(중첩 객체의 모르는 키도 거부: `tolerance`, `split`, `output`, `seeds` 등). 이전에는 최상위만 거부했다. 잡 출력은 내보내기 전에 계약 스키마로 자기 검사한다. 빈 `rejected_reasons`는 거부가 아닐 때 결과 한 줄에서 뺀다(ADR 0016).

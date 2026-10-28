@@ -1,4 +1,4 @@
-"""dataset-store 서비스(I2 서버, D100). HTTP.md `## I2`와 CONVENTIONS 9절을 따른다. 표준 라이브러리 HTTP 서버(ADR 0012).
+"""dataset-store 서비스(I2 서버, D100). HTTP.md `## I2`와 CONVENTIONS 9절을 따른다. WSGI(PEP 3333) 앱 + waitress(ADR 0017, D111).
 
 환경 변수(진입점 `python -m synthetic_data.service`). 비밀은 boundary_contracts.read_secret(D84)으로 읽는다:
   DATASET_STORE_READ_TOKENS_FILE / DATASET_STORE_READ_TOKENS    역할=토큰,역할=토큰 (읽기 경로)
@@ -6,14 +6,15 @@
   DATASET_STORE_ROOT         저장 볼륨(기본 /data)
   DATASET_STORE_SURVEY_SCHEMA_DIR  문진 스키마 디렉터리(CONTRACT_VERSION과 schemas/, 기본 /app/survey_schema)
   DATASET_STORE_PORT         기본 8080 (0이면 빈 포트)
-  DATASET_STORE_MAX_BODY     게시 본문 최대 바이트(기본 1GiB)
-  DATASET_STORE_SOCKET_TIMEOUT / MAX_CONNECTIONS / MAX_PUBLISHES / MAX_DOWNLOADS / MAX_ENTRIES / HEADER_DEADLINE /
-  AUTH_FAIL_LIMIT / MIN_FREE_GB / MIN_TOKEN_LEN
+  DATASET_STORE_MAX_BODY     게시 본문 최대 바이트(기본 1GiB). waitress max_request_body_size
+  DATASET_STORE_SOCKET_TIMEOUT  유휴 연결 timeout 초(waitress channel_timeout)
+  DATASET_STORE_MAX_CONNECTIONS  동시 연결 상한(waitress connection_limit). DATASET_STORE_THREADS  작업 스레드 수
+  DATASET_STORE_DRAIN_GRACE  종료 신호 뒤 진행 중 요청을 기다리는 최대 초
+  DATASET_STORE_MAX_PUBLISHES / MAX_DOWNLOADS / MAX_ENTRIES / AUTH_FAIL_LIMIT / MIN_FREE_GB / MIN_TOKEN_LEN
 로그는 표준 출력으로, 토큰과 본문은 남기지 않는다."""
 from __future__ import annotations
 
 import hmac
-import io
 import json
 import os
 import re
@@ -24,12 +25,14 @@ import tempfile
 import threading
 import time
 from contextlib import contextmanager
+from http import HTTPStatus
 from collections import defaultdict, deque
-from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from urllib.parse import parse_qs, unquote, urlparse
+from urllib.parse import parse_qs, unquote
 
 from boundary_contracts import BoundaryError, SecretError, read_secret
+from waitress import wasyncore
+from waitress.server import create_server
 
 from boundary_contracts import canonical
 
@@ -40,7 +43,6 @@ from . import tarutil
 STATUS = {"INVALID_RECORD": 400, "PERMISSION_DENIED": 403, "NOT_FOUND": 404, "CONFLICT": 409,
           "FAILED_PRECONDITION": 412, "UNSUPPORTED_VERSION": 422, "INTEGRITY_ERROR": 422, "UNAVAILABLE": 503}
 WRITE_ROLE = "synthetic-data"      # HTTP.md I2: 쓰기 역할은 synthetic-data 하나
-DRAIN_CAP = 1 << 20                # 거절 응답 전에 버리는 본문의 최대 바이트(ADR 0012, 측정 안 함)
 MIN_TOKEN_LEN = 32                 # 128비트 이상 무작위 16진수(OWASP 세션 관리 치트시트·NIST SP 800-63B 참고, 원문은 다시 확인하지 않았다)
 
 
@@ -79,8 +81,8 @@ def check_token_strength(tokens, *, min_len=MIN_TOKEN_LEN):
 
 class Service:
     def __init__(self, root: Path, validators: Validators, read_tokens: dict, write_tokens: dict, *, max_body: int = 1 << 30,
-                 log=lambda s: print(s, flush=True), socket_timeout: float = 30.0, max_connections: int = 32,
-                 max_publishes: int = 8, max_downloads: int = 8, max_entries: int = 1000, header_deadline: float = 10.0,
+                 log=lambda s: print(s, flush=True),
+                 max_publishes: int = 8, max_downloads: int = 8, max_entries: int = 1000,
                  auth_fail_limit: int = 10, auth_fail_window: float = 60.0,
                  min_free_gb: float = 1.0, free_bytes=None):
         for role in write_tokens.values():
@@ -91,10 +93,9 @@ class Service:
         self.root, self.read, self.write, self.max_body, self.log = Path(root), read_tokens, write_tokens, max_body, log
         self.store = FileDatasetStore(self.root / "datasets", validators)
         self.tmp = self.root / ".tmp"
-        self.socket_timeout, self.max_connections = socket_timeout, max_connections
         self.auth_fail_limit, self.auth_fail_window, self.min_free_gb = auth_fail_limit, auth_fail_window, min_free_gb
         self._free_bytes = free_bytes or (lambda: shutil.disk_usage(self.root).free)
-        self.max_entries, self.header_deadline = max_entries, header_deadline
+        self.max_entries = max_entries
         self.publish_slots = threading.BoundedSemaphore(max(1, max_publishes))
         self.download_slots = threading.BoundedSemaphore(max(1, max_downloads))
         self._locks: dict[str, list] = {}         # dataset_id -> [Lock, 참조 수]
@@ -208,35 +209,6 @@ class Service:
         tarutil.pack({f["path"]: self.verified_file(did, ver, f["path"])[0] for f in m["files"]}, out)
 
 
-class _DeadlineRaw(io.RawIOBase):
-    """소켓 읽기에 요청 한 건의 헤더 수신 전체 마감을 건다(slowloris 완화). 소켓 timeout은 recv 한 번마다라 바이트를 천천히 흘리면 못 막는다.
-    첫 바이트가 올 때까지는 소켓 timeout(유휴 연결)만 적용하고, 첫 바이트부터 disarm()까지 limit초를 준다. recv마다 남은 시간으로 확인한다."""
-
-    def __init__(self, conn, limit: float, idle: float):
-        self._conn, self._limit, self._idle = conn, limit, idle
-        self._deadline = None
-
-    def readable(self):
-        return True
-
-    def disarm(self):
-        self._deadline = None
-        self._conn.settimeout(self._idle)
-
-    def readinto(self, b):
-        if self._deadline is None:
-            self._conn.settimeout(self._idle)
-            n = self._conn.recv_into(b)
-            if n:
-                self._deadline = time.monotonic() + self._limit
-            return n
-        left = self._deadline - time.monotonic()
-        if left <= 0:
-            raise TimeoutError("헤더 수신 마감")
-        self._conn.settimeout(min(self._idle, left))
-        return self._conn.recv_into(b)
-
-
 _DS = re.compile(r"^/v1/datasets/([^/]+)/versions$")
 _VER = re.compile(r"^/v1/datasets/([^/]+)/versions/([^/]+)$")
 _FILES = re.compile(r"^/v1/datasets/([^/]+)/versions/([^/]+)/files$")
@@ -267,247 +239,234 @@ def _limit(q) -> int:
     return min(v, 500)
 
 
-def make_handler(svc: Service):
-    class H(BaseHTTPRequestHandler):
-        protocol_version = "HTTP/1.1"
-        server_version = "dataset-store"
-        timeout = svc.socket_timeout        # 느린 클라이언트가 스레드를 잡지 못하게 한다
+class _Stream:
+    """파일을 청크로 흘리는 WSGI 응답 본문. 응답이 끝나거나 클라이언트가 끊으면 서버가 close()를 불러 정리한다(PEP 3333)."""
 
-        def setup(self):
-            super().setup()
-            self._dl = _DeadlineRaw(self.connection, svc.header_deadline, svc.socket_timeout)
-            self.rfile = io.BufferedReader(self._dl, self.rbufsize if self.rbufsize > 0 else io.DEFAULT_BUFFER_SIZE)
+    def __init__(self, path: Path, cleanup):
+        self._f = open(path, "rb")
+        self._cleanup = cleanup
 
-        def log_message(self, fmt, *args):
-            # 요청 줄이 잘못됐거나 URI가 너무 길면(414) self.path·command가 아직 없다
-            svc.log(f"{getattr(self, 'command', None) or '-'} {urlparse(getattr(self, 'path', '-')).path} {args[1] if len(args) > 1 else ''}")
-
-        def _send(self, code, body: bytes, ctype="application/json", headers=()):
-            self.send_response(code)
-            for k, v in headers:
-                self.send_header(k, v)
-            self.send_header("Content-Type", ctype + ("; charset=utf-8" if ctype == "application/json" else ""))
-            self.send_header("Content-Length", str(len(body)))
-            self.end_headers()
-            self.wfile.write(body)
-
-        def _json(self, code, obj, headers=()):
-            self._send(code, json.dumps(obj, ensure_ascii=False).encode(), headers=headers)
-
-        def _file(self, path: Path, ctype: str, size: int = None):
-            self.send_response(200)
-            self.send_header("Content-Type", ctype)
-            self.send_header("Content-Length", str(path.stat().st_size if size is None else size))
-            self.end_headers()
-            with open(path, "rb") as f:
-                shutil.copyfileobj(f, self.wfile, 1 << 20)       # 청크로 흘린다
-
-        def _length(self):
-            """Content-Length를 엄격히 읽는다: 숫자만, 한 번만. 아니면 400(요청 밀반입·비정상 값 방어)."""
-            vals = self.headers.get_all("Content-Length") or []
-            if len(vals) > 1 or (vals and not vals[0].isascii()) or (vals and not vals[0].isdigit()):
-                raise BoundaryError("INVALID_RECORD", "Content-Length가 올바르지 않다")
-            return int(vals[0]) if vals else None
-
-        def _fail(self, e: BoundaryError):
-            if self.command == "POST":
-                self.close_connection = True
-                self._drain()
-            if isinstance(e, Unauthenticated):
-                return self._json(401, e.to_record(), headers=(("WWW-Authenticate", "Bearer"),))
-            self._json(STATUS[e.code], e.to_record())
-
-        _consumed = False
-
-        def _drain(self):
-            # 읽지 않고 답하면 아직 보내는 클라이언트가 연결 초기화를 받아 403/400을 못 본다. 작은 본문만 버리고 연결을 닫는다.
-            if self._consumed:
+    def __iter__(self):
+        while True:
+            chunk = self._f.read(1 << 20)
+            if not chunk:
                 return
-            self._consumed = True
-            try:
-                left = min(self._length() or 0, DRAIN_CAP)
-                self._dl._idle = 0.25          # 읽기 대기는 0.25초까지(느린 송신자가 스레드를 잡지 못하게). 연결은 곧 닫는다
-                while left > 0:
-                    chunk = self.rfile.read1(min(1 << 20, left))
-                    if not chunk:
-                        break
-                    left -= len(chunk)
-            except (OSError, ValueError, BoundaryError):
-                pass
+            yield chunk
 
-        def _dispatch(self):
-            self._dl.disarm()                  # 헤더를 다 받았다. 본문은 소켓 timeout만 적용
-            self._length()                     # 어떤 메서드든 잘못된 Content-Length는 인증 전에 400
-            u = urlparse(self.path)
-            path, q = u.path, parse_qs(u.query)
-            if path == "/healthz":
-                return self._json(200, {"status": "ok"})
-            if path == "/readyz":
-                ok = svc.ready()
-                return self._json(200 if ok else 503, {"status": "ready" if ok else "not-ready"})
-            addr, hdr = self.client_address[0], self.headers.get("Authorization")
-            # 차단 확인이 먼저다: 차단 중인 주소는 올바른 토큰도 거부한다(그렇지 않으면 차단 중에도 추측이 맞는지 알 수 있다, ADR 0012)
-            if svc.auth_blocked(addr):
-                raise BoundaryError("UNAVAILABLE", "인증 시도가 너무 많다. 잠시 뒤 다시 시도한다")
-            try:
-                svc.authorize(self.command, hdr)
-            except BoundaryError:
-                if not svc.token_valid(hdr):      # 유효한 토큰의 403(역할 부족)은 실패 횟수에 넣지 않는다
-                    svc.note_auth_failure(addr)
-                raise
-            if self.command == "POST":
-                if path != "/v1/datasets":
-                    raise BoundaryError("NOT_FOUND", "경로가 없다")
-                return self._publish()
-            if self.command != "GET":
-                raise BoundaryError("NOT_FOUND", "경로가 없다")
-            if path == "/v1/datasets":
-                return self._json(200, _page(svc.list_ids(), _one(q, "cursor"), _limit(q)))
-            m = _DS.match(path)
-            if m:
-                return self._json(200, _page(svc.store.list_versions(unquote(m.group(1))), _one(q, "cursor"), _limit(q)))
-            m = _VER.match(path)
-            if m:
-                return self._json(200, svc.store.get_manifest(unquote(m.group(1)), unquote(m.group(2))))
-            m = _FILES.match(path)
-            if m:
-                with self._download():
-                    with tempfile.TemporaryDirectory(dir=svc.tmp) as td:
-                        out = Path(td) / "d.tar"
-                        svc.dataset_tar(unquote(m.group(1)), unquote(m.group(2)), out)
-                        return self._file(out, "application/x-tar")
-            m = _FILE.match(path)
-            if m:
-                did, ver, fp = (unquote(g) for g in m.groups())
-                svc.store._check_path(fp)          # '..'·절대 경로·역슬래시는 400(HTTP.md). 그 밖에 manifest에 없는 경로는 404
-                with self._download():
-                    p, size = svc.verified_file(did, ver, fp)
-                    return self._file(p, "application/octet-stream", size)
-            raise BoundaryError("NOT_FOUND", "경로가 없다")
-
-        @contextmanager
-        def _download(self):
-            if not svc.download_slots.acquire(blocking=False):      # 동시 다운로드 상한: 디스크 읽기와 임시 tar를 지킨다
-                raise BoundaryError("UNAVAILABLE", "다운로드가 많다. 잠시 뒤 다시 시도한다")
-            try:
-                yield
-            finally:
-                svc.download_slots.release()
-
-        def _publish(self):
-            n = self._length()
-            if n is None:
-                raise BoundaryError("INVALID_RECORD", "Content-Length가 필요하다")
-            if n > svc.max_body:
-                raise BoundaryError("INVALID_RECORD", "본문이 너무 크다")
-            if not svc.publish_slots.acquire(blocking=False):
-                raise BoundaryError("UNAVAILABLE", "다른 게시가 진행 중이다. 잠시 뒤 다시 시도한다")
-            try:
-                self._publish_locked(n)
-            finally:
-                svc.publish_slots.release()
-
-        def _publish_locked(self, n: int):
-            svc.check_free_space(n)
-            self._consumed = True
-            with tempfile.TemporaryDirectory(dir=svc.tmp) as td:
-                td = Path(td)
-                body = td / "body.tar"
-                left = n
-                with open(body, "wb") as f:
-                    while left:
-                        chunk = self.rfile.read(min(1 << 20, left))
-                        if not chunk:
-                            raise BoundaryError("INVALID_RECORD", "본문이 중간에 끊겼다")
-                        f.write(chunk)
-                        left -= len(chunk)
-                tarutil.unpack(body, td / "in", max_bytes=svc.max_body, max_entries=svc.max_entries)
-                body.unlink()
-                mp = td / "in" / "manifest.json"
-                if not mp.is_file():
-                    raise BoundaryError("INVALID_RECORD", "tar에 manifest.json이 있어야 한다")
-                try:
-                    manifest = json.loads(mp.read_text(encoding="utf-8"))
-                except ValueError:
-                    raise BoundaryError("INVALID_RECORD", "manifest.json이 JSON이 아니다") from None
-                if not isinstance(manifest, dict):
-                    raise BoundaryError("INVALID_RECORD", "manifest.json이 객체가 아니다")
-                fdir = td / "in" / "files"
-                got = {p.relative_to(fdir).as_posix(): p for p in fdir.rglob("*") if p.is_file()} if fdir.is_dir() else {}
-                stray = [p.relative_to(td / "in").as_posix() for p in (td / "in").rglob("*")
-                         if p.is_file() and p != mp and fdir not in p.parents]
-                if stray:
-                    raise BoundaryError("INVALID_RECORD", "tar에 manifest.json과 files/ 밖의 항목이 있다")
-                did, ver = str(manifest.get("dataset_id")), str(manifest.get("version"))
-                with svc.dataset_lock(did):
-                    # 잠금 안에서 판정하므로 existed와 저장소의 멱등·충돌 판정이 같은 시점을 본다: 같은 hash면 200, 다르면 저장소가 409
-                    try:
-                        svc.store.get_manifest(did, ver)
-                        existed = True
-                    except BoundaryError as e:
-                        if e.code not in ("NOT_FOUND", "INVALID_RECORD"):    # 형식이 틀린 ID는 publish가 같은 오류로 거절한다
-                            raise
-                        existed = False
-                    res = svc.store.publish(manifest, got)
-            self._json(200 if existed else 201, res)
-
-        def _handle(self):
-            self._consumed = False
-            try:
-                self._dispatch()
-            except BoundaryError as e:
-                self._fail(e)
-            except Exception as e:
-                svc.log(f"내부 오류 {type(e).__name__}")
-                self._fail(BoundaryError("UNAVAILABLE", "서비스 내부 오류"))
-
-        do_GET = do_POST = do_PUT = do_DELETE = do_PATCH = _handle
-
-        def _no_body_405(self):
-            # 왜: HEAD·OPTIONS를 정의하지 않으면 표준 라이브러리가 HTML 본문의 501을 낸다. 아는 메서드는 JSON 계약대로 405로 답한다(퍼징 시험이 발견).
-            self.send_response(405)
-            self.send_header("Allow", "GET, POST")
-            self.send_header("Content-Length", "0")
-            self.end_headers()
-
-        do_HEAD = do_OPTIONS = _no_body_405
-
-    return H
-
-
-class _Server(ThreadingHTTPServer):
-    daemon_threads = False        # 진행 중 요청을 끊지 않고 server_close가 기다린다
-    block_on_close = True
-
-    def __init__(self, addr, handler, max_connections: int):
-        super().__init__(addr, handler)
-        self._slots = threading.BoundedSemaphore(max(1, max_connections))
-
-    def process_request(self, request, client_address):
-        if not self._slots.acquire(blocking=False):
-            try:
-                request.settimeout(2)
-                body = json.dumps(BoundaryError("UNAVAILABLE", "연결이 너무 많다").to_record(), ensure_ascii=False).encode()
-                request.sendall(b"HTTP/1.1 503 Service Unavailable\r\nContent-Type: application/json\r\nContent-Length: "
-                                + str(len(body)).encode() + b"\r\nConnection: close\r\n\r\n" + body)
-            except OSError:
-                pass
-            self.shutdown_request(request)
-            return
-        super().process_request(request, client_address)
-
-    def process_request_thread(self, request, client_address):
+    def close(self):
         try:
-            super().process_request_thread(request, client_address)
+            self._f.close()
         finally:
-            self._slots.release()
+            self._cleanup()
 
 
-def make_server(svc: Service, host="127.0.0.1", port=0) -> ThreadingHTTPServer:
-    return _Server((host, port), make_handler(svc), svc.max_connections)
+def make_app(svc: Service):
+    """WSGI 앱. 연결·timeout·스레드·본문 상한은 서버(waitress)의 몫이고 여기는 인증, 경로, 계약 오류만 다룬다."""
+
+    def respond(start_response, code, body: bytes, ctype="application/json", headers=()):
+        ct = ctype + ("; charset=utf-8" if ctype == "application/json" else "")
+        start_response(f"{code} {HTTPStatus(code).phrase}", [("Content-Type", ct), ("Content-Length", str(len(body))), *headers])
+        return [body]
+
+    def json_response(start_response, code, obj, headers=()):
+        return respond(start_response, code, json.dumps(obj, ensure_ascii=False).encode(), headers=headers)
+
+    def stream(start_response, path: Path, ctype: str, size: int, cleanup):
+        start_response("200 OK", [("Content-Type", ctype), ("Content-Length", str(size))])
+        return _Stream(path, cleanup)
+
+    def fail(start_response, e: BoundaryError):
+        if isinstance(e, Unauthenticated):
+            return json_response(start_response, 401, e.to_record(), headers=(("WWW-Authenticate", "Bearer"),))
+        return json_response(start_response, STATUS[e.code], e.to_record())
+
+    @contextmanager
+    def download_slot():
+        if not svc.download_slots.acquire(blocking=False):      # 동시 다운로드 상한: 디스크 읽기와 임시 tar를 지킨다
+            raise BoundaryError("UNAVAILABLE", "다운로드가 많다. 잠시 뒤 다시 시도한다")
+        try:
+            yield
+        finally:
+            svc.download_slots.release()
+
+    def publish(environ):
+        n = int(environ.get("CONTENT_LENGTH") or 0)
+        if not svc.publish_slots.acquire(blocking=False):
+            raise BoundaryError("UNAVAILABLE", "다른 게시가 진행 중이다. 잠시 뒤 다시 시도한다")
+        try:
+            return publish_locked(environ["wsgi.input"], n)
+        finally:
+            svc.publish_slots.release()
+
+    def publish_locked(src, n: int):
+        svc.check_free_space(n)
+        with tempfile.TemporaryDirectory(dir=svc.tmp) as td:
+            td = Path(td)
+            body = td / "body.tar"
+            with open(body, "wb") as f:
+                shutil.copyfileobj(src, f, 1 << 20)       # waitress가 이미 받아 둔 본문(큰 것은 임시 파일)을 옮긴다
+            tarutil.unpack(body, td / "in", max_bytes=svc.max_body, max_entries=svc.max_entries)
+            body.unlink()
+            mp = td / "in" / "manifest.json"
+            if not mp.is_file():
+                raise BoundaryError("INVALID_RECORD", "tar에 manifest.json이 있어야 한다")
+            try:
+                manifest = json.loads(mp.read_text(encoding="utf-8"))
+            except ValueError:
+                raise BoundaryError("INVALID_RECORD", "manifest.json이 JSON이 아니다") from None
+            if not isinstance(manifest, dict):
+                raise BoundaryError("INVALID_RECORD", "manifest.json이 객체가 아니다")
+            fdir = td / "in" / "files"
+            got = {p.relative_to(fdir).as_posix(): p for p in fdir.rglob("*") if p.is_file()} if fdir.is_dir() else {}
+            stray = [p.relative_to(td / "in").as_posix() for p in (td / "in").rglob("*")
+                     if p.is_file() and p != mp and fdir not in p.parents]
+            if stray:
+                raise BoundaryError("INVALID_RECORD", "tar에 manifest.json과 files/ 밖의 항목이 있다")
+            did, ver = str(manifest.get("dataset_id")), str(manifest.get("version"))
+            with svc.dataset_lock(did):
+                # 잠금 안에서 판정하므로 existed와 저장소의 멱등·충돌 판정이 같은 시점을 본다: 같은 hash면 200, 다르면 저장소가 409
+                try:
+                    svc.store.get_manifest(did, ver)
+                    existed = True
+                except BoundaryError as e:
+                    if e.code not in ("NOT_FOUND", "INVALID_RECORD"):    # 형식이 틀린 ID는 publish가 같은 오류로 거절한다
+                        raise
+                    existed = False
+                res = svc.store.publish(manifest, got)
+        return (200 if existed else 201), res
+
+    def dispatch(environ, start_response):
+        # 왜 REQUEST_URI인가: WSGI의 PATH_INFO는 퍼센트 디코딩돼 있어 파일 경로의 %2F(HTTP.md I2 open_file)가 '/'로 바뀐다. 원래 경로를 쓴다.
+        method, path = environ["REQUEST_METHOD"], (environ.get("REQUEST_URI") or environ["PATH_INFO"]).split("?", 1)[0]
+        q = parse_qs(environ.get("QUERY_STRING", ""))
+        if method in ("HEAD", "OPTIONS"):
+            # 왜: 아는 메서드는 JSON 계약대로 405로 답한다(퍼징 시험이 발견한 결함, 표준 라이브러리 서버는 HTML 501을 냈다)
+            start_response("405 Method Not Allowed", [("Allow", "GET, POST"), ("Content-Length", "0")])
+            return [b""]
+        if path == "/healthz":
+            return json_response(start_response, 200, {"status": "ok"})
+        if path == "/readyz":
+            ok = svc.ready()
+            return json_response(start_response, 200 if ok else 503, {"status": "ready" if ok else "not-ready"})
+        addr, hdr = environ.get("REMOTE_ADDR", "-"), environ.get("HTTP_AUTHORIZATION")
+        # 차단 확인이 먼저다: 차단 중인 주소는 올바른 토큰도 거부한다(그렇지 않으면 차단 중에도 추측이 맞는지 알 수 있다, ADR 0012)
+        if svc.auth_blocked(addr):
+            raise BoundaryError("UNAVAILABLE", "인증 시도가 너무 많다. 잠시 뒤 다시 시도한다")
+        try:
+            svc.authorize(method, hdr)
+        except BoundaryError:
+            if not svc.token_valid(hdr):      # 유효한 토큰의 403(역할 부족)은 실패 횟수에 넣지 않는다
+                svc.note_auth_failure(addr)
+            raise
+        if method == "POST":
+            if path != "/v1/datasets":
+                raise BoundaryError("NOT_FOUND", "경로가 없다")
+            code, res = publish(environ)
+            return json_response(start_response, code, res)
+        if method != "GET":
+            raise BoundaryError("NOT_FOUND", "경로가 없다")
+        if path == "/v1/datasets":
+            return json_response(start_response, 200, _page(svc.list_ids(), _one(q, "cursor"), _limit(q)))
+        m = _DS.match(path)
+        if m:
+            return json_response(start_response, 200, _page(svc.store.list_versions(unquote(m.group(1))), _one(q, "cursor"), _limit(q)))
+        m = _VER.match(path)
+        if m:
+            return json_response(start_response, 200, svc.store.get_manifest(unquote(m.group(1)), unquote(m.group(2))))
+        m = _FILES.match(path)
+        if m:
+            with download_slot():
+                td = Path(tempfile.mkdtemp(dir=svc.tmp))
+                try:
+                    svc.dataset_tar(unquote(m.group(1)), unquote(m.group(2)), td / "d.tar")
+                    return stream(start_response, td / "d.tar", "application/x-tar", (td / "d.tar").stat().st_size,
+                                  lambda: shutil.rmtree(td, ignore_errors=True))
+                except BaseException:
+                    shutil.rmtree(td, ignore_errors=True)
+                    raise
+        m = _FILE.match(path)
+        if m:
+            did, ver, fp = (unquote(g) for g in m.groups())
+            svc.store._check_path(fp)          # '..'·절대 경로·역슬래시는 400(HTTP.md). 그 밖에 manifest에 없는 경로는 404
+            with download_slot():
+                p, size = svc.verified_file(did, ver, fp)
+                return stream(start_response, p, "application/octet-stream", size, lambda: None)
+        raise BoundaryError("NOT_FOUND", "경로가 없다")
+
+    def app(environ, start_response):
+        status = []
+
+        def sr(st, headers, exc_info=None):
+            status.append(st.split(" ", 1)[0])
+            return start_response(st, headers, exc_info)
+        try:
+            out = dispatch(environ, sr)
+        except BoundaryError as e:
+            out = fail(sr, e)
+        except Exception as e:
+            svc.log(f"내부 오류 {type(e).__name__}")
+            out = fail(sr, BoundaryError("UNAVAILABLE", "서비스 내부 오류"))
+        svc.log(f"{environ['REQUEST_METHOD']} {environ['PATH_INFO']} {status[0] if status else '-'}")
+        return out
+
+    return app
 
 
-# 기본값은 모두 측정하지 않은 보수적 시작값이다(ADR 0012). 환경 변수로 조정한다.
+# 기본값은 모두 측정하지 않은 시작값이다(ADR 0012, 0017). 환경 변수로 조정한다.
+DEFAULT_THREADS = 16        # 동시 게시 8 + 동시 다운로드 8(슬롯 상한의 합). 읽기 목록 요청은 짧다. 측정 안 함(ADR 0017)
+DEFAULT_CONNECTIONS = 32    # 이전 구현의 시작값을 그대로 옮긴다. 측정 안 함
+DEFAULT_IDLE_TIMEOUT = 30   # 이전 구현의 소켓 timeout을 그대로 옮긴다. 측정 안 함
+DEFAULT_DRAIN_GRACE = 8     # Docker stop 기본 대기 10초(SIGKILL 전)에서 여유 2초를 뺀 값(제약). 큰 게시는 이보다 길 수 있다
+
+
+class DatasetServer:
+    """waitress 서버 하나와 종료 절차. serve_forever()는 shutdown()이 불릴 때까지 돌고, 그때 새 연결을 받지 않고 진행 중인 요청을
+    drain_grace초까지 마저 처리한 뒤 돌아온다. 왜 직접 루프를 도나: waitress의 run()은 종료 신호에 작업 스레드를 5초만 기다리고 응답을
+    소켓에 쓰는 주 루프를 먼저 끝내 진행 중 응답이 나가지 못한다(waitress 3.0.2 server.py run())."""
+
+    def __init__(self, svc: Service, host="127.0.0.1", port=0, *, threads=DEFAULT_THREADS, connection_limit=DEFAULT_CONNECTIONS,
+                 channel_timeout=DEFAULT_IDLE_TIMEOUT, drain_grace=DEFAULT_DRAIN_GRACE):
+        self._map: dict = {}
+        self._srv = create_server(make_app(svc), map=self._map, host=host, port=port, threads=threads, connection_limit=connection_limit,
+                                  channel_timeout=int(channel_timeout),
+                                  cleanup_interval=min(5, max(1, int(channel_timeout))), max_request_body_size=svc.max_body, ident="dataset-store",
+                                  clear_untrusted_proxy_headers=True)
+        self._stop, self._done, self._grace = threading.Event(), threading.Event(), drain_grace
+        self._done.set()
+
+    @property
+    def server_address(self):
+        return (self._srv.effective_host, self._srv.effective_port)
+
+    def serve_forever(self):
+        self._done.clear()
+        try:
+            while not self._stop.is_set():
+                wasyncore.loop(timeout=0.1, map=self._map, count=1)
+            wasyncore.dispatcher.close(self._srv)           # 새 연결을 받지 않는다(trigger는 작업 스레드가 쓰므로 닫지 않는다)
+            deadline = time.monotonic() + self._grace
+            while time.monotonic() < deadline and any(self._busy(c) for c in list(self._srv.active_channels.values())):
+                wasyncore.loop(timeout=0.1, map=self._map, count=1)
+        finally:
+            self._done.set()
+
+    @staticmethod
+    def _busy(ch) -> bool:
+        return bool(ch.requests or ch.total_outbufs_len or ch.request is not None)
+
+    def shutdown(self):
+        self._stop.set()
+        self._done.wait()
+
+    def server_close(self):
+        wasyncore.close_all(self._map)
+        self._srv.task_dispatcher.shutdown()
+
+
+def make_server(svc: Service, host="127.0.0.1", port=0, **kw) -> DatasetServer:
+    return DatasetServer(svc, host, port, **kw)
+
+
 def main(env=os.environ) -> int:
     try:
         read = parse_tokens(read_secret("DATASET_STORE_READ_TOKENS", environ=env))
@@ -519,30 +478,30 @@ def main(env=os.environ) -> int:
         validators.runtime_contract_version          # 스키마 디렉터리가 없으면 시작을 거부한다
         svc = Service(Path(env.get("DATASET_STORE_ROOT", "/data")), validators, read, write,
                       max_body=int(env.get("DATASET_STORE_MAX_BODY", 1 << 30)),
-                      socket_timeout=float(env.get("DATASET_STORE_SOCKET_TIMEOUT", 30)),
-                      max_connections=int(env.get("DATASET_STORE_MAX_CONNECTIONS", 32)),
                       max_publishes=int(env.get("DATASET_STORE_MAX_PUBLISHES", 8)),
                       max_downloads=int(env.get("DATASET_STORE_MAX_DOWNLOADS", 8)),
                       max_entries=int(env.get("DATASET_STORE_MAX_ENTRIES", 1000)),
-                      header_deadline=float(env.get("DATASET_STORE_HEADER_DEADLINE", 10)),
                       auth_fail_limit=int(env.get("DATASET_STORE_AUTH_FAIL_LIMIT", 10)),
                       min_free_gb=float(env.get("DATASET_STORE_MIN_FREE_GB", 1)))
+        srv = make_server(svc, env.get("DATASET_STORE_HOST", "0.0.0.0"), int(env.get("DATASET_STORE_PORT", 8080)),
+                          threads=int(env.get("DATASET_STORE_THREADS", DEFAULT_THREADS)),
+                          connection_limit=int(env.get("DATASET_STORE_MAX_CONNECTIONS", DEFAULT_CONNECTIONS)),
+                          channel_timeout=float(env.get("DATASET_STORE_SOCKET_TIMEOUT", DEFAULT_IDLE_TIMEOUT)),
+                          drain_grace=float(env.get("DATASET_STORE_DRAIN_GRACE", DEFAULT_DRAIN_GRACE)))
     except (ValueError, OSError, SecretError, BoundaryError) as e:
         print(f"시작 실패: {type(e).__name__}: {e}", file=sys.stderr, flush=True)
         return 2
-    srv = make_server(svc, env.get("DATASET_STORE_HOST", "0.0.0.0"), int(env.get("DATASET_STORE_PORT", 8080)))
 
     def _stop(signum, frame):
-        threading.Thread(target=srv.shutdown, daemon=True).start()
+        srv._stop.set()                  # 루프가 알아채고 진행 중 요청을 마친 뒤 돌아온다
     try:
         signal.signal(signal.SIGTERM, _stop)
+        signal.signal(signal.SIGINT, _stop)
     except ValueError:
         pass
     print(f"dataset-store 시작 포트 {srv.server_address[1]}", flush=True)
     try:
         srv.serve_forever()
-    except KeyboardInterrupt:
-        pass
     finally:
         srv.server_close()
         shutil.rmtree(svc.tmp, ignore_errors=True)

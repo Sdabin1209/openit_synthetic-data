@@ -25,7 +25,7 @@ HTTP 경로는 이 영역 문서에 없어 `../boundary-contracts/HTTP.md`로 �
 | `seeds.py`, `seed_samples.py` | 확정된 실패 사례(CONFIRMED) 수집(I7)과 시드 샘플 조립 |
 | `quality.py`, `split.py`, `package.py`, `context.py` | 품질 검사, 시나리오 단위 분할, 패키징, 문항 세트 묶음 |
 | `store/` | I2 구현(파일 `FileDatasetStore`, 메모리 `MemoryDatasetStore`) |
-| `service/` | I2 HTTP 서버(dataset-store, D100, ADR 0012). `Dockerfile`, `requirements-service.txt`, `scripts/smoke_service.sh`. 잡은 `output.store.kind: http`로 게시(ADR 0013) |
+| `service/` | I2 HTTP 서버(dataset-store, D100, ADR 0012, WSGI+waitress는 ADR 0017). `Dockerfile`, `requirements-service.txt`, `scripts/smoke_service.sh`. 잡은 `output.store.kind: http`로 게시(ADR 0013) |
 | `importer.py` | 게시기(import) 모드: 외부 학습 데이터 검증·게시 |
 | `adapters.py`, `schemas.py` | 이웃 HTTP 연결 공장, 스키마 검증 |
 | `configs/dev.job.json` | 이웃 대역을 쓰는 개발용 설정 |
