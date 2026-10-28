@@ -38,6 +38,8 @@ store = FileDatasetStore(root, v)     # 또는 MemoryDatasetStore(v)
 | --- | --- | --- | --- |
 | 문항, 변경 분류 | I1 `QuestionReader` | `latest(reviewed_only)`, `list_versions`, `get_question_bank`(해시 재확인), `get_reviews`, `get_change`(REGENERATE_SAMPLES) | 설정의 `adapters.question_reader.factory`가 만든 객체. Protocol만 안다 |
 | 실패 사례, 비식별 trace | I7 `FailureStore`(`question_set`, `expected_kind` 사용, 없으면 폴백) | `list_cases(review_status=CONFIRMED)`, `get_trace` | `adapters.failure_store.factory` |
+
+2026-10-28(헤드 허가, ADR 0010): 위 I1·I7은 시드 잡 `run`만 소비한다. `import` 모드는 이웃 읽기 SDK를 쓰지 않고 파일 jsonl 6개를 읽는다. v1 합성 생성은 제거돼 I1은 문항 세트 참조·본문 확인용이다.
 | 정답 구성 규칙, 버전 | I8 turn-engine | 버전만(`ENGINE_VERSION`). 호출은 아직 없음(CR-002) | `import turn_engine`이 되면 사용, 아니면 설정 값 |
 
 - 이웃 코드를 가져오지 않는다. 의존은 boundary-contracts(Protocol, 오류, 해시), 문진 스키마(읽기 전용 파일), turn-engine(예정)뿐이다.

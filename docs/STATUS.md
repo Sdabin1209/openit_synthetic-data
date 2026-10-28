@@ -34,7 +34,7 @@
 - 컨테이너: 서비스 없는 잡이라 Dockerfile 없이 requirements.lock 고정으로 승인됨.
 
 ## 열림 (ADR 0010)
-- 시드 경로를 이 영역의 `run`으로 계속 둘지, `regeneration.mode`·감수 샘플링(`review_sample.jsonl`)이 아직 필요한지: 헤드 결정. 배포 E2E 설정이 v1 키(scenarios, generators, style_guide_version)를 아직 싣고 있어 무시하는 호환을 두었다(deploy가 고치면 제거).
+- 시드 `run`은 유지(헤드 결정 2026-10-28, deploy 단계 7이 호출). 제거 여부는 데이터셋 담당 이전 계획과 함께 나중에 정한다. `regeneration.mode`·감수 샘플링: deploy는 설정 값(`regeneration.mode=full`, `review.per_kind=2`)을 써넣기만 하고 `review_sample.jsonl`이나 affected_only 동작을 읽는 곳은 grep으로 찾지 못했다. 삭제하지 않고 열림으로 둔다. 배포 E2E 설정이 v1 키(scenarios, generators, style_guide_version)를 아직 싣고 있어 무시하는 호환을 두었다(deploy가 고치면 제거).
 
 ## 변경 요청
 CR-001~005 모두 헤드가 결정(2026-10-15, D43). 반영: FailureCase 1.1 필드 사용과 폴백, SlotRef 마지막 '.' 분할, boundary-contracts v1.1.0 고정과 패키지 스키마 사용.

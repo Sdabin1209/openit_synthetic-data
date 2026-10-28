@@ -5,30 +5,32 @@
 > **버전(D14, D19).** 문진 스키마는 정수 버전(`CONTRACT_VERSION`, 현재 1)에 정확히 일치해야 한다. 경계 계약은 `MAJOR.MINOR`이며 값은 `boundary-contracts`가 정한다. 불변 산출물은 `ArtifactRef`(id, version, content_hash)로 가리킨다.
 > **업무 규칙.** 이 영역이 구현하거나 의존하는 업무 요구는 `docs/rules/`에 있다(헤드가 전달, 출처는 `docs/rules/SOURCE.md`). 규칙 문서에 없는 정책은 임의로 만들지 말고 `docs/change-requests/`에 쓴다.
 
+> **2026-10-28 헤드 허가로 v1 생성 제거 반영.** 이 영역은 합성 데이터를 생성하지 않는다(D91, ADR 0001·0010). 현재 코드는 시드 `run` + 게시기 `import`다. 본문은 이 기준으로 고쳤다.
+
 ## 1. 목적과 범위
 
-- 목적: 문항 정의와 실패 사례를 바탕으로 LoRA-A·B의 학습·검증·평가 데이터를 계약 형식으로 만든다.
-- 하는 일: 시나리오 설계, 시드 수집, 정답 구성, 발화 생성, STT 노이즈 주입, 응답 문장 생성, 품질 검사, 감수 샘플링, 분할, 패키징.
-- 하지 않는 일: 모델 학습·평가, 평가셋의 합성·실제 비율 결정(O11, 사용자), 실제 환자 발화의 수집.
+- 목적: 데이터셋 담당의 최종 학습 데이터를 검증해 게시하고(`import`), 확정된 실패 사례를 시드 샘플로 만들어 게시한다(`run`). LoRA-A·B 데이터를 계약 형식으로 데이터셋 저장소에 낸다.
+- 하는 일: 학습 데이터 행 검증과 허용치 판정(import), 시드 수집, 시드 샘플 조립, 품질 검사, 감수 샘플링, 분할, 패키징, 게시.
+- 하지 않는 일: 합성 데이터 생성(시나리오 설계·발화/응답 생성·노이즈·정답 구성, 제거됨), 모델 학습·평가, 평가셋의 합성·실제 비율 결정(O11, 사용자), 실제 환자 발화의 수집.
 
 ## 2. 소유하는 것
 
 - 소유 저장소: 데이터셋 저장소(불변 버전).
 - 제공하는 SDK 인터페이스: 데이터셋 게시 SDK(쓰기), 데이터셋 읽기 SDK(지정 버전 조회). 소비자는 model-lab.
 - 이 SDK의 메모리 구현(가짜 구현)을 함께 배포한다.
-- 생산하는 계약: `ParserSample`, `GeneratorSample`, `DatasetManifest`.
+- 생산하는 계약: `ActionExtractionSample`, `ResponseSample`, `DatasetManifest`.
 
 ## 3. 소비하는 것
 
 - 소비하는 계약: `QuestionBank`, `ChangeClassification`, `FailureCase`, 런타임 입출력 계약(샘플의 입력·정답 형식).
-- 소비하는 SDK: 문항 읽기 SDK(question-authoring), 실패 사례 읽기 SDK(ops-feedback). 라이브러리로 turn-engine(정답 구성에 필요한 규칙), 문진 스키마.
+- 소비하는 SDK: 문항 읽기 SDK(question-authoring), 실패 사례 읽기 SDK(ops-feedback). 문진 스키마. turn-engine은 버전 기록만(호출 없음, CR-002).
 - 지원하는 계약 버전: 문진 스키마 정수 버전, 경계 계약 `MAJOR.MINOR`.
 
 ## 3-1. 경계 명세 (블랙박스 기준)
 
 상대 영역은 블랙박스다. 아래 인터페이스 번호의 시그니처, 오류, 멱등성은 `../boundary-contracts/INTERFACES.md`와 `CONVENTIONS.md`가 정한다. 이 명세 밖의 것을 상대에게 기대하거나 가정하지 않는다.
 
-- 내는 것: **I2** DatasetStore(`ParserSample`·`GeneratorSample` JSONL, `DatasetManifest`).
+- 내는 것: **I2** DatasetStore(`ActionExtractionSample`·`ResponseSample` JSONL, `DatasetManifest`).
 - 받는 것: **I1**(문항, 변경 분류), **I7**(시드 사례), **I8**.
 - 해야 하는 것: 평가 샘플의 시나리오는 학습·검증과 겹치지 않는다. 샘플의 input·expected는 문진 스키마로 검증한다. 변경 분류의 `REGENERATE_SAMPLES` 후속 작업이 있으면 해당 문항의 샘플을 새 데이터셋 버전으로 다시 만든다.
 
@@ -61,7 +63,7 @@
 
 ## 8. 시드
 
-시나리오 설계기, 시드 수집기, 정답 구성기, 발화 생성기, STT 노이즈 주입기, 응답 문장 생성기, 품질 검사기, 감수 샘플링, 분할기, 패키저.
+시드 수집기, 시드 샘플 조립기, 게시기(importer), 품질 검사기, 감수 샘플링, 분할기, 패키저. (시나리오 설계기·정답 구성기·발화/응답 생성기·STT 노이즈 주입기는 제거됨)
 
 ## 9. 요구하는 산출물
 
