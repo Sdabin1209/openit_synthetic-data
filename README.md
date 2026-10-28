@@ -41,13 +41,12 @@ import: 설정(JSON) + 학습 데이터 jsonl 6개 -> 행 검증 -> 허용치 �
 
 ## 3. 실행 방법
 
-전제: Python 3.10 이상(pyproject.toml), git. `../boundary-contracts`(개발용 작업 트리)와 `../survey-service/schema`가 형제 폴더에 있어야 합니다. Docker는 필요 없습니다. 서비스가 없는 잡이라 Dockerfile 없이 `requirements.lock`으로 고정하기로 헤드가 승인했습니다(docs/runbook.md).
+전제: Python 3.10 이상(pyproject.toml), git, boundary-contracts 태그를 받을 SSH 접근. 이웃 폴더는 필요 없습니다(계약은 `requirements.lock`의 태그로 설치). Docker는 필요 없습니다. 서비스가 없는 잡이라 Dockerfile 없이 `requirements.lock`으로 고정하기로 헤드가 승인했습니다(docs/runbook.md).
 
 ```bash
-# 설치 (배포는 boundary-contracts를 git ssh 태그로 설치하므로 SSH 접근이 필요)
-python3 -m venv .venv && . .venv/bin/activate
-pip install -r requirements.lock pytest
-pip install -e ../boundary-contracts          # 개발용: 작업 트리로 덮어씀
+# 설치 (멱등. .venv 생성, requirements.lock + pytest + -e . 설치)
+bash scripts/setup-env.sh
+. .venv/bin/activate
 
 # 시험
 python -m pytest -q

@@ -5,11 +5,11 @@
 ```bash
 . .venv/bin/activate && python -m synthetic_data run --config <설정.json>
 ```
-(환경이 없으면 먼저 `python3 -m venv .venv && . .venv/bin/activate && pip install -r requirements.lock`.)
+(환경이 없으면 먼저 `bash scripts/setup-env.sh`.)
 
 ## GPU 호스트에서 돌리기 (D49)
 
-이 영역은 GPU 호스트에서 돌 가능성이 높고, I2 DatasetStore의 운영 형태는 dataset-store HTTP 서버다(D100). 아래는 로컬·단일 호스트 개발 방식(파일 저장소)이고, 운영 게시는 `output.store.kind: http`(ADR 0013)다(잡은 CPU만 쓴다). (1) 코드 전송: `rsync -a --exclude .venv --exclude work --exclude '.git' ./ <호스트>:<경로>/synthetic-data/` 후 호스트에서 `python3 -m venv .venv && . .venv/bin/activate && pip install -r requirements.lock`. (2) 설정의 `output.store`를 `{"kind":"file","root":"<데이터셋 루트>"}`로 두고 `output.work_dir`는 임시 경로로 둔다. 이웃 읽기는 `adapters.*.factory`를 `synthetic_data.adapters:http_question_reader`/`http_failure_store`, `kwargs`를 `{"base_url": "...", "token_env": "<토큰 환경 변수 이름>"}`로 하고 토큰은 실행 셸의 환경 변수로만 준다(파일과 리포지토리에 넣지 않는다). (3) 데이터셋은 `<데이터셋 루트>/<dataset_id>/<version>/{manifest.json, files/...}`에 생긴다. model-lab은 같은 호스트에서 `FileDatasetStore(<같은 루트>, Validators())`의 `get_manifest`/`open_file`로 같은 경로를 읽는다(읽기만 하면 문진 스키마 경로는 필요 없다). 게시는 임시 디렉터리 후 rename이라 읽는 쪽이 반쯤 쓴 버전을 보지 않는다.
+이 영역은 GPU 호스트에서 돌 가능성이 높고, I2 DatasetStore의 운영 형태는 dataset-store HTTP 서버다(D100). 아래는 로컬·단일 호스트 개발 방식(파일 저장소)이고, 운영 게시는 `output.store.kind: http`(ADR 0013)다(잡은 CPU만 쓴다). (1) 코드 전송: `rsync -a --exclude .venv --exclude work --exclude '.git' ./ <호스트>:<경로>/synthetic-data/` 후 호스트에서 `bash scripts/setup-env.sh`. (2) 설정의 `output.store`를 `{"kind":"file","root":"<데이터셋 루트>"}`로 두고 `output.work_dir`는 임시 경로로 둔다. 이웃 읽기는 `adapters.*.factory`를 `synthetic_data.adapters:http_question_reader`/`http_failure_store`, `kwargs`를 `{"base_url": "...", "token_env": "<토큰 환경 변수 이름>"}`로 하고 토큰은 실행 셸의 환경 변수로만 준다(파일과 리포지토리에 넣지 않는다). (3) 데이터셋은 `<데이터셋 루트>/<dataset_id>/<version>/{manifest.json, files/...}`에 생긴다. model-lab은 같은 호스트에서 `FileDatasetStore(<같은 루트>, Validators())`의 `get_manifest`/`open_file`로 같은 경로를 읽는다(읽기만 하면 문진 스키마 경로는 필요 없다). 게시는 임시 디렉터리 후 rename이라 읽는 쪽이 반쯤 쓴 버전을 보지 않는다.
 
 ## 게시기(import) 실행 (G02 방향)
 
@@ -30,9 +30,7 @@ I1·I7 클라이언트는 읽기 모드다. 같은 MAJOR의 모르는 필드와 
 ## 준비
 
 ```bash
-python3 -m venv .venv && . .venv/bin/activate
-pip install -r requirements.lock pytest                 # 배포: boundary-contracts 태그는 requirements.lock이 정본
-pip install -e ../boundary-contracts                    # 개발: 작업 트리 사용(위 설치 뒤에 덮어쓴다)
+bash scripts/setup-env.sh && . .venv/bin/activate   # 정본: scripts/setup-env.sh. 태그는 requirements.lock
 ```
 (배포에서는 boundary-contracts를 Git 태그로 고정한다.)
 
