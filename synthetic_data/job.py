@@ -20,6 +20,7 @@ from . import __version__
 from .config import ConfigError, JobConfig, load_config
 from .context import QuestionSetContext
 from .package import dumps_line, package
+from .publishing import publish_idempotent
 from .quality import check_lora_a_sample, check_lora_b_sample
 from .rng import derive_int
 from .seed_samples import build_seed_samples
@@ -189,16 +190,7 @@ def _run_job(cfg, question_reader, store, failure_store, validators, clock, repo
         report["counts"] = _counts(final)
         report["dataset_digest"] = digest
         res = JobResult("PUBLISHED", cfg.dataset_id, manifest["version"], None, digest, report["counts"])
-        if cfg.version is None:
-            try:
-                ex = store.get_manifest(cfg.dataset_id, manifest["version"])
-                if ex.get("ext", {}).get("synthetic-data", {}).get("dataset_digest") == digest:
-                    res.status, res.content_hash = "ALREADY_PUBLISHED", ex["content_hash"]
-            except BoundaryError as e:
-                if e.code != "NOT_FOUND":
-                    raise
-        if res.status == "PUBLISHED":
-            res.content_hash = store.publish(manifest, files)["content_hash"]
+        res.status, res.content_hash = publish_idempotent(store, manifest, files, digest)
     report["result"] = {"status": res.status, "version": res.version, "content_hash": res.content_hash}
     res.report_path = _write_report(cfg, report)
     return res

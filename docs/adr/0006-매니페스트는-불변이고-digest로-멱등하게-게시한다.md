@@ -24,3 +24,6 @@ dataset_digest = 입력 파일 sha256들, 쓴 파일들의 해시, 문항 세트
 
 ## 되돌리는 조건
 digest 입력 항목이 부족해 다른 내용이 같은 digest가 되는 사례가 나오면 항목을 추가하는 새 ADR을 쓴다.
+
+## 보강 (2026-10-29, 표준성 점검 A10)
+`ALREADY_PUBLISHED` 판정이 `import`(version을 지정해도 판정)와 `run`(version을 비웠을 때만 판정)에서 달라, version을 고정하고 created_at만 다른 `run` 재실행이 CONFLICT가 났다. `synthetic_data/publishing.py`의 `publish_idempotent` 한 함수로 통일했다. 기대값의 출처: 계약 I2의 멱등 규칙과 CR-005 결정(digest가 같으면 이미 게시됨). 재현 시험: `tests/test_already_published_unified.py`. digest가 다르면 여전히 저장소가 CONFLICT를 낸다.

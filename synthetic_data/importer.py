@@ -25,6 +25,7 @@ from boundary_contracts.errors import BoundaryError
 from . import PIPELINE_SCHEMA_VERSION, __version__
 from .config import ConfigError, _ID_RE
 from .package import EXT, dumps_line
+from .publishing import publish_idempotent
 from .schemas import Validators
 from .store import FileDatasetStore, MemoryDatasetStore
 from .store.spec import build_http_store, parse_store
@@ -443,15 +444,7 @@ def _run_import(cfg, store, validators, clock, report) -> ImportResult:
                 "tolerance": report["tolerance"]}}}}
         manifest["content_hash"] = canonical.content_hash(manifest)
         res = ImportResult("PUBLISHED", cfg.dataset_id, manifest["version"], None, digest, counts)
-        try:   # version을 지정했어도 입력 digest가 같으면 created_at이 달라도 이미 게시된 것으로 본다(SD-4)
-            ex = store.get_manifest(cfg.dataset_id, manifest["version"])
-            if ex.get("ext", {}).get(EXT, {}).get("dataset_digest") == digest:
-                res.status, res.content_hash = "ALREADY_PUBLISHED", ex["content_hash"]
-        except BoundaryError as e:
-            if e.code != "NOT_FOUND":
-                raise
-        if res.status == "PUBLISHED":
-            res.content_hash = store.publish(manifest, files)["content_hash"]
+        res.status, res.content_hash = publish_idempotent(store, manifest, files, digest)   # run과 같은 판정(A10)
     report["dataset_digest"] = digest
     report["result"] = {"status": res.status, "version": res.version, "content_hash": res.content_hash}
     res.report_path = _write(cfg, report)
