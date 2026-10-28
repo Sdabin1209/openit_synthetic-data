@@ -6,7 +6,11 @@
 
 데이터셋 저장소(불변 버전). 쓰는 영역은 이 영역뿐이다. 구현은 파일 기반(`FileDatasetStore`)과 메모리(`MemoryDatasetStore`)이며, 배치는 `<root>/<dataset_id>/<version>/{manifest.json, meta.json, files/<path>}`. 한 번 게시한 `(dataset_id, version)`은 바뀌지 않는다(같은 내용의 재게시는 멱등, 다른 내용은 CONFLICT).
 
-## 2. 제공하는 SDK
+## 2. 제공하는 인터페이스 (HTTP 서버와 SDK)
+
+**HTTP(운영, D100·D49)**: dataset-store 서버(`synthetic_data/service/`)가 `boundary-contracts/HTTP.md ## I2`를 서비스한다. 읽기 토큰은 소비자(model-lab), 쓰기 토큰(역할 `synthetic-data`)은 이 영역의 잡이 쓴다. 경로·인증·한도의 근거는 `docs/adr/0012`, 잡의 게시 설정은 `docs/adr/0013`이다. 이웃은 이 영역의 저장소 볼륨을 읽지 않는다.
+
+아래는 서버 안에서 쓰는 저장소 구현과 같은 Protocol이다(로컬 개발·시험용으로 직접 쓸 수도 있다).
 
 **I2 DatasetStore** (`boundary_contracts.sdk.DatasetStore` Protocol). 생성자 인자로만 설정을 받고 환경 변수를 읽지 않는다.
 
@@ -25,7 +29,7 @@ store = FileDatasetStore(root, v)     # 또는 MemoryDatasetStore(v)
 | `open_file(dataset_id, version, path)` | 파일 해시 재확인 후 `BinaryIO` | NOT_FOUND, INTEGRITY_ERROR |
 
 - 모든 실패는 `BoundaryError`다. 메모리 구현도 같은 조건에서 같은 코드를 던진다(같은 적합성 시험).
-- 소비자는 model-lab이다. 읽기용 별도 SDK는 없고 같은 Protocol의 읽기 메서드를 쓴다.
+- 소비자는 model-lab이고 운영에서는 HTTP 클라이언트(`HttpDatasetStore`)로 읽는다. 읽기용 별도 SDK는 없다.
 - `dataset_id`와 `version`은 Id 규칙(`[A-Za-z0-9][A-Za-z0-9._:-]*`, 128자 이하)을 지켜야 한다(경로 안전, CR-005). 파일 경로(`files[].path`)는 상대 경로이고 `..`, 절대 경로, 중복 슬래시를 쓸 수 없다.
 
 ## 3. 산출 계약
