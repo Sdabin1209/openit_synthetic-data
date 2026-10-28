@@ -16,7 +16,7 @@ dependencies = [
 dev = ["pytest"]
 
 [tool.setuptools]
-packages = ["synthetic_data", "synthetic_data.store", "synthetic_data.generators"]
+packages = ["synthetic_data", "synthetic_data.store"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

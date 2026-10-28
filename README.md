@@ -1,10 +1,10 @@
 # synthetic-data (합성 데이터)
 
-문항 정의와 실패 사례로 LoRA-A(발화 해석)·LoRA-B(응답 문장) 학습·검증·평가 데이터를 만들어 데이터셋 저장소에 게시하는 **run-once 잡**입니다.
+데이터셋 담당의 최종 학습 데이터를 검증해(`import`), 그리고 확정된 실패 사례를 시드 샘플로 만들어(`run`) 데이터셋 저장소에 게시하는 **run-once 잡**입니다.
 
 이 영역은 문진 시스템에서 모델을 학습시키는 쪽에 먹일 연습문제집을 만듭니다. 설정 파일 하나로 한 번 돌고 끝나며(같은 입력과 시드면 같은 결과, 여러 번 실행해도 안전), 결과는 불변 버전으로 저장소에 쌓입니다. 하지 않는 것: 모델 학습·평가, 평가셋의 합성·실제 비율 결정(O11, 사용자 몫), 실제 환자 발화 수집, 웹 서비스 운영(서비스가 아니라 `/healthz`도 없음).
 
-> 중요(G02): 생성 파이프라인(`run`)은 v1 내용을 만들어 합성 샘플이 전부 걸러지므로 운영에서 돌리지 않습니다. 사용자가 정한 방향은 데이터셋 담당이 서버에서 만든 최종 학습 데이터를 재생성 없이 가져와 검증·게시하는 것이고, 그 **게시기(`import`) 모드**를 구현했습니다(docs/design.md 부록 A). 실제 C1 학습 데이터 6개(64,459행)로 검증·임시 저장소 게시·멱등 재실행을 확인했습니다(결과: docs/design.md 부록 B). 운영 저장소 게시와 의미 검사는 하지 않았습니다.
+> 중요(G02, D91): 이 영역은 합성 데이터를 생성하지 않습니다. 학습 데이터 본체는 데이터셋 담당이 서버에서 만든 최종 데이터를 재생성 없이 가져와 검증·게시하는 **게시기(`import`) 모드**가 맡고(docs/design.md 부록 A), 실제 C1 학습 데이터 6개(64,459행)로 검증·임시 저장소 게시·멱등 재실행을 확인했습니다(결과: docs/design.md 부록 B). 운영 저장소 게시와 의미 검사는 하지 않았습니다. v1 생성 경로는 제거했고 `run`은 **시드 잡**(확정된 실패 사례를 시드 샘플로 게시)만 합니다(docs/adr/0010).
 
 ## 1. 전체 속의 위치
 
@@ -22,10 +22,8 @@ HTTP 경로는 이 영역 문서에 없어 `../boundary-contracts/HTTP.md`로 �
 | 경로 | 역할 |
 |---|---|
 | `synthetic_data/job.py`, `__main__.py`, `config.py` | 잡 진입점(`run`)과 설정 |
-| `scenario.py`, `plans.py`, `directives.py` | 시나리오 설계(v1 내용) |
-| `generators/` | 발화·응답 문장 생성기(규칙 기반, 교체 가능한 Protocol) |
-| `noise.py`, `labeler.py`, `seeds.py` | STT 노이즈, 정답 구성, 실패 사례 시드 |
-| `quality.py`, `split.py`, `package.py` | 품질 검사, 시나리오 단위 분할, 패키징 |
+| `seeds.py`, `seed_samples.py` | 확정된 실패 사례(CONFIRMED) 수집(I7)과 시드 샘플 조립 |
+| `quality.py`, `split.py`, `package.py`, `context.py` | 품질 검사, 시나리오 단위 분할, 패키징, 문항 세트 묶음 |
 | `store/` | I2 구현(파일 `FileDatasetStore`, 메모리 `MemoryDatasetStore`) |
 | `importer.py` | 게시기(import) 모드: 외부 학습 데이터 검증·게시 |
 | `adapters.py`, `schemas.py` | 이웃 HTTP 연결 공장, 스키마 검증 |
@@ -35,12 +33,10 @@ HTTP 경로는 이 영역 문서에 없어 `../boundary-contracts/HTTP.md`로 �
 | `docs/` | 7절 참고 |
 
 ```
-설정(JSON) -> 문항 읽기(I1) -> 시나리오 설계 -> 발화 생성 -> STT 노이즈 -> 정답 구성 -+
-              시드 수집(I7) -> 시드 샘플 ----------------------------------------------+
-                                                                                        v
-  게시(I2) <- 패키징 <- 분할(시나리오 단위) <- 중복 제거 <- 품질 검사 <- 샘플 레코드
+run:    설정(JSON) -> 문항 읽기(I1) -> 시드 수집(I7) -> 시드 샘플 -> 품질 검사 -> 분할 -> 패키징 -> 게시(I2)
+import: 설정(JSON) + 학습 데이터 jsonl 6개 -> 행 검증 -> 허용치 판정 -> 패키징 -> 게시(I2)
 ```
-(docs/design.md 1절의 도식을 줄인 것)
+
 
 ## 3. 실행 방법
 
@@ -65,23 +61,24 @@ PYTHONPATH=tests python -m synthetic_data run --config configs/dev.job.json [--c
 - 게시기 보고서: 중복 발화·개인정보 의심 패턴 건수, `deid_attested: false`(비식별은 확인하지 않음), 의미 검사 미수행 표시. 입력 값은 담지 않습니다.
 - 결과 확인: `<work_dir>/report.json`(버린 사유 `dropped`), `review_sample.jsonl`, 저장소의 `<root>/<dataset_id>/<version>/manifest.json`.
 
-이 문서를 쓰며 **실제로 돌린 것**: `python -m pytest -q -rs`(2026-10-28, 이 PC 한 환경: 114 통과, 16 건너뜀, 0 실패; 건너뜀 16건은 생성기가 아직 v1 내용을 만들어 보류한 시험 15건과 `SD_REFERENCE_DATA_DIR`(실제 파일 경로) 없음 1건), `python -m synthetic_data --help`(정상). **돌리지 않은 것**: `run` 잡, pip 설치. 스모크 스크립트는 없습니다(서비스가 아님).
+이 문서를 쓰며 **실제로 돌린 것**과 시험 개수는 5절에 있습니다. 스모크 스크립트는 없습니다(서비스가 아님).
 
 ## 4. 현재 상태
 
-확인된 것(근거 문서의 진술이며 이번에 시험을 다시 돌려 확인하지는 않았음):
-- v2 이전(D74/D75) 시점에 시험 85건 통과, 15건 보류(생성기 v2 대기, `tests/conftest.py`의 `needs_generator_v2`)였다(CHANGELOG 0.2.0). 당시 수집은 104건, 그중 skip 15건이었고 D84가 시험 4건을 더해 실행 대상은 89건이다(수집·표시 개수는 확인, 통과 여부는 미확인). 버전은 pyproject 0.2.0, CHANGELOG는 0.2.2(제안)로 어긋나 있다(docs/STATUS.md).
+확인된 것은 5절의 실행 결과입니다. 문서의 진술에 기댄 것(이번에 다시 확인하지 않음):
 - I2 파일·메모리 구현이 같은 적합성 시험을 통과, 같은 입력과 시드는 같은 `dataset_digest`(docs/STATUS.md).
-- D84(NAME_FILE)와 boundary-contracts v2.0.2 반영, 비밀이 산출물에 안 나오는 시험 추가(CHANGELOG 0.2.2, 제안 버전).
-- 변경 요청 CR-001~005는 헤드가 결정(docs/STATUS.md).
+- D84(NAME_FILE)와 boundary-contracts v2.0.2 반영, 비밀이 산출물에 안 나오는 시험 추가(CHANGELOG 0.2.2, 제안 버전). 버전은 pyproject 0.2.0, CHANGELOG는 0.2.2(제안)로 어긋나 있다(docs/STATUS.md).
+- 변경 요청 CR-001~005는 헤드가 결정(docs/STATUS.md). CR-007(v1 생성 경로 제거 제안)은 시드 경로를 남기는 범위까지 ADR 0010으로 실행했다.
 
-이전 확인(2026-10-27 `pytest -q` 실행 출력, 오래된 값): 113 passed, 15 skipped(전체 128건 수집). 현재 실측은 위 실행 결과(114 passed, 16 skipped). 늘어난 24건은 게시기 시험(`tests/test_import.py`, 가짜 입력)이다. 확인 못 한 것: 게시기를 실제 학습 데이터 파일로 돌린 적 없음(행 형식 추정), v2 의미 검사 미수행(CR-006), 이웃 영역과의 실제 연동, 이웃 영역과의 실제 HTTP 연동(운영 환경), 이미지·E2E(해당 없음 또는 미실행), turn-engine 연동(미구현).
+확인 못 한 것: 게시기를 운영 저장소에 게시한 적 없음, v2 의미 검사 미수행(CR-006), 이웃 영역과의 실제 HTTP 연동(운영 환경), 이미지·E2E(해당 없음 또는 미실행), turn-engine 연동(미구현).
 
-## 5. 이 영역의 열린 항목 (head/docs/OPEN_GAPS.md)
+## 5. 시험 상태와 이 영역의 열린 항목 (head/docs/OPEN_GAPS.md)
+
+시험 상태(이 영역 시험 개수는 이 절에만 적는다). 2026-10-28, 이 PC 한 환경(가상환경 `.venv`, 이웃은 tests/doubles.py 대역·참조 서버): `python -m pytest -q -rs` -> 107 통과, 1 건너뜀, 0 실패. 건너뜀 1건은 `SD_REFERENCE_DATA_DIR`(실제 학습 데이터 파일 경로)가 없어서다. v1 생성 경로 제거(ADR 0010) 전에는 114 통과, 16 건너뜀(보류 15건 포함)이었다. 돌리지 않은 것: 깨끗한 두 번째 환경, 전체 E2E, 운영 이웃 영역과의 연동.
 
 | ID | 요약 | 막는 것 |
 |---|---|---|
-| G02 | 생성 파이프라인이 v1 내용을 만들어 합성 샘플이 전부 걸러짐. 15개 시험 보류 | 방향은 사용자가 정함(서버 데이터를 그대로 가져와 게시). 게시기 구현됨, 실제 데이터 게시는 미실시, 열린 질문은 CR-006 |
+| G02 | v1 생성 경로와 보류 시험 15건 | 제거함(ADR 0010). 시드 경로(`run`)는 E2E 단계 7이 쓰므로 남김. 게시기 구현됨, 운영 게시는 미실시, 열린 질문은 CR-006. 시드를 이 영역에 계속 둘지는 헤드 결정(ADR 0010 대안 1) |
 | U07(일부) | v2 E2E에서 "단계 2(G02)"를 건너뜀 | G02 결정 |
 | O11 | 평가셋 구성과 합성·실제 비율(OPEN_GAPS에는 없고 docs/brief.md에 있음) | 사용자 결정. `split.ratios`는 예시 값만 |
 
@@ -90,7 +87,7 @@ GPU가 막는 항목은 이 영역에 없습니다(잡은 CPU만 사용).
 
 ## 6. 남은 일 (docs/STATUS.md)
 
-v2 의미 검사는 turn-engine `validate_extraction` 이후(미정), turn-engine 연동(CR-002), LLM 생성기와 재현성, 이웃 대역을 실제 SDK로 교체.
+v2 의미 검사는 turn-engine `validate_extraction` 이후(미정), turn-engine 연동(CR-002), 이웃 대역을 실제 SDK로 교체.
 
 ## 7. 더 자세한 문서
 
@@ -103,6 +100,6 @@ v2 의미 검사는 turn-engine `validate_extraction` 이후(미정), turn-engin
 | `docs/runbook.md` | 실행, GPU 호스트, 설정 필드, 문제 대응, 비밀 |
 | `docs/STATUS.md` | 한 일, 남은 일, 막힌 것 |
 | `docs/CHANGELOG.md` | 변경 이력 |
-| `docs/adr/` | 구조 선택의 '왜' (ADR 0001~0009, 목록은 `docs/adr/README.md`) |
+| `docs/adr/` | 구조 선택의 '왜' (ADR 0001~0010, 목록은 `docs/adr/README.md`) |
 | `docs/change-requests/` | 헤드에게 낸 변경 요청 CR-001~005 |
 | `docs/rules/` | 헤드가 전달한 업무 규칙(출처 SOURCE.md) |

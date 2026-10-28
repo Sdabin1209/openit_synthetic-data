@@ -49,11 +49,6 @@ def run(cfg_raw: dict, store, validators, *, reader=None, fstore=None, **kw):
     return cfg, run_job(cfg, question_reader=reader, failure_store=fstore, store=store, validators=validators, **kw)
 
 
-GEN_V2_PENDING = ("생성 파이프라인(시나리오 설계·정답 구성·발화/응답 생성기)은 아직 v1 내용을 만든다. v2 샘플을 만들도록 옮기는 일은 "
-                  "synthetic-data의 역할 결정(head/docs/migration-2.0.0.md '아직 정해지지 않은 것')을 기다리는 미정 사항이다")
-needs_generator_v2 = pytest.mark.skip(reason=GEN_V2_PENDING)
-
-
 def v2_sample(role: str, n: int, split: str, ref: dict, *, scenario: str = None, origin: str = "SYNTHETIC") -> dict:
     """손으로 지은 v2 샘플(ActionExtractionSample/ResponseSample)."""
     a = role == "LORA_A"
@@ -68,7 +63,7 @@ def v2_sample(role: str, n: int, split: str, ref: dict, *, scenario: str = None,
 def build_v2_dataset(tmp: Path):
     """v2 샘플을 package()로 묶은 (매니페스트, 파일 바이트). 생성기를 거치지 않는다."""
     from synthetic_data.package import package
-    from synthetic_data.scenario import QuestionSetContext
+    from synthetic_data.context import QuestionSetContext
     r = doubles.make_question_reader()
     ctxs = []
     for qid, use in (("qs-main", "TRAIN_POOL"), ("qs-unseen", "HELD_OUT_EVAL")):

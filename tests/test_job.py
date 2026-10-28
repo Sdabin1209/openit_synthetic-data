@@ -8,7 +8,7 @@ import pytest
 from boundary_contracts.errors import BoundaryError
 
 import doubles
-from conftest import SURVEY_DIR, make_cfg_raw, needs_generator_v2, run
+from conftest import SURVEY_DIR, make_cfg_raw, run
 from synthetic_data.__main__ import main
 from synthetic_data.config import ConfigError, parse_config
 from synthetic_data.store import FileDatasetStore, MemoryDatasetStore
@@ -26,69 +26,6 @@ def published(tmp_path, validators):
     st = MemoryDatasetStore(validators)
     cfg, res = run(make_cfg_raw(tmp_path), st, validators)
     return st, res, st.get_manifest(res.dataset_id, res.version)
-
-
-@needs_generator_v2
-def test_end_to_end_manifest(published):
-    st, res, m = published
-    assert res.status == "PUBLISHED" and res.content_hash == m["content_hash"]
-    assert m["runtime_contract_version"] == 1 and m["scenario_disjoint_across_splits"] is True
-    assert m["turn_engine_version"] == "0.0.0-test" and m["seed_case_ids"] == ["fc-a", "fc-b"]
-    assert {r["id"] for r in m["question_sets"]} == {"qs-main", "qs-unseen"}
-    assert m["generator_version"].startswith("rule-utterance@")
-    assert sum(e["sample_count"] for e in m["files"]) > 100
-    roles = {e["role"] for e in m["files"]}
-    assert roles == {"PARSER", "GENERATOR"}
-
-
-@needs_generator_v2
-def test_scenarios_disjoint_across_splits(published):
-    st, res, m = published
-    seen = {}
-    for path, recs in read_all(st, m).items():
-        for r in recs:
-            seen.setdefault(r["split"], set()).add(r["scenario_id"])
-    assert set(seen) == {"TRAIN", "VALIDATION", "EVAL"}
-    for a, b in (("EVAL", "TRAIN"), ("EVAL", "VALIDATION"), ("TRAIN", "VALIDATION")):
-        assert not seen[a] & seen[b]
-
-
-@needs_generator_v2
-def test_same_scenario_variants_stay_together(published):
-    st, res, m = published
-    where = {}
-    for recs in read_all(st, m).values():
-        for r in recs:
-            where.setdefault(r["scenario_id"], set()).add(r["split"])
-    assert all(len(v) == 1 for v in where.values())
-    noisy = [r for recs in read_all(st, m).values() for r in recs if r.get("noise_types")]
-    assert noisy, "노이즈 변형이 하나도 없다"
-
-
-@needs_generator_v2
-def test_unseen_question_set_eval(published):
-    st, res, m = published
-    unseen = [e for e in m["files"] if e["path"].endswith("eval_unseen.jsonl")]
-    assert unseen and all(e["split"] == "EVAL" for e in unseen)
-    unseen_ids = {r["id"] for e in unseen for r in e["question_sets"]}
-    assert unseen_ids == {"qs-unseen"}
-    train_ids = {r["id"] for e in m["files"] if e["split"] in ("TRAIN", "VALIDATION") for r in e["question_sets"]}
-    assert "qs-unseen" not in train_ids
-    data = read_all(st, m)
-    for recs in data.values():
-        for r in recs:
-            if r["question_set"]["id"] == "qs-unseen":
-                assert r["split"] == "EVAL"
-    assert m["ext"]["synthetic-data"]["unseen_eval_files"] == sorted(e["path"] for e in unseen)
-
-
-@needs_generator_v2
-def test_no_quality_drops_besides_duplicates(tmp_path, validators):
-    cfg_raw = make_cfg_raw(tmp_path)
-    run(cfg_raw, MemoryDatasetStore(validators), validators)
-    rep = json.loads((Path(cfg_raw["output"]["work_dir"]) / "report.json").read_text())
-    assert set(rep["dropped"]) <= {"duplicate_input", "synthetic_dropped_for_seed_input"}, rep["dropped"]
-    assert (Path(cfg_raw["output"]["work_dir"]) / "review_sample.jsonl").stat().st_size > 0
 
 
 def test_reproducible_same_content_hash(tmp_path, validators):
@@ -119,17 +56,6 @@ def test_rerun_is_already_published_even_with_new_created_at(tmp_path, validator
     b = run(raw, st, validators)[1]
     assert b.status == "ALREADY_PUBLISHED" and b.content_hash == a.content_hash
     assert st.list_versions("ds-test") == [a.version]
-
-
-@needs_generator_v2
-def test_explicit_version_conflict_on_different_content(tmp_path, validators):
-    st = MemoryDatasetStore(validators)
-    run(make_cfg_raw(tmp_path / "a", version="v1"), st, validators)
-    with pytest.raises(BoundaryError) as e:
-        run(make_cfg_raw(tmp_path / "b", version="v1", seed=99), st, validators)
-    assert e.value.code == "CONFLICT"
-    again = run(make_cfg_raw(tmp_path / "c", version="v1"), st, validators)[1]
-    assert again.status == "PUBLISHED"       # 같은 내용이면 멱등 게시
 
 
 def test_seed_samples(published):
@@ -203,46 +129,6 @@ def test_boundary_error_from_neighbor_propagates(tmp_path, validators):
     assert e.value.retryable
 
 
-@needs_generator_v2
-def test_regeneration_affected_only(tmp_path, validators):
-    reader = doubles.make_question_reader()
-    change = {"pipeline_schema_version": "2.0", "classification_id": "cc-1", "to": {}, "change_kinds": ["TEXT"],
-              "affected_slots": ["Q3.hours"], "follow_ups": ["REGENERATE_SAMPLES"], "created_at": "2026-10-15T00:00:00Z"}
-    reader.add("qs-main", "2", doubles.make_bank("main", wording=" (개정)"), change=change)
-    raw = make_cfg_raw(tmp_path, regeneration={"mode": "affected_only"}, seeds={"enabled": False},
-                       question_sets=[{"id": "qs-main", "version": "2"}])
-    st = MemoryDatasetStore(validators)
-    _, res = run(raw, st, validators, reader=reader)
-    m = st.get_manifest(res.dataset_id, res.version)
-    qids = set()
-    for recs in read_all(st, m).values():
-        for r in recs:
-            if r["sample_id"].startswith("ps-"):
-                qids |= {q["question_id"] for q in r["input"]["awaiting_questions"]}
-    assert qids == {"Q3"}
-    # REGENERATE_SAMPLES가 없으면 할 일이 없다
-    reader2 = doubles.make_question_reader()
-    reader2.add("qs-main", "2", doubles.make_bank("main", wording=" (개정)"), change=dict(change, follow_ups=["REEVALUATE_MODEL"]))
-    _, res2 = run(make_cfg_raw(tmp_path / "n", regeneration={"mode": "affected_only"}, seeds={"enabled": False},
-                               question_sets=[{"id": "qs-main", "version": "2"}]), MemoryDatasetStore(validators), validators, reader=reader2)
-    assert res2.status == "NOTHING_TO_DO"
-
-
-@needs_generator_v2
-def test_generators_are_swappable(tmp_path, validators):
-    raw = make_cfg_raw(tmp_path, seeds={"enabled": False}, scenarios={"variants": 1, "noise_variants": 0},
-                       generators={"utterance": "custom_gens:FixedUtteranceGenerator", "response": "custom_gens:FixedResponseGenerator"})
-    st = MemoryDatasetStore(validators)
-    _, res = run(raw, st, validators)
-    m = st.get_manifest(res.dataset_id, res.version)
-    assert "fixed-utt@9.9" in m["generator_version"] and "fixed-resp@9.9" in m["generator_version"]
-    data = read_all(st, m)
-    parser = [r for recs in data.values() for r in recs if r["sample_id"].startswith("ps-")]
-    assert parser and all(r["input"]["utterance"] == "몰라요" for r in parser)
-    gen = [r for recs in data.values() for r in recs if r["sample_id"].startswith("gs-")]
-    assert gen and all(r["input"]["directive"]["action"] == "ASK_NEXT" for r in gen)
-
-
 def test_config_requires_split_ratios(tmp_path):
     raw = make_cfg_raw(tmp_path)
     del raw["split"]
@@ -309,27 +195,12 @@ def test_seed_question_set_not_in_run_is_skipped(tmp_path, validators):
     assert any(s["case_id"] == "fc-new" and "학습 풀" in s["reason"] for s in rep["skipped_seeds"])
 
 
-def test_affected_slots_split_at_last_dot():
-    from synthetic_data.job import _affected_questions
-    assert _affected_questions({"affected_slots": ["Q3b.sub.frequency", "Q1.status"]}) == {"Q3b.sub", "Q1"}
-    assert _affected_questions({"affected_slots": []}) is None
-
-
 def test_labels_never_copied_from_contract_examples():
     """boundary-contracts의 examples/ 정답 예시는 읽지도 복사하지도 않는다. 합성 정답은 라벨 기준 구현에서만 나온다."""
     from synthetic_data.job import __file__ as _  # noqa
     src = Path(__file__).resolve().parent.parent / "synthetic_data"
     for p in src.rglob("*.py"):
         assert "examples" not in p.read_text(encoding="utf-8"), p
-
-
-def test_synthetic_all_dropped_is_reported_not_silent(tmp_path, validators):
-    """생성기가 아직 v1 내용을 만들어 합성 샘플이 전부 v2 스키마에서 빠진다. 그 사실이 보고서에 남아야 한다."""
-    cfg_raw = make_cfg_raw(tmp_path)
-    cfg, res = run(cfg_raw, MemoryDatasetStore(validators), validators)
-    rep = json.loads((cfg.work_dir / "report.json").read_text())
-    assert rep["dropped"]["schema_sample"] > 0
-    assert any("v1 내용" in n for n in rep["notes"])
 
 
 def test_seed_needs_reviewed_input_and_v2_schema(tmp_path, validators):
@@ -351,3 +222,24 @@ def test_seed_needs_reviewed_input_and_v2_schema(tmp_path, validators):
     assert "스키마를 위반" in skipped["fc-badinput"] and "스키마를 위반" in skipped["fc-v1exp"]
     assert "fc-oldkind" not in skipped             # v1 종류 이름은 모르는 값이라 expected 형태(객체)로 판별해 LORA_A로 쓴다
     assert any("PARSER" in n for n in rep["notes"])
+
+
+def test_regeneration_affected_only_excludes_sets_without_follow_up(tmp_path, validators):
+    """regeneration.mode=affected_only: REGENERATE_SAMPLES 후속 작업이 없는 문항 세트는 제외하고, 남은 것이 없으면 할 일이 없다."""
+    change = {"pipeline_schema_version": "2.0", "classification_id": "cc-1", "to": {}, "change_kinds": ["TEXT"],
+              "affected_slots": ["Q3.hours"], "follow_ups": ["REEVALUATE_MODEL"], "created_at": "2026-10-15T00:00:00Z"}
+    reader = doubles.make_question_reader()
+    reader.add("qs-main", "2", doubles.make_bank("main", wording=" (개정)"), change=change)
+    raw = make_cfg_raw(tmp_path, regeneration={"mode": "affected_only"}, question_sets=[{"id": "qs-main", "version": "2"}])
+    _, res = run(raw, MemoryDatasetStore(validators), validators, reader=reader)
+    assert res.status == "NOTHING_TO_DO"
+
+
+def test_v1_generation_config_keys_are_ignored_and_reported(tmp_path, validators):
+    """배포 E2E의 기존 설정이 싣고 있는 scenarios·generators·style_guide_version은 받되 무시하고 보고서에 남긴다(ADR 0010)."""
+    raw = make_cfg_raw(tmp_path, scenarios={"variants": 3, "noise_variants": 2}, generators={"utterance": "rule", "response": "rule"},
+                       style_guide_version="1")
+    cfg, res = run(raw, MemoryDatasetStore(validators), validators)
+    rep = json.loads((cfg.work_dir / "report.json").read_text())
+    assert res.status == "PUBLISHED" and any("v1 생성 설정 키" in n for n in rep["notes"])
+    assert set(res.counts) >= {"origin.FAILURE_CASE_SEED"} and "origin.SYNTHETIC" not in res.counts

@@ -12,7 +12,7 @@ from boundary_contracts import canonical
 
 from . import PIPELINE_SCHEMA_VERSION
 from .config import JobConfig
-from .scenario import QuestionSetContext
+from .context import QuestionSetContext
 
 EXT = "synthetic-data"
 

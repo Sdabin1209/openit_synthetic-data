@@ -1,4 +1,5 @@
-"""생성 잡: 설정 하나로 문항 읽기 -> 시나리오 설계 -> 생성 -> 노이즈 -> 정답 -> 품질 검사 -> 분할 -> 패키징 -> 게시를 끝까지 돈다.
+"""시드 잡(`run`): 설정 하나로 문항 읽기 -> 시드 수집(I7) -> 시드 샘플 -> 품질 검사 -> 분할 -> 패키징 -> 게시를 끝까지 돈다.
+v1 생성 경로(시나리오 설계·발화/응답 생성·노이즈·정답 구성)는 ADR 0010으로 제거했다. 학습 데이터 본체는 `import` 모드가 게시한다.
 같은 입력(문항 세트 내용, 시드 사례, 설정)과 시드는 같은 dataset_digest를 낸다. created_at을 고정하면 매니페스트 content_hash도 같다."""
 from __future__ import annotations
 
@@ -17,18 +18,15 @@ from boundary_contracts.sdk import DatasetStore, FailureStore, QuestionReader
 
 from . import __version__
 from .config import JobConfig, load_config
-from .generators import load_response_generator, load_utterance_generator
+from .context import QuestionSetContext
 from .package import dumps_line, package
-from .pipeline import build_generator_samples, build_parser_samples, build_seed_samples
 from .quality import check_lora_a_sample, check_lora_b_sample
 from .rng import derive_int
-from .scenario import QuestionSetContext, design_generator_plans, design_parser_plans
+from .seed_samples import build_seed_samples
 from .schemas import Validators
 from .seeds import collect_seeds
 from .split import assign_split
 from .store import FileDatasetStore, MemoryDatasetStore
-
-NOISE_VERSION = "0.1.0"
 
 
 @dataclass
@@ -70,14 +68,6 @@ def _find_ref(reader: QuestionReader, qid: str, version: str) -> dict:
             raise BoundaryError("NOT_FOUND", f"문항 세트 버전이 없다: {qid}@{version}")
 
 
-def _affected_questions(change: dict) -> Optional[set]:
-    """affected_slots(SlotRef 문자열 '<question_id>.<slot_id>', CONVENTIONS 10절)에서 문항 ID를 뽑는다.
-    마지막 '.'에서 나눈다(문항 ID에는 '.'이 있을 수 있다). 비어 있으면 None(전체)."""
-    if not change["affected_slots"]:
-        return None
-    return {s.rsplit(".", 1)[0] for s in change["affected_slots"]}
-
-
 def run_job(cfg: JobConfig, *, question_reader: QuestionReader, store: DatasetStore,
             failure_store: Optional[FailureStore] = None, validators: Optional[Validators] = None,
             clock: Optional[Callable[[], str]] = None) -> JobResult:
@@ -97,7 +87,7 @@ def _run_job(cfg, question_reader, store, failure_store, validators, clock, repo
     contract = v.runtime_contract_version
     te_version = resolve_turn_engine_version(cfg)
     # 1. 문항 읽기 (I1)
-    ctxs, qfilter = [], {}
+    ctxs = []
     for spec in cfg.question_sets:
         ref = _find_ref(question_reader, spec.id, spec.version) if spec.version else \
             question_reader.latest(spec.id, reviewed_only=cfg.reviewed_only)
@@ -113,29 +103,18 @@ def _run_job(cfg, question_reader, store, failure_store, validators, clock, repo
             if ch is None or "REGENERATE_SAMPLES" not in ch["follow_ups"]:
                 report["notes"].append(f"{ref['id']}@{ref['version']}: REGENERATE_SAMPLES 후속 작업이 없어 제외")
                 continue
-            qfilter[ref["id"], ref["version"]] = _affected_questions(ch)
         ctxs.append(QuestionSetContext(ref, bank, spec.usage))
     if not ctxs:
         return JobResult("NOTHING_TO_DO", cfg.dataset_id, report_path=_write_report(cfg, report))
 
-    # 2~4. 시나리오 설계 -> 생성 -> 노이즈 -> 정답
-    ugen, rgen = load_utterance_generator(cfg.utterance_generator), load_response_generator(cfg.response_generator)
+    # 2. 시드 샘플 (I7). v1 합성 샘플은 만들지 않는다(ADR 0010)
     samples: list[dict] = []
     gen_stats = Counter()
-    banks = {}
-    for c in ctxs:
-        banks[(c.ref["id"], c.ref["version"])] = c.bank
-        qf = qfilter.get((c.ref["id"], c.ref["version"]))
-        pp, s1 = design_parser_plans(c, variants=cfg.variants, seed=cfg.seed, kinds=cfg.kinds, question_filter=qf)
-        gp, s2 = design_generator_plans(c, variants=cfg.variants, seed=cfg.seed, question_filter=qf)
-        ps, s3 = build_parser_samples(pp, ugen, cfg, contract)
-        gs, s4 = build_generator_samples(gp, rgen, cfg, contract)
-        samples += ps + gs
-        gen_stats.update({"plans_parser": len(pp), "plans_generator": len(gp), "not_applicable": s1["not_applicable"] + s2["not_applicable"]})
-        gen_stats.update(s3)
-        gen_stats.update(s4)
+    banks = {(c.ref["id"], c.ref["version"]): c.bank for c in ctxs}
+    ignored = sorted(k for k in ("scenarios", "generators", "style_guide_version") if k in cfg.raw)
+    if ignored:
+        report["notes"].append(f"v1 생성 설정 키는 무시한다(ADR 0010): {ignored}")
 
-    # 시드 (I7)
     if cfg.seeds_enabled:
         if failure_store is None:
             raise BoundaryError("FAILED_PRECONDITION", "seeds.enabled인데 failure_store가 없다")
@@ -157,12 +136,12 @@ def _run_job(cfg, question_reader, store, failure_store, validators, clock, repo
                 report["skipped_seeds"].append({"case_id": sd.case_id, "reason": why})
             else:
                 pairs.append((sd, c))
-        ss, skipped2, s5 = build_seed_samples(pairs, cfg, contract)
+        ss, skipped2, s5 = build_seed_samples(pairs)
         samples += ss
         report["skipped_seeds"] += skipped2
         gen_stats.update(s5)
 
-    # 5. 품질 검사 + 중복 제거
+    # 3. 품질 검사 + 중복 제거
     kept, dropped = [], Counter()
     for s in sorted(samples, key=lambda r: r["sample_id"]):
         bank = banks[(s["question_set"]["id"], s["question_set"]["version"])]
@@ -189,25 +168,22 @@ def _run_job(cfg, question_reader, store, failure_store, validators, clock, repo
         else:
             final.append(seed_first[0])
             dropped["duplicate_input"] += len(group) - 1
-    if dropped.get("schema_sample") and not any(s["origin"] == "SYNTHETIC" for s in final):
-        report["notes"].append(f"합성 샘플 {dropped['schema_sample']}건이 모두 v2 스키마 위반으로 빠졌다: 생성기가 아직 v1 내용을 만든다"
-                               "(synthetic-data의 역할 결정 전, migration-2.0.0.md). 이 데이터셋에는 시드 샘플만 있다")
     report["dropped"] = dict(sorted(dropped.items()))
     report["generation"] = dict(sorted(gen_stats.items()))
     usage = {c.ref["id"]: c.usage for c in ctxs}
 
-    # 6. 분할 (시나리오 단위)
+    # 4. 분할 (시나리오 단위)
     for s in final:
         s["split"] = assign_split(s["scenario_id"], usage[s["question_set"]["id"]], cfg.ratios, cfg.seed)
     if not final:
-        report["notes"].append("남은 샘플이 없다")
+        report["notes"].append("남은 샘플이 없다(시드가 꺼져 있거나 쓸 수 있는 시드가 없다)")
         return JobResult("NOTHING_TO_DO", cfg.dataset_id, report_path=_write_report(cfg, report))
 
-    # 7. 감수 샘플링
+    # 5. 감수 샘플링
     _write_review_sample(cfg, final)
 
-    # 8. 패키징과 게시
-    gv = f"{ugen.name}@{ugen.version}+{rgen.name}@{rgen.version}+noise@{NOISE_VERSION}+job@{__version__}"
+    # 6. 패키징과 게시
+    gv = f"seed-only+job@{__version__}"
     created_at = cfg.created_at or (clock() if clock else datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"))
     with tempfile.TemporaryDirectory(prefix="dsbuild-", dir=cfg.work_dir) as td:
         manifest, files, digest = package(final, ctxs, cfg, staging=Path(td) / "files", contract=contract,

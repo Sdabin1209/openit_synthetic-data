@@ -1,4 +1,4 @@
-"""생성 잡 설정. 설정 파일(JSON) 하나가 잡의 모든 입력이다. 상대 경로는 설정 파일이 있는 디렉터리 기준이다.
+"""시드 잡(`run`) 설정. 설정 파일(JSON) 하나가 잡의 모든 입력이다. 상대 경로는 설정 파일이 있는 디렉터리 기준이다.
 
 평가셋 구성·지표·임계치는 사용자 결정(O11)이라 코드에 기본값을 두지 않는다. split.ratios는 반드시 설정에 적어야 하고,
 저장소의 예시 설정에 있는 값은 동작 확인용 자리 표시이지 결정이 아니다."""
@@ -34,25 +34,19 @@ class QuestionSetSpec:
 
 @dataclass
 class JobConfig:
+    # v1 생성 설정 키(scenarios, generators, style_guide_version)는 받되 무시한다(ADR 0010). 배포 E2E의 기존 설정 파일이 아직 싣고 있다.
     dataset_id: str
     seed: int
     created_at: Optional[str]
     version: Optional[str]
-    style_guide_version: str
     turn_engine_version: Optional[str]
     survey_schema_dir: Path
     question_reader: AdapterSpec
     failure_store: Optional[AdapterSpec]
     question_sets: list
     reviewed_only: bool
-    variants: int
-    noise_variants: int
-    noise_types: list
-    kinds: Optional[list]
     seeds_enabled: bool
     seeds_question_set_id: Optional[str]
-    utterance_generator: str
-    response_generator: str
     ratios: dict
     review_per_kind: int
     regeneration_mode: str
@@ -102,7 +96,7 @@ def parse_config(raw: dict, base_dir: Path) -> JobConfig:
         if ids.setdefault(q.id, q.usage) != q.usage:
             raise ConfigError(f"같은 문항 세트 {q.id}를 TRAIN_POOL과 HELD_OUT_EVAL에 함께 쓸 수 없다")
     ad = _req(raw, "adapters", "")
-    sc, sd = raw.get("scenarios", {}), raw.get("seeds", {})
+    sd = raw.get("seeds", {})
     out = _req(raw, "output", "")
     store = _req(out, "store", "output.")
     kind = _req(store, "kind", "output.store.")
@@ -113,13 +107,6 @@ def parse_config(raw: dict, base_dir: Path) -> JobConfig:
     reg = raw.get("regeneration", {}).get("mode", "full")
     if reg not in ("full", "affected_only"):
         raise ConfigError("regeneration.mode는 full 또는 affected_only")
-    from .noise import NOISE_TYPES
-    nt = sc.get("noise_types", NOISE_TYPES)
-    if not set(nt) <= set(NOISE_TYPES):
-        raise ConfigError(f"알 수 없는 noise_types: {sorted(set(nt) - set(NOISE_TYPES))}")
-    variants = sc.get("variants", 2)
-    if not isinstance(variants, int) or variants < 1:
-        raise ConfigError("scenarios.variants는 1 이상의 정수")
     seeds_on = bool(sd.get("enabled", False))
     if seeds_on:
         if "failure_store" not in ad:
@@ -128,16 +115,12 @@ def parse_config(raw: dict, base_dir: Path) -> JobConfig:
             raise ConfigError("seeds.question_set_id가 question_sets에 없다")
     return JobConfig(
         dataset_id=did, seed=seed, created_at=raw.get("created_at"), version=raw.get("version"),
-        style_guide_version=str(raw.get("style_guide_version", "1")),
         turn_engine_version=raw.get("turn_engine_version"),
         survey_schema_dir=path(_req(raw, "survey_schema_dir", "")),
         question_reader=_adapter(_req(ad, "question_reader", "adapters."), "adapters.question_reader"),
         failure_store=_adapter(ad["failure_store"], "adapters.failure_store") if "failure_store" in ad else None,
         question_sets=qsets, reviewed_only=bool(raw.get("reviewed_only", True)),
-        variants=variants, noise_variants=int(sc.get("noise_variants", 1)), noise_types=list(nt),
-        kinds=sc.get("kinds"), seeds_enabled=seeds_on, seeds_question_set_id=sd.get("question_set_id"),
-        utterance_generator=raw.get("generators", {}).get("utterance", "rule"),
-        response_generator=raw.get("generators", {}).get("response", "rule"),
+        seeds_enabled=seeds_on, seeds_question_set_id=sd.get("question_set_id"),
         ratios={k: float(v) for k, v in ratios.items()},
         review_per_kind=int(raw.get("review", {}).get("per_kind", 2)), regeneration_mode=reg,
         work_dir=path(_req(out, "work_dir", "output.")), store_kind=kind,

@@ -1,5 +1,8 @@
 # 변경 이력
 
+## 미배포 (2026-10-28)
+- 제거: v1 생성 경로(scenario, plans, directives, generators, noise, labeler, bank, josa)와 보류 시험 15건, 생성 전용 시험(ADR 0010). `run`은 시드 잡으로 남는다. `generator_version`은 `seed-only+job@<버전>`. `scenarios`·`generators`·`style_guide_version` 설정 키는 무시하고 보고서에 남긴다. `pipeline.py`의 시드 조립은 `seed_samples.py`로, `QuestionSetContext`는 `context.py`로 옮겼다.
+
 ## 0.3.0 (제안 버전, 미적용: pyproject는 올리지 않음)
 - 실제 C1 데이터 첫 실행: 중복 판정을 '같은 입력' 엄격 키로 바꿈(설정 `max_cross_split_duplicate_inputs`).
 - 점검 반영: 중복 발화 거부, 사유에서 입력 값 제거, version 지정 재실행 멱등, pending 정책, origin/비식별 미확인 명시, 의심 패턴 건수, 의미 검사 한계 명시(CR-006), 생성 경로 제거 제안(CR-007).
