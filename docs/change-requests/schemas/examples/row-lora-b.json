@@ -1,0 +1,19 @@
+{
+  "human_review": "auto_only",
+  "scenario_id": "sc-EVAL-0",
+  "split": "test",
+  "messages": [
+    {
+      "role": "system",
+      "content": "sys"
+    },
+    {
+      "role": "user",
+      "content": "{\"action\": \"NEXT\", \"topic\": \"수면 시간\", \"user_utterance\": \"발화 11\", \"known\": \"수면 5시간\", \"next\": {\"type\": \"NEXT\", \"question_id\": \"Q4\", \"text\": \"일주일에 며칠, 하루 몇 분 운동하세요?\"}}"
+    },
+    {
+      "role": "assistant",
+      "content": "다섯 시간 주무시는군요. 일주일에 며칠, 하루 몇 분 운동하세요?"
+    }
+  ]
+}

@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://openit.invalid/synthetic-data/job-config-import.schema.json",
+  "title": "synthetic-data import(게시기) 설정 (초안)",
+  "description": "초안(CR-008). `python -m synthetic_data import --config <파일>`의 설정. 만드는 쪽: deploy 스케줄러 또는 개발자. 읽는 쪽: synthetic_data/importer.py parse_import_config. 모르는 키 정책: 거부(ADR 0014; 최상위는 이번 작업으로 코드에 반영됨). 중첩 객체(tolerance, output)의 모르는 키는 현재 코드가 무시하며 이 초안은 거부를 제안한다.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["dataset_id", "input_dir", "survey_schema_dir", "question_sets", "source_label", "turn_engine_version", "tolerance", "output"],
+  "properties": {
+    "_comment": {"type": "string"},
+    "dataset_id": {"$ref": "_defs.schema.json#/$defs/DatasetId"},
+    "input_dir": {"type": "string", "minLength": 1, "description": "학습 데이터 jsonl 6개가 있는 디렉터리(형식: training-data-row.schema.json). 상대 경로는 설정 파일 위치 기준."},
+    "survey_schema_dir": {"type": "string", "minLength": 1},
+    "question_sets": {"type": "array", "minItems": 1, "items": {"$ref": "_defs.schema.json#/$defs/ArtifactRef"},
+                      "description": "외부 데이터에는 문항 세트 출처가 없어 설정으로 받는다(CR-006)."},
+    "source_label": {"type": "string", "pattern": "\\S", "description": "데이터 출처 표시. generator_version에 들어간다. 비어 있거나 공백뿐이면 거부."},
+    "turn_engine_version": {"type": "string", "description": "매니페스트 turn_engine_version으로 그대로 기록된다(SD-06은 이 CR 범위 밖)."},
+    "tolerance": {
+      "type": "object", "additionalProperties": false, "required": ["max_invalid_rows", "max_invalid_rate"],
+      "properties": {"max_invalid_rows": {"type": "integer", "minimum": 0}, "max_invalid_rate": {"type": "number", "minimum": 0, "maximum": 1},
+                     "max_cross_split_duplicate_inputs": {"type": "integer", "minimum": 0, "default": 0},
+                     "max_pii_suspect_rows": {"type": "integer", "minimum": 0, "description": "생략하면 경고만(게시를 막지 않음)."}},
+      "description": "기본값은 가장 엄격(ADR 0005). 허용치를 넘으면 게시하지 않고 종료 코드 4."
+    },
+    "pending_policy": {"enum": ["report", "exclude", "reject"], "default": "report", "description": "human_review가 pending인 행의 처리. 기본값은 정책이 아니라 보고만(사용자 결정 대기, ADR 0005)."},
+    "origin": {"const": "SYNTHETIC", "default": "SYNTHETIC"},
+    "version": {"type": "string"},
+    "created_at": {"type": "string"},
+    "output": {"$ref": "_defs.schema.json#/$defs/Output"}
+  }
+}

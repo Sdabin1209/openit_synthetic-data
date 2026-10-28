@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://openit.invalid/synthetic-data/_defs.schema.json",
+  "title": "synthetic-data 초안 공통 정의",
+  "description": "초안. 잡 설정(run, import)이 함께 쓰는 정의. output.store는 store/spec.py(parse_store)의 동작을 옮긴 것이다.",
+  "$defs": {
+    "DatasetId": {"type": "string", "maxLength": 128, "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$"},
+    "Sha256Hash": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "Store": {
+      "description": "게시 대상 저장소. file·memory는 로컬 개발용, 운영은 http(dataset-store, D100). 토큰 값은 설정에 넣지 않고 token_env(비밀 이름)로만 받는다(D84): 'token' 키는 additionalProperties:false로 거부된다.",
+      "oneOf": [
+        {"type": "object", "additionalProperties": false, "required": ["kind", "root"],
+         "properties": {"kind": {"const": "file"}, "root": {"type": "string", "minLength": 1}}},
+        {"type": "object", "additionalProperties": false, "required": ["kind"],
+         "properties": {"kind": {"const": "memory"}}},
+        {"type": "object", "additionalProperties": false, "required": ["kind", "base_url"],
+         "properties": {"kind": {"const": "http"}, "base_url": {"type": "string", "pattern": "^https?://"},
+                        "token_env": {"type": "string", "minLength": 1}, "timeout": {"type": "number", "exclusiveMinimum": 0}}}
+      ]
+    },
+    "Output": {
+      "type": "object", "additionalProperties": false, "required": ["work_dir", "store"],
+      "properties": {"work_dir": {"type": "string", "minLength": 1}, "store": {"$ref": "#/$defs/Store"}}
+    },
+    "ArtifactRef": {
+      "description": "boundary-contracts _common.schema.json의 ArtifactRef와 같은 모양(id, version, content_hash). 초안 안에서 단독 검증하려고 옮겨 적었고, 계약에 올릴 때는 그쪽 $ref로 바꾼다.",
+      "type": "object", "additionalProperties": false, "required": ["id", "version", "content_hash"],
+      "properties": {"id": {"type": "string", "minLength": 1}, "version": {"type": "string", "minLength": 1}, "content_hash": {"$ref": "#/$defs/Sha256Hash"}}
+    }
+  }
+}

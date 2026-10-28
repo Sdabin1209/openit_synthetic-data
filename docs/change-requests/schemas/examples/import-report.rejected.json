@@ -1,0 +1,125 @@
+{
+  "dataset_id": "ds-imp-bad",
+  "deid_attested": false,
+  "deid_note": "비식별 확인 주체는 데이터셋 담당이다. 게시기는 확인하지 않았고 패턴 경고만 센다",
+  "first_invalid_line": {
+    "lora_a_val.jsonl | record_json: JSON이 아니다(Expecting value)": 1
+  },
+  "format_assumption": "행 형식은 C1 빌드 실제 파일로 확인(docs/design.md 부록 A). 다른 빌드는 이 보고서의 invalid 건수로 확인",
+  "human_review_counts": {
+    "auto_only": 11
+  },
+  "inputs": {
+    "lora_a_test.jsonl": {
+      "invalid": 0,
+      "rows": 2,
+      "sha256": "sha256:6ef76c911d8924a37ca7aed5f45237c16a1f7d07535872abfe719d702352e6d3",
+      "valid": 2
+    },
+    "lora_a_train.jsonl": {
+      "invalid": 0,
+      "rows": 2,
+      "sha256": "sha256:313a2d7c48ba6f747b93692da12b2cb17ea6f47be15e0717931a84cfccfd79e3",
+      "valid": 2
+    },
+    "lora_a_val.jsonl": {
+      "invalid": 1,
+      "rows": 2,
+      "sha256": "sha256:36865e7de77568611c85eea1d72ef6a4cd5f46da29221525545f054835eeec3f",
+      "valid": 1
+    },
+    "lora_b_test.jsonl": {
+      "invalid": 0,
+      "rows": 2,
+      "sha256": "sha256:ed87ed4c5beb5a7534820563cb33ea3eb475424dba86d989728f084121b18b8a",
+      "valid": 2
+    },
+    "lora_b_train.jsonl": {
+      "invalid": 0,
+      "rows": 2,
+      "sha256": "sha256:debcfd9667e70869738570f6576e8aea9d36f7afe86fdbe37f7194601ca6039f",
+      "valid": 2
+    },
+    "lora_b_val.jsonl": {
+      "invalid": 0,
+      "rows": 2,
+      "sha256": "sha256:94049acb05f4811987e6f2fda053a70ce222c983929ab2705f5419f2d2c12fa4",
+      "valid": 2
+    }
+  },
+  "invalid_reasons_by_file": {
+    "lora_a_test.jsonl": {},
+    "lora_a_train.jsonl": {},
+    "lora_a_val.jsonl": {
+      "record_json: JSON이 아니다(Expecting value)": 1
+    },
+    "lora_b_test.jsonl": {},
+    "lora_b_train.jsonl": {},
+    "lora_b_val.jsonl": {}
+  },
+  "invalid_reasons_total": {
+    "record_json: JSON이 아니다(Expecting value)": 1
+  },
+  "invalid_rows": 1,
+  "job_version": "0.2.0",
+  "mode": "import",
+  "notes": [],
+  "origin_assumed": "SYNTHETIC",
+  "pending_excluded": 0,
+  "pending_policy": "report",
+  "pending_rows": 0,
+  "pii_suspect": {
+    "patterns": [
+      "email",
+      "phone_landline",
+      "phone_mobile",
+      "rrn"
+    ],
+    "rows_by_file": {},
+    "rows_by_kind": {},
+    "rows_total": 0
+  },
+  "result": {
+    "reasons": [
+      "검증 실패 행 1건이 허용 건수 0를 넘는다",
+      "검증 실패율 1/12=0.083333이 허용 비율 0.0를 넘는다"
+    ],
+    "status": "REJECTED"
+  },
+  "row_split_field": {
+    "lora_a_test.jsonl": {
+      "absent": 0,
+      "distinct_values": 1
+    },
+    "lora_a_train.jsonl": {
+      "absent": 0,
+      "distinct_values": 1
+    },
+    "lora_a_val.jsonl": {
+      "absent": 1,
+      "distinct_values": 1
+    },
+    "lora_b_test.jsonl": {
+      "absent": 0,
+      "distinct_values": 1
+    },
+    "lora_b_train.jsonl": {
+      "absent": 0,
+      "distinct_values": 1
+    },
+    "lora_b_val.jsonl": {
+      "absent": 0,
+      "distinct_values": 1
+    }
+  },
+  "semantic_checks": {
+    "performed": false,
+    "reason": "v2 의미 검사(targets, next_item, 건너뛰기 순서, save)는 패키지에 없다(CR-006). 스키마 검증만 했다"
+  },
+  "tolerance": {
+    "max_invalid_rate": 0.0,
+    "max_invalid_rows": 0
+  },
+  "total_rows": 12,
+  "valid_rows": 11
+}

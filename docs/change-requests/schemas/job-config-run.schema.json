@@ -1,0 +1,57 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://openit.invalid/synthetic-data/job-config-run.schema.json",
+  "title": "synthetic-data run(시드 잡) 설정 (초안)",
+  "description": "초안(CR-008). `python -m synthetic_data run --config <파일>`의 설정. 만드는 쪽: deploy 스케줄러(e2e 설정) 또는 개발자. 읽는 쪽: synthetic_data/config.py parse_config. 모르는 키 정책: 거부(ADR 0014). 현재 코드는 최상위만 거부하고 중첩 객체의 모르는 키는 무시한다; 이 초안은 중첩도 거부하는 제안이다(안전 설정이 기본값으로 조용히 돌아가는 것을 막는다는 ADR 0014와 같은 이유).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["dataset_id", "seed", "survey_schema_dir", "adapters", "question_sets", "split", "output"],
+  "properties": {
+    "_comment": {"type": "string"},
+    "dataset_id": {"$ref": "_defs.schema.json#/$defs/DatasetId"},
+    "seed": {"type": "integer", "description": "같은 입력과 시드는 같은 결과(멱등). bool은 거부."},
+    "created_at": {"type": "string", "description": "매니페스트 created_at(UTC Z). 생략하면 실행 시각. --created-at 인자가 우선."},
+    "version": {"type": "string", "description": "생략하면 digest에서 만든다(v+12자)."},
+    "turn_engine_version": {"type": ["string", "null"], "description": "turn_engine 패키지가 설치돼 있으면 그 ENGINE_VERSION이 우선한다(SD-06은 이 CR 범위 밖). 둘 다 없으면 실행 오류."},
+    "survey_schema_dir": {"type": "string", "minLength": 1, "description": "문진 스키마 디렉터리. 상대 경로는 설정 파일 위치 기준. SD-07은 이 CR 범위 밖."},
+    "adapters": {
+      "type": "object", "additionalProperties": false, "required": ["question_reader"],
+      "properties": {"question_reader": {"$ref": "#/$defs/Adapter"}, "failure_store": {"$ref": "#/$defs/Adapter"}}
+    },
+    "question_sets": {
+      "type": "array", "minItems": 1,
+      "items": {"type": "object", "additionalProperties": false, "required": ["id"],
+                "properties": {"id": {"type": "string", "minLength": 1}, "version": {"type": "string"},
+                               "usage": {"enum": ["TRAIN_POOL", "HELD_OUT_EVAL"], "default": "TRAIN_POOL"}}},
+      "description": "불변식(코드가 검사, 스키마로는 표현 못 함): 같은 id를 TRAIN_POOL과 HELD_OUT_EVAL에 함께 쓰지 않는다."
+    },
+    "reviewed_only": {"type": "boolean", "default": true},
+    "seeds": {
+      "type": "object", "additionalProperties": false,
+      "properties": {"enabled": {"type": "boolean", "default": false}, "question_set_id": {"type": "string"}},
+      "description": "불변식(코드가 검사): enabled=true이면 adapters.failure_store가 있어야 하고, question_set_id는 question_sets에 있어야 한다."
+    },
+    "split": {
+      "type": "object", "additionalProperties": false, "required": ["ratios"],
+      "properties": {"ratios": {"type": "object", "additionalProperties": false, "required": ["TRAIN", "VALIDATION", "EVAL"],
+                                "properties": {"TRAIN": {"type": "number", "minimum": 0}, "VALIDATION": {"type": "number", "minimum": 0}, "EVAL": {"type": "number", "minimum": 0}},
+                                "description": "합이 0보다 커야 한다(코드가 검사). 값은 사용자 결정(O11)이며 예시 값은 동작 확인용 자리 표시."}}
+    },
+    "review": {"type": "object", "additionalProperties": false, "properties": {"per_kind": {"type": "integer", "default": 2}}},
+    "regeneration": {"type": "object", "additionalProperties": false, "properties": {"mode": {"enum": ["full", "affected_only"], "default": "full"}}},
+    "output": {"$ref": "_defs.schema.json#/$defs/Output"}
+  },
+  "$defs": {
+    "Adapter": {
+      "description": "이웃 읽기 클라이언트를 만드는 방법. 현재 형식은 factory(파이썬 'module:function' 문자열 + kwargs)이고, 제안 형식은 kind:http(SD-05)다. 두 형식 중 정확히 하나.",
+      "oneOf": [
+        {"title": "factory (현재)", "type": "object", "additionalProperties": false, "required": ["factory"],
+         "properties": {"factory": {"type": "string", "pattern": "^[^:]+:[^:]+$"}, "kwargs": {"type": "object"}}},
+        {"title": "http (제안, 코드에 아직 없음)", "type": "object", "additionalProperties": false, "required": ["kind", "base_url", "token_env"],
+         "properties": {"kind": {"const": "http"}, "base_url": {"type": "string", "pattern": "^https?://"},
+                        "token_env": {"type": "string", "minLength": 1, "description": "비밀 이름. 값은 boundary_contracts.read_secret(NAME_FILE 우선)이 읽는다(D84)."},
+                        "timeout": {"type": "number", "exclusiveMinimum": 0, "default": 10}}}
+      ]
+    }
+  }
+}

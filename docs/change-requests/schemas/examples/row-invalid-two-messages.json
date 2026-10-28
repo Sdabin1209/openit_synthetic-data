@@ -1,0 +1,15 @@
+{
+  "human_review": "auto_only",
+  "scenario_id": "sc-TRAIN-0",
+  "split": "x",
+  "messages": [
+    {
+      "role": "system",
+      "content": "sys"
+    },
+    {
+      "role": "user",
+      "content": "{\"question_id\": \"Q3\", \"current_question\": \"하루에 몇 시간 주무세요?\", \"user_utterance\": \"발화 1\", \"state\": {}}"
+    }
+  ]
+}
