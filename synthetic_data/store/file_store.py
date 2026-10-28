@@ -19,6 +19,23 @@ from .base import DatasetStoreBase
 from ..schemas import Validators
 
 
+def _fsync(path: Path) -> None:
+    # 왜: 데이터가 저장 장치에 닿기 전에 rename만 내구해지면 정전 뒤 '게시됨'인데 내용이 빈 버전이 남을 수 있다. 임시 파일 쓰기 -> 파일 fsync ->
+    #     rename -> 디렉터리 fsync가 POSIX의 원자적 교체 관행이다(fsync(2), ADR 0008 보강). 디렉터리는 O_RDONLY로 열어 fsync한다.
+    fd = os.open(path, os.O_RDONLY)
+    try:
+        os.fsync(fd)
+    finally:
+        os.close(fd)
+
+
+def _fsync_tree(top: Path) -> None:
+    for dirpath, _dirs, names in os.walk(top, topdown=False):
+        for n in names:
+            _fsync(Path(dirpath) / n)
+        _fsync(Path(dirpath))
+
+
 class FileDatasetStore(DatasetStoreBase):
     def __init__(self, root: Path, validators: Validators):
         super().__init__(validators)
@@ -52,6 +69,7 @@ class FileDatasetStore(DatasetStoreBase):
                 (tmp / "manifest.json").write_text(
                     json.dumps(manifest, ensure_ascii=False, sort_keys=True, indent=2) + "\n", encoding="utf-8")
                 (tmp / "meta.json").write_text(json.dumps({"seq": max(seqs, default=0) + 1}), encoding="utf-8")
+                _fsync_tree(tmp)
                 try:
                     os.rename(tmp, ddir / ver)
                 except OSError:
@@ -60,6 +78,9 @@ class FileDatasetStore(DatasetStoreBase):
                     if again is not None and again["content_hash"] == manifest["content_hash"]:
                         return
                     raise BoundaryError("CONFLICT", f"같은 (dataset_id, version)에 다른 내용이다: {did}@{ver}")
+                # rename 뒤 fsync 실패를 동시 게시 충돌로 오인하지 않도록 위 try 밖에 둔다
+                _fsync(ddir)
+                _fsync(self.root)     # 새 데이터셋 디렉터리의 항목도 내구하게 한다
             finally:
                 shutil.rmtree(tmp, ignore_errors=True)
         except OSError as e:
