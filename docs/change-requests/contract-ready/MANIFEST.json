@@ -1,0 +1,89 @@
+{
+  "area": "synthetic-data",
+  "date": "2026-10-29",
+  "not_promoted": [
+    {
+      "name": "training-data-row",
+      "reason": "외부 데이터셋 담당과의 형식. 영역에 남긴다(schemas/training-data-row.schema.json 초안 그대로)"
+    }
+  ],
+  "entries": [
+    {
+      "name": "SyntheticJobConfigRun",
+      "source_draft": "schemas/job-config-run.schema.json",
+      "producer": "deploy(스케줄러, E2E 설정) 또는 개발자",
+      "consumers": [
+        "synthetic-data"
+      ],
+      "unknown_keys": "reject",
+      "note": "받는 형식. 최상위 모르는 키 거부는 코드에 있음(ADR 0014). 중첩 객체(tolerance, output, split 등)의 모르는 키 거부는 코드에 아직 없고 이 스키마가 제안하는 것(승격되면 코드를 맞춘다). 스키마로 못 쓰는 불변식(코드가 검사)은 description에 있다. deploy가 이 설정을 어떻게 만드는지는 이웃 쪽 미확인. 초안의 adapters kind:http 제안 형식(SD-05)은 코드에 없어 뺐다. seeds.max_pii_suspect_rows(2026-10-29 추가)와 version 32자리를 반영했다. created_at은 _common Timestamp(UTC Z)로 올렸다. 식별자·해시·Timestamp는 _common을 쓴다."
+    },
+    {
+      "name": "SyntheticJobConfigImport",
+      "source_draft": "schemas/job-config-import.schema.json",
+      "producer": "deploy 또는 개발자",
+      "consumers": [
+        "synthetic-data"
+      ],
+      "unknown_keys": "reject",
+      "note": "받는 형식. 최상위 모르는 키 거부는 코드에 있음(ADR 0014). 중첩 객체(tolerance, output, split 등)의 모르는 키 거부는 코드에 아직 없고 이 스키마가 제안하는 것(승격되면 코드를 맞춘다). 스키마로 못 쓰는 불변식(코드가 검사)은 description에 있다. deploy가 이 설정을 어떻게 만드는지는 이웃 쪽 미확인. tolerance.max_pii_suspect_rows 생략=0(거부), null=경고만(2026-10-29). question_sets는 _common ArtifactRef를 쓴다. 입력 jsonl 행 형식(training-data-row)은 외부 데이터셋 담당과의 형식이라 승격하지 않는다."
+    },
+    {
+      "name": "SyntheticJobResult",
+      "source_draft": "schemas/job-result.schema.json",
+      "producer": "synthetic-data",
+      "consumers": [
+        "deploy(스케줄러)"
+      ],
+      "unknown_keys": "ignore",
+      "note": "내는 형식(stdout 한 줄). 종료 코드 표가 description에 있다(0, 2, 3, 4, 75). 읽는 쪽은 모르는 키를 무시하고 이 영역은 필드를 더할 수 있다. deploy가 실제로 어떤 필드를 읽는지는 이웃 쪽 미확인."
+    },
+    {
+      "name": "SyntheticJobError",
+      "source_draft": "schemas/job-error.schema.json",
+      "producer": "synthetic-data",
+      "consumers": [
+        "deploy(스케줄러)"
+      ],
+      "unknown_keys": "reject",
+      "note": "종료 코드 2의 stderr 한 줄. 종료 코드 3·75의 stderr는 이 형식이 아니라 BoundaryError(이미 계약에 있음). 이웃 쪽 미확인."
+    },
+    {
+      "name": "SyntheticImportReport",
+      "source_draft": "schemas/import-report.schema.json",
+      "producer": "synthetic-data",
+      "consumers": [
+        "deploy",
+        "사람(데이터셋 담당에게 거부 사유 전달)"
+      ],
+      "unknown_keys": "ignore",
+      "note": "import_report.json. 두 형태: 정상/거부(result 있음), 경계 오류(error=BoundaryError, 이후 단계 필드 없음). deid_attested는 항상 false(ADR 0007), semantic_checks.performed는 항상 false(ADR 0009), 입력 행의 값 없음(ADR 0003). 이웃 쪽 미확인."
+    },
+    {
+      "name": "SyntheticRunReport",
+      "source_draft": "schemas/run-report.schema.json",
+      "producer": "synthetic-data",
+      "consumers": [
+        "deploy",
+        "사람"
+      ],
+      "unknown_keys": "ignore",
+      "note": "report.json(run). 경계 오류가 나면 result 대신 error(BoundaryError). 2026-10-29 추가된 pii_suspect(시드 검사 요약)를 반영했다. 이웃 쪽 미확인."
+    },
+    {
+      "name": "SyntheticDefs",
+      "source_draft": "schemas/_defs.schema.json",
+      "producer": "synthetic-data",
+      "consumers": [
+        "SyntheticJobConfigRun",
+        "SyntheticJobConfigImport"
+      ],
+      "unknown_keys": "reject",
+      "def": [
+        "Store",
+        "Output"
+      ],
+      "note": "$defs 묶음. 예시는 파일 이름 두 번째 조각이 가리키는 $defs(Store 또는 Output)로 검증한다. 초안의 DatasetId·Sha256Hash·ArtifactRef는 _common의 Id·Hash·ArtifactRef와 같아서 지웠다(중복 정의 금지). Store의 http 예시는 ADR 0013의 설정 형식을 손으로 쓴 값이다(코드가 낸 값이 아님)."
+    }
+  ]
+}

@@ -1,0 +1,7 @@
+{
+  "store": {
+    "kind": "file",
+    "root": "../work/store"
+  },
+  "work_dir": "../work/dev"
+}

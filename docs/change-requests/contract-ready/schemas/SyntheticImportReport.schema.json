@@ -1,0 +1,269 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "SyntheticImportReport.schema.json",
+  "title": "SyntheticImportReport",
+  "description": "계약 승격용(CR-008 초안에서 정리, 2026-10-29). import가 <work_dir>/import_report.json에 쓴다(사람과 deploy가 읽는다; deploy가 실제로 읽는 필드는 미확인). 입력 행의 값은 담지 않는다(건수와 사유 코드만, ADR 0003). 두 형태: 정상/거부(result 있음), 경계 오류(error 있음, 이후 단계 필드 없음). 모르는 키 정책: 읽는 쪽은 무시. 불변식: deid_attested는 항상 false(비식별은 이 영역이 보증하지 않는다, ADR 0007); semantic_checks.performed는 항상 false(ADR 0009); valid_rows + invalid_rows = total_rows.",
+  "type": "object",
+  "required": [
+    "job_version",
+    "mode",
+    "dataset_id",
+    "notes"
+  ],
+  "properties": {
+    "job_version": {
+      "type": "string"
+    },
+    "mode": {
+      "const": "import"
+    },
+    "dataset_id": {
+      "$ref": "_common.schema.json#/$defs/Id"
+    },
+    "notes": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "format_assumption": {
+      "type": "string"
+    },
+    "tolerance": {
+      "type": "object",
+      "required": [
+        "max_invalid_rows",
+        "max_invalid_rate"
+      ],
+      "properties": {
+        "max_invalid_rows": {
+          "type": "integer"
+        },
+        "max_invalid_rate": {
+          "type": "number"
+        }
+      }
+    },
+    "inputs": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "required": [
+          "sha256",
+          "rows",
+          "valid",
+          "invalid"
+        ],
+        "properties": {
+          "sha256": {
+            "$ref": "_common.schema.json#/$defs/Hash"
+          },
+          "rows": {
+            "type": "integer"
+          },
+          "valid": {
+            "type": "integer"
+          },
+          "invalid": {
+            "type": "integer"
+          }
+        }
+      }
+    },
+    "total_rows": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "valid_rows": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "invalid_rows": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "invalid_reasons_by_file": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": {
+          "type": "integer"
+        }
+      }
+    },
+    "invalid_reasons_total": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "integer"
+      }
+    },
+    "first_invalid_line": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "integer"
+      }
+    },
+    "row_split_field": {
+      "type": "object"
+    },
+    "human_review_counts": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "integer"
+      }
+    },
+    "pending_policy": {
+      "enum": [
+        "report",
+        "exclude",
+        "reject"
+      ]
+    },
+    "pending_rows": {
+      "type": "integer"
+    },
+    "pending_excluded": {
+      "type": "integer"
+    },
+    "origin_assumed": {
+      "const": "SYNTHETIC"
+    },
+    "deid_attested": {
+      "const": false
+    },
+    "deid_note": {
+      "type": "string"
+    },
+    "semantic_checks": {
+      "type": "object",
+      "required": [
+        "performed"
+      ],
+      "properties": {
+        "performed": {
+          "const": false
+        },
+        "reason": {
+          "type": "string"
+        }
+      }
+    },
+    "pii_suspect": {
+      "type": "object",
+      "required": [
+        "rows_total"
+      ],
+      "properties": {
+        "rows_total": {
+          "type": "integer"
+        },
+        "rows_by_file": {
+          "type": "object"
+        },
+        "rows_by_kind": {
+          "type": "object"
+        },
+        "patterns": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "cross_split_duplicate_utterances": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "integer"
+      }
+    },
+    "cross_split_duplicate_inputs": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "integer"
+      }
+    },
+    "dataset_digest": {
+      "$ref": "_common.schema.json#/$defs/Hash"
+    },
+    "result": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "status",
+            "reasons"
+          ],
+          "properties": {
+            "status": {
+              "const": "REJECTED"
+            },
+            "reasons": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "status",
+            "version",
+            "content_hash"
+          ],
+          "properties": {
+            "status": {
+              "enum": [
+                "PUBLISHED",
+                "ALREADY_PUBLISHED"
+              ]
+            },
+            "version": {
+              "type": "string"
+            },
+            "content_hash": {
+              "$ref": "_common.schema.json#/$defs/Hash"
+            }
+          }
+        }
+      ]
+    },
+    "error": {
+      "$ref": "BoundaryError.schema.json",
+      "description": "경계 오류가 났을 때 BoundaryError 레코드(boundary-contracts)."
+    }
+  },
+  "oneOf": [
+    {
+      "required": [
+        "result",
+        "inputs",
+        "total_rows",
+        "valid_rows",
+        "invalid_rows",
+        "deid_attested",
+        "semantic_checks"
+      ],
+      "not": {
+        "required": [
+          "error"
+        ]
+      }
+    },
+    {
+      "required": [
+        "error"
+      ],
+      "not": {
+        "required": [
+          "result"
+        ]
+      }
+    }
+  ]
+}

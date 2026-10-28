@@ -1,0 +1,121 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "SyntheticRunReport.schema.json",
+  "title": "SyntheticRunReport",
+  "description": "계약 승격용(CR-008 초안에서 정리, 2026-10-29). run이 <work_dir>/report.json에 쓴다. 경계 오류가 나면 result 대신 error(BoundaryError 레코드)가 있다. 모르는 키 정책: 읽는 쪽은 무시. 불변식: dropped·skipped_seeds는 항상 있다(버린 이유를 숨기지 않는다); result.status가 있으면 dataset_digest도 있다.",
+  "type": "object",
+  "required": [
+    "job_version",
+    "dataset_id",
+    "notes",
+    "dropped",
+    "skipped_seeds"
+  ],
+  "properties": {
+    "job_version": {
+      "type": "string"
+    },
+    "dataset_id": {
+      "$ref": "_common.schema.json#/$defs/Id"
+    },
+    "notes": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "dropped": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "integer",
+        "minimum": 0
+      }
+    },
+    "skipped_seeds": {
+      "type": "array",
+      "items": {
+        "type": [
+          "object",
+          "string"
+        ]
+      }
+    },
+    "generation": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "integer",
+        "minimum": 0
+      }
+    },
+    "counts": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "integer",
+        "minimum": 0
+      }
+    },
+    "dataset_digest": {
+      "$ref": "_common.schema.json#/$defs/Hash"
+    },
+    "result": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "version",
+        "content_hash"
+      ],
+      "properties": {
+        "status": {
+          "enum": [
+            "PUBLISHED",
+            "ALREADY_PUBLISHED"
+          ]
+        },
+        "version": {
+          "type": "string"
+        },
+        "content_hash": {
+          "$ref": "_common.schema.json#/$defs/Hash"
+        }
+      }
+    },
+    "error": {
+      "$ref": "BoundaryError.schema.json",
+      "description": "경계 오류가 났을 때 BoundaryError 레코드(boundary-contracts)."
+    },
+    "pii_suspect": {
+      "type": "object",
+      "required": [
+        "rows_total"
+      ],
+      "properties": {
+        "rows_total": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "patterns": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "description": "시드 개인정보 의심 패턴 검사 요약(값 없음). seeds.enabled일 때만."
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "required": [
+          "result"
+        ]
+      },
+      "then": {
+        "required": [
+          "dataset_digest"
+        ]
+      }
+    }
+  ]
+}

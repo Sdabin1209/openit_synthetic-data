@@ -1,0 +1,5 @@
+{
+  "base_url": "http://x",
+  "kind": "http",
+  "token": "secret"
+}

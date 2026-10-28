@@ -1,0 +1,128 @@
+{
+  "cross_split_duplicate_inputs": {
+    "EVAL~TRAIN": 0,
+    "EVAL~VALIDATION": 0,
+    "TRAIN~VALIDATION": 0
+  },
+  "cross_split_duplicate_utterances": {
+    "EVAL~TRAIN": 0,
+    "EVAL~VALIDATION": 0,
+    "TRAIN~VALIDATION": 0
+  },
+  "dataset_id": "ds-imp",
+  "deid_attested": false,
+  "deid_note": "비식별 확인 주체는 데이터셋 담당이다. 게시기는 확인하지 않았고 패턴 경고만 센다",
+  "error": {
+    "code": "UNAVAILABLE",
+    "message": "저장소에 연결할 수 없다",
+    "pipeline_schema_version": "2.0",
+    "retryable": true
+  },
+  "first_invalid_line": {},
+  "format_assumption": "행 형식은 C1 빌드 실제 파일로 확인(docs/design.md 부록 A). 다른 빌드는 이 보고서의 invalid 건수로 확인",
+  "human_review_counts": {
+    "auto_only": 18
+  },
+  "inputs": {
+    "lora_a_test.jsonl": {
+      "invalid": 0,
+      "rows": 3,
+      "sha256": "sha256:0ec1cf8db7af1557ef25653d12e8cf1e622e18afd5a7c39c2d46f04b3246c7c7",
+      "valid": 3
+    },
+    "lora_a_train.jsonl": {
+      "invalid": 0,
+      "rows": 3,
+      "sha256": "sha256:223c91dcf3e529c26d5aba874d4b44bace0fc5e8877d6aeb740b6ea7b1f0403a",
+      "valid": 3
+    },
+    "lora_a_val.jsonl": {
+      "invalid": 0,
+      "rows": 3,
+      "sha256": "sha256:327bf90ede5f0847faa162ebbe9bb9916d70ecbc656d91489ef0427212daffbc",
+      "valid": 3
+    },
+    "lora_b_test.jsonl": {
+      "invalid": 0,
+      "rows": 3,
+      "sha256": "sha256:11831c0667ffe4ebd4848f3fbd3b7341fdda09c16d41a5a1ef0c2d799b2b5757",
+      "valid": 3
+    },
+    "lora_b_train.jsonl": {
+      "invalid": 0,
+      "rows": 3,
+      "sha256": "sha256:64b5d7b3cc20398dff591982b18ec869c487d9dc7759a9dfa92e90c4c334ed9b",
+      "valid": 3
+    },
+    "lora_b_val.jsonl": {
+      "invalid": 0,
+      "rows": 3,
+      "sha256": "sha256:c93d8ccacbc441f92fbc2a85a09c6326b9e60e3b45b0b5714edc72671753373b",
+      "valid": 3
+    }
+  },
+  "invalid_reasons_by_file": {
+    "lora_a_test.jsonl": {},
+    "lora_a_train.jsonl": {},
+    "lora_a_val.jsonl": {},
+    "lora_b_test.jsonl": {},
+    "lora_b_train.jsonl": {},
+    "lora_b_val.jsonl": {}
+  },
+  "invalid_reasons_total": {},
+  "invalid_rows": 0,
+  "job_version": "0.2.0",
+  "mode": "import",
+  "notes": [],
+  "origin_assumed": "SYNTHETIC",
+  "pending_excluded": 0,
+  "pending_policy": "report",
+  "pending_rows": 0,
+  "pii_suspect": {
+    "patterns": [
+      "email",
+      "phone_landline",
+      "phone_mobile",
+      "rrn"
+    ],
+    "rows_by_file": {},
+    "rows_by_kind": {},
+    "rows_total": 0
+  },
+  "row_split_field": {
+    "lora_a_test.jsonl": {
+      "absent": 0,
+      "distinct_values": 1
+    },
+    "lora_a_train.jsonl": {
+      "absent": 0,
+      "distinct_values": 1
+    },
+    "lora_a_val.jsonl": {
+      "absent": 0,
+      "distinct_values": 1
+    },
+    "lora_b_test.jsonl": {
+      "absent": 0,
+      "distinct_values": 1
+    },
+    "lora_b_train.jsonl": {
+      "absent": 0,
+      "distinct_values": 1
+    },
+    "lora_b_val.jsonl": {
+      "absent": 0,
+      "distinct_values": 1
+    }
+  },
+  "semantic_checks": {
+    "performed": false,
+    "reason": "v2 의미 검사(targets, next_item, 건너뛰기 순서, save)는 패키지에 없다(CR-006). 스키마 검증만 했다"
+  },
+  "tolerance": {
+    "max_invalid_rate": 0.0,
+    "max_invalid_rows": 0
+  },
+  "total_rows": 18,
+  "valid_rows": 18
+}

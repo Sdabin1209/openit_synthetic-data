@@ -1,0 +1,20 @@
+{
+  "content_hash": null,
+  "counts": {
+    "lora_a_test.jsonl.valid": 3,
+    "lora_a_train.jsonl.valid": 3,
+    "lora_a_val.jsonl.valid": 3,
+    "lora_b_test.jsonl.valid": 3,
+    "lora_b_train.jsonl.valid": 3,
+    "lora_b_val.jsonl.valid": 3,
+    "rows_invalid": 0,
+    "rows_total": 18,
+    "rows_valid": 18
+  },
+  "dataset_digest": null,
+  "dataset_id": "ds-import-example",
+  "rejected_reasons": [],
+  "report_path": "/tmp/sd-contract-ready-lb1_cp_h/iw2/import_report.json",
+  "status": "REJECTED",
+  "version": null
+}

@@ -1,0 +1,52 @@
+{
+  "_comment": "개발용 시드 잡(run) 설정. 이웃 영역의 읽기 SDK가 나오기 전에는 tests/doubles.py의 대역을 쓴다(PYTHONPATH=tests). split.ratios는 동작 확인용 자리 표시이며 평가셋 구성(O11)은 사용자 결정이다. v1 생성 설정 키는 ADR 0010으로 제거했다.",
+  "adapters": {
+    "failure_store": {
+      "factory": "doubles:make_failure_store_factory"
+    },
+    "question_reader": {
+      "factory": "doubles:make_question_reader"
+    }
+  },
+  "created_at": "2026-10-15T00:00:00Z",
+  "dataset_id": "ds-dev",
+  "output": {
+    "store": {
+      "base_url": "http://x",
+      "kind": "http",
+      "token": "secret"
+    },
+    "work_dir": "../work/dev"
+  },
+  "question_sets": [
+    {
+      "id": "qs-main",
+      "usage": "TRAIN_POOL"
+    },
+    {
+      "id": "qs-unseen",
+      "usage": "HELD_OUT_EVAL"
+    }
+  ],
+  "regeneration": {
+    "mode": "full"
+  },
+  "review": {
+    "per_kind": 2
+  },
+  "reviewed_only": true,
+  "seed": 20261015,
+  "seeds": {
+    "enabled": true,
+    "question_set_id": "qs-main"
+  },
+  "split": {
+    "ratios": {
+      "EVAL": 0.1,
+      "TRAIN": 0.8,
+      "VALIDATION": 0.1
+    }
+  },
+  "survey_schema_dir": "../../survey-service/schema",
+  "turn_engine_version": "0.0.0-unpinned"
+}
