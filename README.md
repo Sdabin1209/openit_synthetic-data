@@ -104,6 +104,6 @@ v2 의미 검사는 turn-engine `validate_extraction` 이후(미정), turn-engin
 | `docs/runbook.md` | 실행, GPU 호스트, 설정 필드, 문제 대응, 비밀 |
 | `docs/STATUS.md` | 한 일, 남은 일, 막힌 것 |
 | `docs/CHANGELOG.md` | 변경 이력 |
-| `docs/adr/` | 구조 선택의 '왜' (ADR 0001~0010, 목록은 `docs/adr/README.md`) |
+| `docs/adr/` | 구조 선택의 '왜' (ADR 0001~0015, 목록은 `docs/adr/README.md`) |
 | `docs/change-requests/` | 헤드에게 낸 변경 요청 CR-001~005 |
 | `docs/rules/` | 헤드가 전달한 업무 규칙(출처 SOURCE.md) |
