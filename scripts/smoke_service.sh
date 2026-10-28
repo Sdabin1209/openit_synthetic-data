@@ -1,19 +1,26 @@
 #!/bin/sh
 # 이미지를 빌드해 띄우고 /healthz, /readyz, 권한, 게시(POST)와 조회를 확인한다. 고정 포트를 쓰지 않는다(Docker가 배정, D22).
-# 환경 변수: SMOKE_WHEELS(boundary-contracts wheel 폴더, 기본 ../model-lab/vendor/wheels), SMOKE_BC_VERSION(기본 requirements.lock의 boundary-contracts 태그),
+# boundary-contracts wheel은 이웃 폴더가 아니라 requirements.lock이 고정한 태그에서 `pip wheel`로 만든다(git SSH 접근 필요).
+# 환경 변수: SMOKE_WHEELS(미리 만든 wheel 폴더. 없으면 태그에서 만든다), SMOKE_BC_VERSION(기본 requirements.lock의 boundary-contracts 태그),
 #            SURVEY_SCHEMA(기본 ../survey-service/schema; 읽기만 한다)
 set -eu
 cd "$(dirname "$0")/.."
 BC_VER=${SMOKE_BC_VERSION:-$(grep ^boundary-contracts requirements.lock | sed "s/.*@v//")}
-WHEELS=${SMOKE_WHEELS:-../model-lab/vendor/wheels}
 SCHEMA=${SURVEY_SCHEMA:-../survey-service/schema}
-WHL=$(ls "$WHEELS"/boundary_contracts-"$BC_VER"-*.whl | head -1)
+if [ -n "${SMOKE_WHEELS:-}" ]; then
+  WHL=$(ls "$SMOKE_WHEELS"/boundary_contracts-"$BC_VER"-*.whl | head -1)
+else
+  # 왜: 태그에서 wheel을 만드는 것이 pip의 표준 경로이고(`pip wheel`), 이웃 영역이 보관하는 폴더 배치에 기대지 않으며 lock의 태그와 이미지가 어긋나지 않는다.
+  BUILT=$(mktemp -d); trap 'rm -rf "$BUILT"' EXIT
+  .venv/bin/python -m pip wheel -q --no-deps --disable-pip-version-check -w "$BUILT" "$(grep ^boundary-contracts requirements.lock)"
+  WHL=$(ls "$BUILT"/boundary_contracts-*.whl | head -1)
+fi
 TAG="synthetic-data-dataset-store:smoke-$$"
 NAME="synthetic-data-dataset-store-smoke-$$"
 SECRETS=$(mktemp -d)
-trap 'rm -rf "$SECRETS"; docker rm -f "$NAME" >/dev/null 2>&1 || true; docker volume rm "$NAME-data" >/dev/null 2>&1 || true; docker rmi "$TAG" >/dev/null 2>&1 || true' EXIT
+trap 'rm -rf "${BUILT:-}" "$SECRETS"; docker rm -f "$NAME" >/dev/null 2>&1 || true; docker volume rm "$NAME-data" >/dev/null 2>&1 || true; docker rmi "$TAG" >/dev/null 2>&1 || true' EXIT
 # wheel 폴더 전체가 아니라 고른 wheel 하나만 컨텍스트로 준다
-WCTX=$(mktemp -d); cp "$WHL" "$WCTX"/; trap 'rm -rf "$WCTX"; rm -rf "$SECRETS"; docker rm -f "$NAME" >/dev/null 2>&1 || true; docker volume rm "$NAME-data" >/dev/null 2>&1 || true; docker rmi "$TAG" >/dev/null 2>&1 || true' EXIT
+WCTX=$(mktemp -d); cp "$WHL" "$WCTX"/; trap 'rm -rf "${BUILT:-}" "$WCTX" "$SECRETS"; docker rm -f "$NAME" >/dev/null 2>&1 || true; docker volume rm "$NAME-data" >/dev/null 2>&1 || true; docker rmi "$TAG" >/dev/null 2>&1 || true' EXIT
 docker build -q --build-context wheels="$WCTX" --build-context survey_schema="$SCHEMA" \
   --build-arg "BC_SPEC=/wheels/$(basename "$WHL")" --build-arg "BC_VERSION=v$BC_VER" --build-arg "SURVEY_SCHEMA_VERSION=$(tr -d ' \n' < "$SCHEMA/CONTRACT_VERSION")" \
   --build-arg "REVISION=$(git rev-parse --short HEAD 2>/dev/null || echo unknown)" -t "$TAG" .

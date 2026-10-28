@@ -61,7 +61,7 @@ PYTHONPATH=tests python -m synthetic_data run --config configs/dev.job.json [--c
 - 게시기 보고서: 중복 발화·개인정보 의심 패턴 건수, `deid_attested: false`(비식별은 확인하지 않음), 의미 검사 미수행 표시. 입력 값은 담지 않습니다.
 - 결과 확인: `<work_dir>/report.json`(버린 사유 `dropped`), `review_sample.jsonl`, 저장소의 `<root>/<dataset_id>/<version>/manifest.json`.
 
-이 문서를 쓰며 **실제로 돌린 것**과 시험 개수는 5절에 있습니다. I2 서버 스모크는 `scripts/smoke_service.sh`(이미지 빌드, `/healthz`·`/readyz`, 권한, 계약 클라이언트로 게시·조회; 빈 포트를 Docker가 배정). 빌드에 문진 스키마 컨텍스트와 계약 wheel이 필요하다(ADR 0011, 스크립트 머리말).
+이 문서를 쓰며 **실제로 돌린 것**과 시험 개수는 5절에 있습니다. I2 서버 스모크는 `scripts/smoke_service.sh`(이미지 빌드, `/healthz`·`/readyz`, 권한, 계약 클라이언트로 게시·조회; 빈 포트를 Docker가 배정). 빌드에 문진 스키마 컨텍스트와 계약 wheel이 필요하다(wheel은 스크립트가 태그에서 만든다. ADR 0011, 스크립트 머리말).
 
 ## 4. 현재 상태
 
@@ -74,7 +74,7 @@ PYTHONPATH=tests python -m synthetic_data run --config configs/dev.job.json [--c
 
 ## 5. 시험 상태
 
-시험 상태(이 영역 시험 개수는 이 절에만 적는다). 2026-10-28, 워크스페이스 밖 새 폴더의 clone(이웃 폴더 없음, `bash scripts/setup-env.sh`로 설치한 `.venv`: boundary-contracts와 문진 스키마 모두 requirements.lock의 태그 설치, 이웃은 tests/doubles.py 대역·참조 서버): `python -m pytest -q -rs` -> 164 통과, 1 건너뜀, 0 실패(I2 HTTP 서버 시험, 계약 클라이언트 시험, 잡의 HTTP 게시 통합 시험, 스모크 비밀 검사 포함). 이미지 스모크 `scripts/smoke_service.sh`는 이전 환경(boundary-contracts 작업 트리에서 만든 wheel)에서 SMOKE_OK였고 새 clone에서는 돌리지 않았다. 건너뜀 1건은 `SD_REFERENCE_DATA_DIR`(실제 학습 데이터 파일 경로)가 없어서다. v1 생성 경로 제거(ADR 0010)로 보류 시험 15건과 생성 전용 시험이 줄었다. 돌리지 않은 것: 서비스끼리 도는 시험, 운영 이웃 영역과의 연동. 서비스끼리 도는 시험의 결과는 deploy/docs/E2E_RESULTS.md를 본다.
+시험 상태(이 영역 시험 개수는 이 절에만 적는다). 2026-10-28, 워크스페이스 밖 새 폴더의 clone(이웃 폴더 없음, `bash scripts/setup-env.sh`로 설치한 `.venv`: boundary-contracts와 문진 스키마 모두 requirements.lock의 태그 설치, 이웃은 tests/doubles.py 대역·참조 서버): `python -m pytest -q -rs` -> 164 통과, 1 건너뜀, 0 실패(I2 HTTP 서버 시험, 계약 클라이언트 시험, 잡의 HTTP 게시 통합 시험, 스모크 비밀 검사 포함). 이미지 스모크 `scripts/smoke_service.sh`(wheel을 requirements.lock 태그에서 `pip wheel`로 만든다, 이웃 폴더 불필요): 2026-10-28 이 작업 환경(이웃 폴더가 있는 워크스페이스, `../survey-service/schema`를 빌드 컨텍스트로 사용)에서 `/healthz`·`/readyz` 응답과 게시·조회까지 SMOKE_OK. 이웃 폴더가 없는 두 번째 환경에서는 돌리지 않았다. 건너뜀 1건은 `SD_REFERENCE_DATA_DIR`(실제 학습 데이터 파일 경로)가 없어서다. v1 생성 경로 제거(ADR 0010)로 보류 시험 15건과 생성 전용 시험이 줄었다. 돌리지 않은 것: 서비스끼리 도는 시험, 운영 이웃 영역과의 연동. 서비스끼리 도는 시험의 결과는 deploy/docs/E2E_RESULTS.md를 본다.
 
 ## 6. 이 영역의 열린 항목 (head/docs/OPEN_GAPS.md)
 
