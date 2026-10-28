@@ -84,7 +84,6 @@ PYTHONPATH=tests python -m synthetic_data run --config configs/dev.job.json [--c
 | G02 | v1 생성 경로와 보류 시험 15건 | 제거함(ADR 0010). 시드 경로(`run`)는 E2E 단계 7이 쓰므로 남김. 게시기 구현됨, 운영 게시는 미실시, 열린 질문은 CR-006. 시드를 이 영역에 계속 둘지는 헤드 결정(ADR 0010 대안 1) |
 | (대장 밖) 시드 `run` 존속 | 헤드 결정(2026-10-28): 유지. deploy 단계 7이 호출 | 제거 여부는 데이터셋 담당 이전 계획과 함께 나중에(ADR 0010 후속) |
 | (대장 밖) `regeneration.mode`, 감수 샘플링(`review_sample.jsonl`, `review.per_kind`) | 이름은 생성용. deploy는 설정 값을 써넣기만 하고 산출물을 읽는 곳은 grep으로 못 찾음 | 삭제하지 않고 열림(ADR 0010) |
-| (대장 밖) deploy E2E 설정의 v1 키(`scenarios`, `generators`, `style_guide_version`) | 무시하는 호환 코드가 남아 있음 | deploy가 설정에서 빼면 호환 코드 제거 가능 |
 | U07(일부) | v2 E2E에서 "단계 2(G02)"를 건너뜀 | G02 결정 |
 | O11 | 평가셋 구성과 합성·실제 비율(OPEN_GAPS에는 없고 docs/brief.md에 있음) | 사용자 결정. `split.ratios`는 예시 값만 |
 

@@ -24,7 +24,6 @@ def make_cfg_raw(tmp_path: Path, **over) -> dict:
         "adapters": {"question_reader": {"factory": "doubles:make_question_reader"},
                      "failure_store": {"factory": "doubles:make_failure_store_factory"}},
         "question_sets": [{"id": "qs-main", "usage": "TRAIN_POOL"}, {"id": "qs-unseen", "usage": "HELD_OUT_EVAL"}],
-        "scenarios": {"variants": 2, "noise_variants": 1},
         "seeds": {"enabled": True, "question_set_id": "qs-main"},
         "split": {"ratios": {"TRAIN": 0.6, "VALIDATION": 0.2, "EVAL": 0.2}},
         "output": {"work_dir": str(tmp_path / "work"), "store": {"kind": "memory"}},

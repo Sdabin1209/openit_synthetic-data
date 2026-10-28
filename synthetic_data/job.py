@@ -112,9 +112,6 @@ def _run_job(cfg, question_reader, store, failure_store, validators, clock, repo
     samples: list[dict] = []
     gen_stats = Counter()
     banks = {(c.ref["id"], c.ref["version"]): c.bank for c in ctxs}
-    ignored = sorted(k for k in ("scenarios", "generators", "style_guide_version") if k in cfg.raw)
-    if ignored:
-        report["notes"].append(f"v1 생성 설정 키는 무시한다(ADR 0010): {ignored}")
 
     if cfg.seeds_enabled:
         if failure_store is None:

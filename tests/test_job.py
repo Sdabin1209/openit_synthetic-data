@@ -236,11 +236,8 @@ def test_regeneration_affected_only_excludes_sets_without_follow_up(tmp_path, va
     assert res.status == "NOTHING_TO_DO"
 
 
-def test_v1_generation_config_keys_are_ignored_and_reported(tmp_path, validators):
-    """배포 E2E의 기존 설정이 싣고 있는 scenarios·generators·style_guide_version은 받되 무시하고 보고서에 남긴다(ADR 0010)."""
-    raw = make_cfg_raw(tmp_path, scenarios={"variants": 3, "noise_variants": 2}, generators={"utterance": "rule", "response": "rule"},
-                       style_guide_version="1")
-    cfg, res = run(raw, MemoryDatasetStore(validators), validators)
-    rep = json.loads((cfg.work_dir / "report.json").read_text())
-    assert res.status == "PUBLISHED" and any("v1 생성 설정 키" in n for n in rep["notes"])
-    assert set(res.counts) >= {"origin.FAILURE_CASE_SEED"} and "origin.SYNTHETIC" not in res.counts
+def test_v1_generation_config_keys_are_rejected(tmp_path, validators):
+    """제거된 v1 생성 키(scenarios·generators·style_guide_version)는 알 수 없는 키로 거부한다(ADR 0014)."""
+    for key, val in (("scenarios", {"variants": 3}), ("generators", {"utterance": "rule"}), ("style_guide_version", "1")):
+        with pytest.raises(ConfigError, match=key):
+            parse_config(make_cfg_raw(tmp_path, **{key: val}), tmp_path)

@@ -36,7 +36,6 @@ class QuestionSetSpec:
 
 @dataclass
 class JobConfig:
-    # v1 생성 설정 키(scenarios, generators, style_guide_version)는 받되 무시한다(ADR 0010). 배포 E2E의 기존 설정 파일이 아직 싣고 있다.
     dataset_id: str
     seed: int
     created_at: Optional[str]
@@ -72,7 +71,15 @@ def _adapter(d: dict, where: str) -> AdapterSpec:
     return AdapterSpec(f, dict(d.get("kwargs", {})))
 
 
+# 왜: v1 생성 키(scenarios, generators, style_guide_version)를 조용히 무시하면 설정이 동작과 어긋난 채 남는다. 알 수 없는 키는 거부한다(ADR 0014).
+KNOWN_KEYS = frozenset({"_comment", "dataset_id", "seed", "created_at", "version", "turn_engine_version", "survey_schema_dir", "adapters",
+                        "question_sets", "reviewed_only", "seeds", "split", "review", "regeneration", "output"})
+
+
 def parse_config(raw: dict, base_dir: Path) -> JobConfig:
+    unknown = sorted(set(raw) - KNOWN_KEYS)
+    if unknown:
+        raise ConfigError(f"설정에 알 수 없는 키가 있다: {unknown} (v1 생성 키 scenarios·generators·style_guide_version은 제거됨, ADR 0010·0014)")
     def path(s):
         p = Path(s)
         return p if p.is_absolute() else (base_dir / p).resolve()
