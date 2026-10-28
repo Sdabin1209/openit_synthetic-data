@@ -1,10 +1,10 @@
 #!/bin/sh
 # 이미지를 빌드해 띄우고 /healthz, /readyz, 권한, 게시(POST)와 조회를 확인한다. 고정 포트를 쓰지 않는다(Docker가 배정, D22).
-# 환경 변수: SMOKE_WHEELS(boundary-contracts wheel 폴더, 기본 ../model-lab/vendor/wheels), SMOKE_BC_VERSION(기본 2.1.0),
+# 환경 변수: SMOKE_WHEELS(boundary-contracts wheel 폴더, 기본 ../model-lab/vendor/wheels), SMOKE_BC_VERSION(기본 requirements.lock의 boundary-contracts 태그),
 #            SURVEY_SCHEMA(기본 ../survey-service/schema; 읽기만 한다)
 set -eu
 cd "$(dirname "$0")/.."
-BC_VER=${SMOKE_BC_VERSION:-2.1.0}
+BC_VER=${SMOKE_BC_VERSION:-$(grep ^boundary-contracts requirements.lock | sed "s/.*@v//")}
 WHEELS=${SMOKE_WHEELS:-../model-lab/vendor/wheels}
 SCHEMA=${SURVEY_SCHEMA:-../survey-service/schema}
 WHL=$(ls "$WHEELS"/boundary_contracts-"$BC_VER"-*.whl | head -1)

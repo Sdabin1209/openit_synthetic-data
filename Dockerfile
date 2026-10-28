@@ -1,7 +1,7 @@
 # dataset-store 서비스(I2 서버, D100). 생성·게시 잡(run-once)은 이미지가 아니라 requirements.lock 환경이다(D22).
 # 문진 스키마는 복사본을 리포지토리에 두지 않으므로 빌드 컨텍스트로 받는다(ADR 0011):
 #   docker build --ssh default --build-context survey_schema=../survey-service/schema \
-#     --build-arg BC_VERSION=v2.1.0 --build-arg SURVEY_SCHEMA_VERSION=$(cat ../survey-service/schema/CONTRACT_VERSION) -t synthetic-data-dataset-store:dev .
+#     --build-arg BC_SPEC="$(grep ^boundary-contracts requirements.lock)" --build-arg BC_VERSION="$(grep -o '@v.*' requirements.lock | tr -d @)" --build-arg SURVEY_SCHEMA_VERSION=$(cat ../survey-service/schema/CONTRACT_VERSION) -t synthetic-data-dataset-store:dev .
 # 로컬 확인(ssh 없이): scripts/smoke_service.sh
 FROM scratch AS wheels
 # 기본은 빈 컨텍스트. 로컬 확인에서는 --build-context wheels=<태그에서 만든 wheel 폴더> 로 바꾼다.
@@ -9,7 +9,8 @@ FROM scratch AS survey_schema
 # 기본은 빈 컨텍스트(빌드 인자 없으면 빌드가 CONTRACT_VERSION 없음으로 실패한다).
 
 FROM python:3.12-slim AS build
-ARG BC_SPEC="boundary-contracts @ git+ssh://git@github.com/Sdabin1209/openit_boundary-contracts.git@v2.1.0"
+# 정본은 requirements.lock의 boundary-contracts 줄이다. 빌드 인자로 받고 여기에 값을 적지 않는다.
+ARG BC_SPEC
 RUN apt-get update && apt-get install -y --no-install-recommends git openssh-client && rm -rf /var/lib/apt/lists/* \
  && mkdir -p -m 0700 /root/.ssh && (ssh-keyscan github.com >> /root/.ssh/known_hosts 2>/dev/null || true)
 RUN python -m venv /opt/venv
