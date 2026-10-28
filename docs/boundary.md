@@ -34,7 +34,7 @@ store = FileDatasetStore(root, v)     # 또는 MemoryDatasetStore(v)
 
 ## 3. 산출 계약
 
-`ActionExtractionSample`(role `LORA_A`), `ResponseSample`(role `LORA_B`)(JSON Lines, UTF-8), `DatasetManifest`(2.0.0, D74). 파일은 `lora_a/{train,validation,eval,eval_unseen}.jsonl`, `lora_b/...`. 샘플의 `input`/`expected`는 `ActionExtractionInput`/`ActionExtraction`, `ResponseRequest`/`ResponseText`(문자열)이며 샘플 스키마가 함께 검증한다. 샘플에 `runtime_contract_version`·`style_guide_version`은 없다(매니페스트에는 `runtime_contract_version`이 그대로 있다). `eval_unseen`은 학습에 쓰지 않은 문항 세트의 평가 샘플이고 `files[].question_sets`로 표시한다(D32). 모든 파일의 `files[].question_sets`에 그 파일의 샘플이 쓰는 문항 세트가 적힌다. `ext["synthetic-data"]`의 내용(소비자는 판단에 쓰지 않는다): 샘플 `kind`, `utterance_generator`/`response_generator`, `directive_source`; 매니페스트 `dataset_digest`, `unseen_eval_files`. 정식 필드 승격은 CR-004.
+`ActionExtractionSample`(role `LORA_A`), `ResponseSample`(role `LORA_B`)(JSON Lines, UTF-8), `DatasetManifest`(스키마 버전은 설치된 boundary-contracts 패키지가 정본, D74). 파일은 `lora_a/{train,validation,eval,eval_unseen}.jsonl`, `lora_b/...`. 샘플의 `input`/`expected`는 `ActionExtractionInput`/`ActionExtraction`, `ResponseRequest`/`ResponseText`(문자열)이며 샘플 스키마가 함께 검증한다. 샘플에 `runtime_contract_version`·`style_guide_version`은 없다(매니페스트에는 `runtime_contract_version`이 그대로 있다). `eval_unseen`은 학습에 쓰지 않은 문항 세트의 평가 샘플이고 `files[].question_sets`로 표시한다(D32). 모든 파일의 `files[].question_sets`에 그 파일의 샘플이 쓰는 문항 세트가 적힌다. `ext["synthetic-data"]`의 내용(소비자는 판단에 쓰지 않는다): 샘플 `kind`, `utterance_generator`/`response_generator`, `directive_source`; 매니페스트 `dataset_digest`, `unseen_eval_files`. 정식 필드 승격은 CR-004.
 
 ## 4. 소비하는 것과 지원 버전
 
