@@ -50,15 +50,10 @@ def load_factory(spec) -> Callable:
 
 
 def resolve_turn_engine_version(cfg: JobConfig) -> str:
-    """turn-engine이 설치돼 있으면 ENGINE_VERSION, 아니면 설정 값. 둘 다 없으면 오류(매니페스트 필수 필드)."""
-    try:
-        import turn_engine  # type: ignore
-        return str(turn_engine.ENGINE_VERSION)
-    except ImportError:
-        pass
+    """설정의 turn_engine_version(매니페스트 필수 필드). 왜: 2.x에서 이 값은 설치본이 아니라 고정 표지다(D109). 코드는 turn-engine에 의존하지 않는다."""
     if cfg.turn_engine_version:
         return cfg.turn_engine_version
-    raise BoundaryError("FAILED_PRECONDITION", "turn-engine 버전을 알 수 없다: turn_engine이 없고 설정 turn_engine_version도 없다")
+    raise BoundaryError("FAILED_PRECONDITION", "turn-engine 버전 표지를 알 수 없다: 설정 turn_engine_version이 없다")
 
 
 def _find_ref(reader: QuestionReader, qid: str, version: str) -> dict:

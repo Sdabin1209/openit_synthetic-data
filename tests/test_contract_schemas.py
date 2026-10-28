@@ -160,3 +160,15 @@ def test_cli_result_line_drops_empty_rejected_reasons_unless_rejected():
     from synthetic_data.importer import ImportResult
     ok = json.loads(_result_line(ImportResult("ALREADY_PUBLISHED", "ds", "v1", "sha256:" + "a" * 64, "sha256:" + "b" * 64)))
     assert "rejected_reasons" not in ok
+
+
+def test_turn_engine_version_comes_from_config_even_if_turn_engine_is_installed(tmp_path, validators, monkeypatch):
+    """D109: turn_engine_version은 설치본이 아니라 설정의 고정 표지다. 설치돼 있어도 설정값이 매니페스트에 들어간다."""
+    import sys
+    import types
+    fake = types.ModuleType("turn_engine")
+    fake.ENGINE_VERSION = "v9.9.9-installed"
+    monkeypatch.setitem(sys.modules, "turn_engine", fake)
+    st = MemoryDatasetStore(validators)
+    _, res = run_job_helper(make_cfg_raw(tmp_path, turn_engine_version="v0.4.3"), st, validators)
+    assert st.get_manifest(res.dataset_id, res.version)["turn_engine_version"] == "v0.4.3"
