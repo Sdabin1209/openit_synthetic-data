@@ -6,6 +6,7 @@ import json
 
 import pytest
 from boundary_contracts import canonical
+from doubles import OLD_PIPELINE_SCHEMA_VERSION
 from boundary_contracts.errors import BoundaryError
 from boundary_contracts.sdk import DatasetStore
 
@@ -319,7 +320,7 @@ def test_reader_needs_no_survey_dir_but_publish_does(captured, tmp_path):
 def test_unsupported_pipeline_major(store, captured, tmp_path):
     m, b = captured
     m2 = copy.deepcopy(m)
-    m2["pipeline_schema_version"] = "1.3"
+    m2["pipeline_schema_version"] = OLD_PIPELINE_SCHEMA_VERSION
     m2["content_hash"] = canonical.content_hash(m2)
     with pytest.raises(BoundaryError) as e:
         store.publish(m2, write_files(tmp_path, b))
@@ -327,7 +328,7 @@ def test_unsupported_pipeline_major(store, captured, tmp_path):
 
 
 def test_v1_roles_and_samples_rejected(store, captured, tmp_path):
-    """2.0.0: PARSER/GENERATOR 역할은 매니페스트 스키마에서 거부되고, v1 샘플 필드(runtime_contract_version 등)는 샘플 스키마에서 거부된다."""
+    """현행 계약: PARSER/GENERATOR 역할은 매니페스트 스키마에서 거부되고, v1 샘플 필드(runtime_contract_version 등)는 샘플 스키마에서 거부된다."""
     m, b = captured
     m2 = copy.deepcopy(m)
     m2["files"][0]["role"] = "PARSER"

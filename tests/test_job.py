@@ -8,6 +8,7 @@ import pytest
 from boundary_contracts.errors import BoundaryError
 
 import doubles
+from boundary_contracts import PIPELINE_SCHEMA_VERSION
 from conftest import SURVEY_DIR, make_cfg_raw, run
 from synthetic_data.__main__ import main
 from synthetic_data.config import ConfigError, parse_config
@@ -226,7 +227,7 @@ def test_seed_needs_reviewed_input_and_v2_schema(tmp_path, validators):
 
 def test_regeneration_affected_only_excludes_sets_without_follow_up(tmp_path, validators):
     """regeneration.mode=affected_only: REGENERATE_SAMPLES 후속 작업이 없는 문항 세트는 제외하고, 남은 것이 없으면 할 일이 없다."""
-    change = {"pipeline_schema_version": "2.0", "classification_id": "cc-1", "to": {}, "change_kinds": ["TEXT"],
+    change = {"pipeline_schema_version": PIPELINE_SCHEMA_VERSION, "classification_id": "cc-1", "to": {}, "change_kinds": ["TEXT"],
               "affected_slots": ["Q3.hours"], "follow_ups": ["REEVALUATE_MODEL"], "created_at": "2026-10-15T00:00:00Z"}
     reader = doubles.make_question_reader()
     reader.add("qs-main", "2", doubles.make_bank("main", wording=" (개정)"), change=change)

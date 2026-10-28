@@ -6,6 +6,8 @@ import json
 import pytest
 
 import doubles
+from doubles import OLD_PIPELINE_SCHEMA_VERSION
+from boundary_contracts import PIPELINE_SCHEMA_VERSION
 from conftest import SURVEY_DIR, make_cfg_raw
 from ref_server import ReferenceServer, ref_of
 from synthetic_data.__main__ import main
@@ -14,7 +16,7 @@ TOK = "tok-reader"
 
 
 def review(ref):
-    return {"pipeline_schema_version": "2.0", "review_id": "rv-" + ref["id"], "question_set": ref,
+    return {"pipeline_schema_version": PIPELINE_SCHEMA_VERSION, "review_id": "rv-" + ref["id"], "question_set": ref,
             "reviewer_role": "clinical-reviewer", "decision": "APPROVED", "clinical_basis_approved": True,
             "reviewed_at": "2026-10-15T00:00:00Z"}
 
@@ -67,7 +69,7 @@ def test_job_over_http(tmp_path, monkeypatch, capsys):
 
 def test_major_mismatch_is_unsupported_version_in_report(tmp_path, monkeypatch, capsys):
     monkeypatch.setenv("SYN_TEST_TOKEN", TOK)
-    with make_server([lambda c: c.update(pipeline_schema_version="1.3")]) as srv:
+    with make_server([lambda c: c.update(pipeline_schema_version=OLD_PIPELINE_SCHEMA_VERSION)]) as srv:
         assert main(["run", "--config", str(http_cfg(tmp_path, srv.url))]) == 3
     err = json.loads((tmp_path / "w" / "report.json").read_text())["error"]
     assert err["code"] == "UNSUPPORTED_VERSION" and err["retryable"] is False

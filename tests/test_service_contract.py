@@ -1,5 +1,5 @@
 """계약 클라이언트(boundary_contracts.clients.HttpDatasetStore)로 이 영역의 실제 서버를 읽고 쓴다(D100 적합성).
-클라이언트가 설치된 계약 버전에 없으면 건너뛴다(v2.1.0 이전)."""
+클라이언트가 설치된 계약 버전에 없으면 건너뛴다(HttpDatasetStore가 생기기 전 계약)."""
 from __future__ import annotations
 
 import pytest
@@ -7,7 +7,7 @@ from boundary_contracts.errors import BoundaryError
 
 clients = pytest.importorskip("boundary_contracts.clients")
 if not hasattr(clients, "HttpDatasetStore"):
-    pytest.skip("설치된 boundary-contracts에 HttpDatasetStore가 없다(v2.1.0 필요)", allow_module_level=True)
+    pytest.skip("설치된 boundary-contracts에 HttpDatasetStore가 없다", allow_module_level=True)
 
 from conftest import write_files
 from test_service import RT, WT, Srv

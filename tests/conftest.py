@@ -7,6 +7,7 @@ from pathlib import Path
 import pytest
 
 import doubles
+from boundary_contracts import PIPELINE_SCHEMA_VERSION
 from synthetic_data.config import parse_config
 from synthetic_data.job import run_job
 from synthetic_data.schemas import Validators
@@ -52,7 +53,7 @@ def run(cfg_raw: dict, store, validators, *, reader=None, fstore=None, **kw):
 def v2_sample(role: str, n: int, split: str, ref: dict, *, scenario: str = None, origin: str = "SYNTHETIC") -> dict:
     """손으로 지은 v2 샘플(ActionExtractionSample/ResponseSample)."""
     a = role == "LORA_A"
-    rec = {"pipeline_schema_version": "2.0", "sample_id": f"{'as' if a else 'rs'}-{n:04d}",
+    rec = {"pipeline_schema_version": PIPELINE_SCHEMA_VERSION, "sample_id": f"{'as' if a else 'rs'}-{n:04d}",
            "scenario_id": scenario or f"sc-{n:04d}", "split": split, "origin": origin, "question_set": copy.deepcopy(ref),
            "input": doubles.a_input(f"발화 {n}") if a else doubles.b_input(f"발화 {n}"),
            "expected": doubles.a_expected() if a else doubles.b_expected(),
