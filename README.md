@@ -41,7 +41,7 @@ import: 설정(JSON) + 학습 데이터 jsonl 6개 -> 행 검증 -> 허용치 �
 
 ## 3. 실행 방법
 
-전제: Python 3.10 이상(pyproject.toml), git, boundary-contracts 태그를 받을 SSH 접근. 이웃 폴더는 필요 없습니다(계약은 `requirements.lock`의 태그로 설치). Docker는 필요 없습니다. 서비스가 없는 잡이라 Dockerfile 없이 `requirements.lock`으로 고정하기로 헤드가 승인했습니다(docs/runbook.md).
+전제: Python 3.10 이상(pyproject.toml), git, 계약·문진 스키마 태그를 받을 SSH 접근. 이웃 폴더는 시험에 필요 없습니다(둘 다 `requirements.lock`의 태그로 설치). Docker는 필요 없습니다. 서비스가 없는 잡이라 Dockerfile 없이 `requirements.lock`으로 고정하기로 헤드가 승인했습니다(docs/runbook.md).
 
 ```bash
 # 설치 (멱등. .venv 생성, requirements.lock + pytest + -e . 설치)

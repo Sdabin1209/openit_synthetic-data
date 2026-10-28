@@ -7,6 +7,7 @@ from pathlib import Path
 import pytest
 
 import doubles
+import survey_schema
 from boundary_contracts import PIPELINE_SCHEMA_VERSION
 from synthetic_data.config import parse_config
 from synthetic_data.job import run_job
@@ -14,7 +15,8 @@ from synthetic_data.schemas import Validators
 from synthetic_data.store import FileDatasetStore, MemoryDatasetStore
 
 ROOT = Path(__file__).resolve().parent.parent
-SURVEY_DIR = ROOT.parent / "survey-service" / "schema"
+# 왜: 문진 스키마는 형제 폴더가 아니라 설치된 패키지(requirements.lock의 태그)에서 읽는다. 새 머신에는 이웃 폴더가 없다.
+SURVEY_DIR = survey_schema.contract_version_dir(1)
 
 
 def make_cfg_raw(tmp_path: Path, **over) -> dict:
