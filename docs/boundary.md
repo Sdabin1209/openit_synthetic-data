@@ -47,6 +47,10 @@ store = FileDatasetStore(root, v)     # 또는 MemoryDatasetStore(v)
 | 정답 구성 규칙, 버전 | I8 turn-engine | 버전만(`ENGINE_VERSION`). 호출은 아직 없음(CR-002) | `import turn_engine`이 되면 사용, 아니면 설정 값 |
 
 - 이웃 코드를 가져오지 않는다. 의존은 boundary-contracts(Protocol, 오류, 해시), 문진 스키마(읽기 전용 파일), turn-engine(예정)뿐이다.
+- 사용하는 비밀(D84: `NAME_FILE`로 파일 경로를 받고 `read_secret(NAME)`으로 읽는다. 환경 변수 `NAME`은 개발용):
+  - 서버(dataset-store) 쪽, 복수형(역할=토큰 목록 파일): `DATASET_STORE_READ_TOKENS_FILE`, `DATASET_STORE_WRITE_TOKENS_FILE`.
+  - 잡(`run`/`import`의 `store.kind=http`) 쪽, 단수형(쓰기 토큰 값 하나): `DATASET_STORE_WRITE_TOKEN_FILE`(`token_env` 설정으로 이름을 바꿀 수 있다).
+  - 정본 배선은 deploy compose를 본다(이 목록은 이름만 적는다).
 - 지원 버전: 문진 스키마 정수 버전은 `CONTRACT_VERSION`과 정확히 일치해야 한다(현재 1, 다르면 `UNSUPPORTED_VERSION`). 경계 계약은 `pipeline_schema_version` MAJOR 2(쓰는 값은 설치된 `boundary_contracts.PIPELINE_SCHEMA_VERSION`, 계약 태그는 `requirements.lock`). 이웃 호출은 HTTP(`boundary_contracts.clients.HttpQuestionReader`/`HttpFailureStore`, 설정의 factory로 선택). 다른 MAJOR는 `UNSUPPORTED_VERSION`이다. 쓸 때는 엄격하다(`additionalProperties: false`라 모르는 필드는 `INVALID_RECORD`). 저장된 파일은 해석하지 않고 바이트 그대로 돌려주므로 `ext`는 보존된다.
 - 시험용 대역은 `tests/doubles.py`(`FakeQuestionReader`, `FakeFailureStore`)에 있다. 소유 영역의 메모리 구현이 나오면 설정의 `factory` 문자열만 바꾼다.
 - 비식별되지 않은 실패 사례(`deidentified != true`)를 받으면 실행을 `INVALID_RECORD`로 거부한다.
