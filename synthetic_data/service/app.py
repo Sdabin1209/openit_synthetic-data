@@ -448,6 +448,15 @@ def make_handler(svc: Service):
 
         do_GET = do_POST = do_PUT = do_DELETE = do_PATCH = _handle
 
+        def _no_body_405(self):
+            # 왜: HEAD·OPTIONS를 정의하지 않으면 표준 라이브러리가 HTML 본문의 501을 낸다. 아는 메서드는 JSON 계약대로 405로 답한다(퍼징 시험이 발견).
+            self.send_response(405)
+            self.send_header("Allow", "GET, POST")
+            self.send_header("Content-Length", "0")
+            self.end_headers()
+
+        do_HEAD = do_OPTIONS = _no_body_405
+
     return H
 
 

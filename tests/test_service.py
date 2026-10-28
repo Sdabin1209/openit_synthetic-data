@@ -388,6 +388,7 @@ def test_same_token_for_read_and_write_refused(tmp_path):
 
 
 def test_write_token_may_read_by_design(srv):
+    """쓰기 토큰은 읽기를 포함한다는 설계 고정. 근거는 ADR 0012(게시자가 자기 게시를 확인, 같은 토큰을 읽기에도 두면 시작 거부)."""
     assert srv.call("GET", "/v1/datasets", token=WT)[0] == 200
 
 
