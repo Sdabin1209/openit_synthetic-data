@@ -27,3 +27,6 @@ digest 입력 항목이 부족해 다른 내용이 같은 digest가 되는 사�
 
 ## 보강 (2026-10-29, 표준성 점검 A10)
 `ALREADY_PUBLISHED` 판정이 `import`(version을 지정해도 판정)와 `run`(version을 비웠을 때만 판정)에서 달라, version을 고정하고 created_at만 다른 `run` 재실행이 CONFLICT가 났다. `synthetic_data/publishing.py`의 `publish_idempotent` 한 함수로 통일했다. 기대값의 출처: 계약 I2의 멱등 규칙과 CR-005 결정(digest가 같으면 이미 게시됨). 재현 시험: `tests/test_already_published_unified.py`. digest가 다르면 여전히 저장소가 CONFLICT를 낸다.
+
+## 보강 (2026-10-29, 표준성 점검 A7)
+버전 이름을 `v` + digest 앞 12자리(48비트)에서 앞 32자리(128비트)로 바꿨다(헤드 결정표 D106). 12자리는 근거가 없었다(위 '근거 기록 없음'). 기대값의 출처: 생일 한계(n비트 해시는 약 2^(n/2)개에서 충돌이 현실적이다). 이 값은 결정표의 지시이며 이 영역이 측정한 것은 아니다. 감수하는 것: 이미 12자리 이름으로 게시된 버전(예: design.md 부록 B의 `v1309e4c9bea3`)은 그대로 남고, 같은 입력을 지금 다시 게시하면 32자리 이름의 새 버전이 하나 더 생긴다(이름으로 멱등을 판정하므로 옛 12자리 버전을 '이미 게시됨'으로 찾지 못한다). 재현 시험: `tests/test_version_name.py`.

@@ -60,7 +60,7 @@ def package(samples: list, ctxs: list[QuestionSetContext], cfg: JobConfig, *, st
         "seed_case_ids": sorted(seeds), "turn_engine_version": turn_engine_version})
     manifest = {
         "pipeline_schema_version": PIPELINE_SCHEMA_VERSION, "dataset_id": cfg.dataset_id,
-        "version": cfg.version or ("v" + digest[7:19]), "created_at": created_at,
+        "version": cfg.version or ("v" + digest[7:39]), "created_at": created_at,
         "runtime_contract_version": contract, "question_sets": qsets, "generator_version": generator_version,
         "seed_case_ids": sorted(seeds), "turn_engine_version": turn_engine_version,
         "scenario_disjoint_across_splits": True, "files": entries,

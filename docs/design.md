@@ -60,7 +60,7 @@ v1 `ParserOutput` 라벨 기준 구현이었다. v2 정답은 데이터셋 담�
 - 난수: 전역 `random`을 쓰지 않고 `rng.derive_int(seed, 용도, ...)`로만 파생. 시각·프로세스 상태를 내용에 쓰지 않는다. 딕셔너리는 정렬해서 직렬화한다.
 - `dataset_digest`: 파일 해시 목록, 문항 세트, 계약 버전, `generator_version`(게시 도구 식별자), 시드 사례 ID, turn-engine 버전의 `canonical` 해시. `created_at`·`version`·`ext`는 뺀다. 같은 입력과 시드는 같은 digest다(시험: `test_reproducible_*`, 메모리/파일 저장소와 작업 디렉터리가 달라도 같음).
 - 매니페스트 `content_hash`에는 `created_at`이 들어간다. 설정에서 고정하면 `content_hash`도 같다. 지정하지 않으면 실행 시각이다. 이 때문에 같은 digest의 버전이 저장소에 이미 있으면 잡이 다시 게시하지 않고 `ALREADY_PUBLISHED`로 끝난다(CR-005).
-- `version`을 생략하면 `v<digest 앞 12자>`다.
+- `version`을 생략하면 `v<digest 앞 32자>`다.
 
 ## 11. 생성 잡과 REGENERATE_SAMPLES
 

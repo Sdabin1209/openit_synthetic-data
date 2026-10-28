@@ -426,10 +426,10 @@ def _run_import(cfg, store, validators, clock, report) -> ImportResult:
             "files": [[e["path"], e["content_hash"]] for e in entries], "question_sets": qsets,
             "runtime_contract_version": contract, "generator_version": gv, "turn_engine_version": cfg.turn_engine_version,
             "pending_policy": cfg.pending_policy})
-        # 왜 digest 앞 12자리: 근거 기록 없음(package.py와 같은 규칙, docs/adr/0006)
+        # 왜 digest 앞 32자리(128비트): 48비트(12자리)는 근거가 없어 바꿨다(docs/adr/0006 보강, 2026-10-29)
         manifest = {
             "pipeline_schema_version": PIPELINE_SCHEMA_VERSION, "dataset_id": cfg.dataset_id,
-            "version": cfg.version or ("v" + digest[7:19]), "created_at": created_at, "runtime_contract_version": contract,
+            "version": cfg.version or ("v" + digest[7:39]), "created_at": created_at, "runtime_contract_version": contract,
             "question_sets": qsets, "generator_version": gv, "seed_case_ids": [], "turn_engine_version": cfg.turn_engine_version,
             "scenario_disjoint_across_splits": True, "files": entries,
             "ext": {EXT: {"dataset_digest": digest, "import": {
