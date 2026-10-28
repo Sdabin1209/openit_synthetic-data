@@ -65,17 +65,17 @@ PYTHONPATH=tests python -m synthetic_data run --config configs/dev.job.json [--c
 - 게시기 보고서: 중복 발화·개인정보 의심 패턴 건수, `deid_attested: false`(비식별은 확인하지 않음), 의미 검사 미수행 표시. 입력 값은 담지 않습니다.
 - 결과 확인: `<work_dir>/report.json`(버린 사유 `dropped`), `review_sample.jsonl`, 저장소의 `<root>/<dataset_id>/<version>/manifest.json`.
 
-이 문서를 쓰며 **실제로 돌린 것**: `python -m pytest --collect-only -q`(104건 수집), `python -m synthetic_data --help`(정상). **돌리지 않은 것**: 전체 pytest 실행, `run` 잡, pip 설치. 스모크 스크립트는 없습니다(서비스가 아님).
+이 문서를 쓰며 **실제로 돌린 것**: `python -m pytest -q -rs`(2026-10-28, 이 PC 한 환경: 114 통과, 16 건너뜀, 0 실패; 건너뜀 16건은 생성기가 아직 v1 내용을 만들어 보류한 시험 15건과 `SD_REFERENCE_DATA_DIR`(실제 파일 경로) 없음 1건), `python -m synthetic_data --help`(정상). **돌리지 않은 것**: `run` 잡, pip 설치. 스모크 스크립트는 없습니다(서비스가 아님).
 
 ## 4. 현재 상태
 
 확인된 것(근거 문서의 진술이며 이번에 시험을 다시 돌려 확인하지는 않았음):
-- v2 이전(D74/D75) 시점에 시험 85건 통과, 15건 보류(생성기 v2 대기, `tests/conftest.py`의 `needs_generator_v2`)였다(CHANGELOG 0.2.0). 현재 수집은 104건, 그중 skip 15건이고 D84가 시험 4건을 더해 실행 대상은 89건이다(수집·표시 개수는 확인, 통과 여부는 미확인). 버전은 pyproject 0.2.0, CHANGELOG는 0.2.2(제안)로 어긋나 있다(docs/STATUS.md).
+- v2 이전(D74/D75) 시점에 시험 85건 통과, 15건 보류(생성기 v2 대기, `tests/conftest.py`의 `needs_generator_v2`)였다(CHANGELOG 0.2.0). 당시 수집은 104건, 그중 skip 15건이었고 D84가 시험 4건을 더해 실행 대상은 89건이다(수집·표시 개수는 확인, 통과 여부는 미확인). 버전은 pyproject 0.2.0, CHANGELOG는 0.2.2(제안)로 어긋나 있다(docs/STATUS.md).
 - I2 파일·메모리 구현이 같은 적합성 시험을 통과, 같은 입력과 시드는 같은 `dataset_digest`(docs/STATUS.md).
 - D84(NAME_FILE)와 boundary-contracts v2.0.2 반영, 비밀이 산출물에 안 나오는 시험 추가(CHANGELOG 0.2.2, 제안 버전).
 - 변경 요청 CR-001~005는 헤드가 결정(docs/STATUS.md).
 
-확인한 것(2026-10-27 `pytest -q` 실행 출력): 113 passed, 15 skipped(전체 128건 수집). 늘어난 24건은 게시기 시험(`tests/test_import.py`, 가짜 입력)이다. 확인 못 한 것: 게시기를 실제 학습 데이터 파일로 돌린 적 없음(행 형식 추정), v2 의미 검사 미수행(CR-006), 이웃 영역과의 실제 연동, 이웃 영역과의 실제 HTTP 연동(운영 환경), 이미지·E2E(해당 없음 또는 미실행), turn-engine 연동(미구현).
+이전 확인(2026-10-27 `pytest -q` 실행 출력, 오래된 값): 113 passed, 15 skipped(전체 128건 수집). 현재 실측은 위 실행 결과(114 passed, 16 skipped). 늘어난 24건은 게시기 시험(`tests/test_import.py`, 가짜 입력)이다. 확인 못 한 것: 게시기를 실제 학습 데이터 파일로 돌린 적 없음(행 형식 추정), v2 의미 검사 미수행(CR-006), 이웃 영역과의 실제 연동, 이웃 영역과의 실제 HTTP 연동(운영 환경), 이미지·E2E(해당 없음 또는 미실행), turn-engine 연동(미구현).
 
 ## 5. 이 영역의 열린 항목 (head/docs/OPEN_GAPS.md)
 
