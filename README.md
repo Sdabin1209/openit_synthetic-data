@@ -30,7 +30,7 @@ HTTP 경로는 이 영역 문서에 없어 `../boundary-contracts/HTTP.md`로 �
 | `configs/dev.job.json` | 이웃 대역을 쓰는 개발용 설정 |
 | `tests/` | 적합성·잡 종단·HTTP 통합·단위 시험, 이웃 대역 `doubles.py` |
 | `requirements.lock` | 의존 고정(boundary-contracts v2.0.2 태그) |
-| `docs/` | 7절 참고 |
+| `docs/` | 8절 참고 |
 
 ```
 run:    설정(JSON) -> 문항 읽기(I1) -> 시드 수집(I7) -> 시드 샘플 -> 품질 검사 -> 분할 -> 패키징 -> 게시(I2)
@@ -72,24 +72,29 @@ PYTHONPATH=tests python -m synthetic_data run --config configs/dev.job.json [--c
 
 확인 못 한 것: 게시기를 운영 저장소에 게시한 적 없음, v2 의미 검사 미수행(CR-006), 이웃 영역과의 실제 HTTP 연동(운영 환경), 이미지·E2E(해당 없음 또는 미실행), turn-engine 연동(미구현).
 
-## 5. 시험 상태와 이 영역의 열린 항목 (head/docs/OPEN_GAPS.md)
+## 5. 시험 상태
 
-시험 상태(이 영역 시험 개수는 이 절에만 적는다). 2026-10-28, 이 PC 한 환경(가상환경 `.venv`, 이웃은 tests/doubles.py 대역·참조 서버): `python -m pytest -q -rs` -> 107 통과, 1 건너뜀, 0 실패. 건너뜀 1건은 `SD_REFERENCE_DATA_DIR`(실제 학습 데이터 파일 경로)가 없어서다. v1 생성 경로 제거(ADR 0010) 전에는 114 통과, 16 건너뜀(보류 15건 포함)이었다. 돌리지 않은 것: 깨끗한 두 번째 환경, 전체 E2E, 운영 이웃 영역과의 연동.
+시험 상태(이 영역 시험 개수는 이 절에만 적는다). 2026-10-28, 이 PC 한 환경(가상환경 `.venv`, 이웃은 tests/doubles.py 대역·참조 서버): `python -m pytest -q -rs` -> 107 통과, 1 건너뜀, 0 실패. 건너뜀 1건은 `SD_REFERENCE_DATA_DIR`(실제 학습 데이터 파일 경로)가 없어서다. v1 생성 경로 제거(ADR 0010)로 보류 시험 15건과 생성 전용 시험이 줄었다. 돌리지 않은 것: 깨끗한 두 번째 환경, 서비스끼리 도는 시험, 운영 이웃 영역과의 연동. 서비스끼리 도는 시험의 결과는 deploy/docs/E2E_RESULTS.md를 본다.
+
+## 6. 이 영역의 열린 항목 (head/docs/OPEN_GAPS.md)
 
 | ID | 요약 | 막는 것 |
 |---|---|---|
 | G02 | v1 생성 경로와 보류 시험 15건 | 제거함(ADR 0010). 시드 경로(`run`)는 E2E 단계 7이 쓰므로 남김. 게시기 구현됨, 운영 게시는 미실시, 열린 질문은 CR-006. 시드를 이 영역에 계속 둘지는 헤드 결정(ADR 0010 대안 1) |
+| (대장 밖) 시드 `run` 존속 | 헤드 결정(2026-10-28): 유지. deploy 단계 7이 호출 | 제거 여부는 데이터셋 담당 이전 계획과 함께 나중에(ADR 0010 후속) |
+| (대장 밖) `regeneration.mode`, 감수 샘플링(`review_sample.jsonl`, `review.per_kind`) | 이름은 생성용. deploy는 설정 값을 써넣기만 하고 산출물을 읽는 곳은 grep으로 못 찾음 | 삭제하지 않고 열림(ADR 0010) |
+| (대장 밖) deploy E2E 설정의 v1 키(`scenarios`, `generators`, `style_guide_version`) | 무시하는 호환 코드가 남아 있음 | deploy가 설정에서 빼면 호환 코드 제거 가능 |
 | U07(일부) | v2 E2E에서 "단계 2(G02)"를 건너뜀 | G02 결정 |
 | O11 | 평가셋 구성과 합성·실제 비율(OPEN_GAPS에는 없고 docs/brief.md에 있음) | 사용자 결정. `split.ratios`는 예시 값만 |
 
 그 밖의 대장 항목 중 이 영역 직접 항목은 grep으로 찾지 못했으나(`synthetic`, `합성`, `G02`, `O11`, 데이터셋 검색) 전체를 정독하지는 않았습니다(미확인).
 GPU가 막는 항목은 이 영역에 없습니다(잡은 CPU만 사용).
 
-## 6. 남은 일 (docs/STATUS.md)
+## 7. 남은 일 (docs/STATUS.md)
 
 v2 의미 검사는 turn-engine `validate_extraction` 이후(미정), turn-engine 연동(CR-002), 이웃 대역을 실제 SDK로 교체.
 
-## 7. 더 자세한 문서
+## 8. 더 자세한 문서
 
 | 문서 | 내용 |
 |---|---|
