@@ -170,5 +170,5 @@ def test_turn_engine_version_comes_from_config_even_if_turn_engine_is_installed(
     fake.ENGINE_VERSION = "v9.9.9-installed"
     monkeypatch.setitem(sys.modules, "turn_engine", fake)
     st = MemoryDatasetStore(validators)
-    _, res = run_job_helper(make_cfg_raw(tmp_path, turn_engine_version="v0.4.3"), st, validators)
-    assert st.get_manifest(res.dataset_id, res.version)["turn_engine_version"] == "v0.4.3"
+    _, res = run_job_helper(make_cfg_raw(tmp_path, turn_engine_version="0.4.3"), st, validators)
+    assert st.get_manifest(res.dataset_id, res.version)["turn_engine_version"] == "0.4.3"
