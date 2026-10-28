@@ -30,7 +30,7 @@ HTTP 경로는 이 영역 문서에 없어 `../boundary-contracts/HTTP.md`로 �
 | `adapters.py`, `schemas.py` | 이웃 HTTP 연결 공장, 스키마 검증 |
 | `configs/dev.job.json` | 이웃 대역을 쓰는 개발용 설정 |
 | `tests/` | 적합성·잡 종단·HTTP 통합·단위 시험, 이웃 대역 `doubles.py` |
-| `requirements.lock` | 의존 고정(boundary-contracts v2.0.2 태그) |
+| `requirements.lock` | 의존 고정(boundary-contracts 태그의 정본. Dockerfile·스모크가 여기서 읽는다) |
 | `docs/` | 8절 참고 |
 
 ```
@@ -68,14 +68,14 @@ PYTHONPATH=tests python -m synthetic_data run --config configs/dev.job.json [--c
 
 확인된 것은 5절의 실행 결과입니다. 문서의 진술에 기댄 것(이번에 다시 확인하지 않음):
 - I2 파일·메모리 구현이 같은 적합성 시험을 통과, 같은 입력과 시드는 같은 `dataset_digest`(docs/STATUS.md).
-- D84(NAME_FILE)와 boundary-contracts v2.0.2 반영, 비밀이 산출물에 안 나오는 시험 추가(CHANGELOG 0.2.2, 제안 버전). 버전은 pyproject 0.2.0, CHANGELOG는 0.2.2(제안)로 어긋나 있다(docs/STATUS.md).
+- D84(NAME_FILE)와 boundary-contracts 갱신 반영, 비밀이 산출물에 안 나오는 시험 추가(CHANGELOG 0.2.2, 제안 버전). 버전은 pyproject 0.2.0, CHANGELOG는 0.2.2(제안)로 어긋나 있다(docs/STATUS.md).
 - 변경 요청 CR-001~005는 헤드가 결정(docs/STATUS.md). CR-007(v1 생성 경로 제거 제안)은 시드 경로를 남기는 범위까지 ADR 0010으로 실행했다.
 
 확인 못 한 것: 게시기를 운영 저장소에 게시한 적 없음, v2 의미 검사 미수행(CR-006), 이웃 영역과의 실제 HTTP 연동(운영 환경), 이미지·E2E(해당 없음 또는 미실행), turn-engine 연동(미구현).
 
 ## 5. 시험 상태
 
-시험 상태(이 영역 시험 개수는 이 절에만 적는다). 2026-10-28, 이 PC 한 환경(가상환경 `.venv`, 이웃은 tests/doubles.py 대역·참조 서버): `python -m pytest -q -rs` -> 162 통과, 1 건너뜀, 0 실패(I2 HTTP 서버 시험 `tests/test_service.py` 40건, 계약 클라이언트 시험 3건, 잡의 HTTP 게시 통합 시험 `tests/test_job_http_publish.py` 9건(이 영역의 실제 서버를 포트 0으로 띄움), 스모크 비밀 검사 3건 포함; 계약 클라이언트는 boundary-contracts 작업 트리(2ec2849, v2.1.0 태그 전)를 editable로 설치한 환경에서 실행). 이미지 스모크 `scripts/smoke_service.sh`는 같은 작업 트리에서 만든 wheel로 SMOKE_OK(v2.1.0 태그 wheel로는 아직 돌리지 않음). 건너뜀 1건은 `SD_REFERENCE_DATA_DIR`(실제 학습 데이터 파일 경로)가 없어서다. v1 생성 경로 제거(ADR 0010)로 보류 시험 15건과 생성 전용 시험이 줄었다. 돌리지 않은 것: 깨끗한 두 번째 환경, 서비스끼리 도는 시험, 운영 이웃 영역과의 연동. 서비스끼리 도는 시험의 결과는 deploy/docs/E2E_RESULTS.md를 본다.
+시험 상태(이 영역 시험 개수는 이 절에만 적는다). 2026-10-28, 이 PC 한 환경(가상환경 `.venv`, 이웃은 tests/doubles.py 대역·참조 서버): `python -m pytest -q -rs` -> 162 통과, 1 건너뜀, 0 실패(I2 HTTP 서버 시험 `tests/test_service.py` 40건, 계약 클라이언트 시험 3건, 잡의 HTTP 게시 통합 시험 `tests/test_job_http_publish.py` 9건(이 영역의 실제 서버를 포트 0으로 띄움), 스모크 비밀 검사 3건 포함; 계약 클라이언트는 boundary-contracts 작업 트리(태그 전 커밋)를 editable로 설치한 환경에서 실행). 이미지 스모크 `scripts/smoke_service.sh`는 같은 작업 트리에서 만든 wheel로 SMOKE_OK(태그 wheel로는 아직 돌리지 않음). 건너뜀 1건은 `SD_REFERENCE_DATA_DIR`(실제 학습 데이터 파일 경로)가 없어서다. v1 생성 경로 제거(ADR 0010)로 보류 시험 15건과 생성 전용 시험이 줄었다. 돌리지 않은 것: 깨끗한 두 번째 환경, 서비스끼리 도는 시험, 운영 이웃 영역과의 연동. 서비스끼리 도는 시험의 결과는 deploy/docs/E2E_RESULTS.md를 본다.
 
 ## 6. 이 영역의 열린 항목 (head/docs/OPEN_GAPS.md)
 

@@ -47,7 +47,7 @@ store = FileDatasetStore(root, v)     # 또는 MemoryDatasetStore(v)
 | 정답 구성 규칙, 버전 | I8 turn-engine | 버전만(`ENGINE_VERSION`). 호출은 아직 없음(CR-002) | `import turn_engine`이 되면 사용, 아니면 설정 값 |
 
 - 이웃 코드를 가져오지 않는다. 의존은 boundary-contracts(Protocol, 오류, 해시), 문진 스키마(읽기 전용 파일), turn-engine(예정)뿐이다.
-- 지원 버전: 문진 스키마 정수 버전은 `CONTRACT_VERSION`과 정확히 일치해야 한다(현재 1, 다르면 `UNSUPPORTED_VERSION`). 경계 계약은 `pipeline_schema_version` MAJOR 2(쓰는 값 `2.0`, boundary-contracts v2.0.2). 이웃 호출은 HTTP(`boundary_contracts.clients.HttpQuestionReader`/`HttpFailureStore`, 설정의 factory로 선택). 다른 MAJOR는 `UNSUPPORTED_VERSION`이다. 쓸 때는 엄격하다(`additionalProperties: false`라 모르는 필드는 `INVALID_RECORD`). 저장된 파일은 해석하지 않고 바이트 그대로 돌려주므로 `ext`는 보존된다.
+- 지원 버전: 문진 스키마 정수 버전은 `CONTRACT_VERSION`과 정확히 일치해야 한다(현재 1, 다르면 `UNSUPPORTED_VERSION`). 경계 계약은 `pipeline_schema_version` MAJOR 2(쓰는 값은 설치된 `boundary_contracts.PIPELINE_SCHEMA_VERSION`, 계약 태그는 `requirements.lock`). 이웃 호출은 HTTP(`boundary_contracts.clients.HttpQuestionReader`/`HttpFailureStore`, 설정의 factory로 선택). 다른 MAJOR는 `UNSUPPORTED_VERSION`이다. 쓸 때는 엄격하다(`additionalProperties: false`라 모르는 필드는 `INVALID_RECORD`). 저장된 파일은 해석하지 않고 바이트 그대로 돌려주므로 `ext`는 보존된다.
 - 시험용 대역은 `tests/doubles.py`(`FakeQuestionReader`, `FakeFailureStore`)에 있다. 소유 영역의 메모리 구현이 나오면 설정의 `factory` 문자열만 바꾼다.
 - 비식별되지 않은 실패 사례(`deidentified != true`)를 받으면 실행을 `INVALID_RECORD`로 거부한다.
 
