@@ -48,6 +48,7 @@ class JobConfig:
     reviewed_only: bool
     seeds_enabled: bool
     seeds_question_set_id: Optional[str]
+    seeds_max_pii_suspect: Optional[int]   # None = 경고만, 기본 0 = 하나라도 있으면 거부
     ratios: dict
     review_per_kind: int
     regeneration_mode: str
@@ -115,6 +116,10 @@ def parse_config(raw: dict, base_dir: Path) -> JobConfig:
     if reg not in ("full", "affected_only"):
         raise ConfigError("regeneration.mode는 full 또는 affected_only")
     seeds_on = bool(sd.get("enabled", False))
+    # 왜: import의 tolerance.max_pii_suspect_rows와 같은 기본(거부)이다. 시드는 이웃이 비식별했다고 한 값이지만 의심 패턴 검사는 별개다(표준성 점검 C4)
+    mpii = sd["max_pii_suspect_rows"] if "max_pii_suspect_rows" in sd else 0
+    if mpii is not None and (not isinstance(mpii, int) or isinstance(mpii, bool) or mpii < 0):
+        raise ConfigError("seeds.max_pii_suspect_rows는 0 이상의 정수(기본 0) 또는 null(경고만)")
     if seeds_on:
         if "failure_store" not in ad:
             raise ConfigError("seeds.enabled인데 adapters.failure_store가 없다")
@@ -127,7 +132,7 @@ def parse_config(raw: dict, base_dir: Path) -> JobConfig:
         question_reader=_adapter(_req(ad, "question_reader", "adapters."), "adapters.question_reader"),
         failure_store=_adapter(ad["failure_store"], "adapters.failure_store") if "failure_store" in ad else None,
         question_sets=qsets, reviewed_only=bool(raw.get("reviewed_only", True)),
-        seeds_enabled=seeds_on, seeds_question_set_id=sd.get("question_set_id"),
+        seeds_enabled=seeds_on, seeds_question_set_id=sd.get("question_set_id"), seeds_max_pii_suspect=mpii,
         ratios={k: float(v) for k, v in ratios.items()},
         review_per_kind=int(raw.get("review", {}).get("per_kind", 2)), regeneration_mode=reg,
         work_dir=path(_req(out, "work_dir", "output.")), store_kind=kind,

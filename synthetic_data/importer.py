@@ -25,6 +25,7 @@ from boundary_contracts.errors import BoundaryError
 from . import PIPELINE_SCHEMA_VERSION, __version__
 from .config import ConfigError, _ID_RE
 from .package import EXT, dumps_line
+from .pii import PII_PATTERNS, PII_SCAN_LIMIT, pii_kinds   # noqa: F401  (옛 import 경로 호환)
 from .publishing import publish_idempotent
 from .schemas import Validators
 from .store import FileDatasetStore, MemoryDatasetStore
@@ -44,15 +45,6 @@ _SPLIT_FILE = {"TRAIN": "train", "VALIDATION": "validation", "EVAL": "eval"}
 IMPORT_GENERATOR_PREFIX = "external-import"
 # 왜: pending을 걸러낼지는 사용자 결정이라 기본 report(보고만)다. 기본값은 정책이 아니다(docs/adr/0005).
 PENDING_POLICIES = ("report", "exclude", "reject")
-# 왜/근거: docs/adr/0007. 형식 패턴이라 식별자 전부를 못 잡는다. 수량자 상한은 ReDoS 방지(OWASP 권고), 값은 형식 길이에서 온 것이며 측정 안 함.
-# 의심 패턴(경고 전용, 비식별 확인이 아니다). 수량자는 모두 상한이 있고 중첩하지 않아 ReDoS에 안전하다. 행당 검사 길이도 제한한다.
-PII_PATTERNS = {
-    "email": re.compile(r"[A-Za-z0-9._%+-]{1,64}@[A-Za-z0-9-]{1,63}(?:\.[A-Za-z0-9-]{1,63}){1,4}"),
-    "phone_mobile": re.compile(r"(?<!\d)01[016789][-. ]?\d{3,4}[-. ]?\d{4}(?!\d)"),
-    "phone_landline": re.compile(r"(?<!\d)0(?:2|[3-6]\d)[-. ]\d{3,4}[-. ]\d{4}(?!\d)"),
-    "rrn": re.compile(r"(?<!\d)\d{6}[- ]?[1-4]\d{6}(?!\d)"),
-}
-PII_SCAN_LIMIT = 20000   # 근거 기록 없음: 행당 상한. 실제 데이터의 최대 길이를 측정하지 않았다(docs/adr/0007)
 _PUNCT = {"P", "S", "Z", "C"}   # 유니코드 General Category(UAX #44): 구두점·기호·구분자·제어. 근거 docs/adr/0004
 
 
@@ -79,12 +71,6 @@ def utterance_key(role: str, inp: dict) -> Optional[str]:
         return None
     ctx = [inp.get("question_id")] if role == "LORA_A" else [inp.get("action"), (inp.get("next") or {}).get("question_id")]
     return canonical.sha256_hash([role, u, ctx])
-
-
-def pii_kinds(rec: dict) -> list[str]:
-    text = (json.dumps(rec["input"], ensure_ascii=False) + " " + (rec["expected"] if isinstance(rec["expected"], str)
-            else json.dumps(rec["expected"], ensure_ascii=False)))[:PII_SCAN_LIMIT]
-    return [k for k, rx in PII_PATTERNS.items() if rx.search(text)]
 
 
 class InputError(ConfigError):
@@ -152,9 +138,10 @@ def parse_import_config(raw: dict, base_dir: Path) -> ImportConfig:
     mc = tol.get("max_cross_split_duplicate_inputs", 0)
     if not isinstance(mc, int) or isinstance(mc, bool) or mc < 0:
         raise ConfigError("tolerance.max_cross_split_duplicate_inputs는 0 이상의 정수(기본 0)")
-    mp = tol.get("max_pii_suspect_rows")
+    # 왜: 기본은 거부(0건 허용)다. 경고만 하려면 null을 명시한다(ADR 0005 제목 '기본값은 가장 엄격하다', 표준성 점검 B14)
+    mp = tol["max_pii_suspect_rows"] if "max_pii_suspect_rows" in tol else 0
     if mp is not None and (not isinstance(mp, int) or isinstance(mp, bool) or mp < 0):
-        raise ConfigError("tolerance.max_pii_suspect_rows는 0 이상의 정수 또는 생략(생략 = 경고만)")
+        raise ConfigError("tolerance.max_pii_suspect_rows는 0 이상의 정수(기본 0 = 하나라도 있으면 거부) 또는 null(경고만)")
     pp = raw.get("pending_policy", "report")
     if pp not in PENDING_POLICIES:
         raise ConfigError(f"pending_policy는 {PENDING_POLICIES} 중 하나(기본 report: 보고만). 정책 값은 사용자 결정")

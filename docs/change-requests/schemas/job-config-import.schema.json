@@ -19,7 +19,7 @@
       "type": "object", "additionalProperties": false, "required": ["max_invalid_rows", "max_invalid_rate"],
       "properties": {"max_invalid_rows": {"type": "integer", "minimum": 0}, "max_invalid_rate": {"type": "number", "minimum": 0, "maximum": 1},
                      "max_cross_split_duplicate_inputs": {"type": "integer", "minimum": 0, "default": 0},
-                     "max_pii_suspect_rows": {"type": "integer", "minimum": 0, "description": "생략하면 경고만(게시를 막지 않음)."}},
+                     "max_pii_suspect_rows": {"type": ["integer", "null"], "minimum": 0, "description": "생략하면 0(하나라도 있으면 거부), null이면 경고만(게시를 막지 않음)."}},
       "description": "기본값은 가장 엄격(ADR 0005). 허용치를 넘으면 게시하지 않고 종료 코드 4."
     },
     "pending_policy": {"enum": ["report", "exclude", "reject"], "default": "report", "description": "human_review가 pending인 행의 처리. 기본값은 정책이 아니라 보고만(사용자 결정 대기, ADR 0005)."},

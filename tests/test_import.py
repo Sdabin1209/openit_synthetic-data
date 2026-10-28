@@ -295,7 +295,7 @@ def test_pending_policies(tmp_path, validators):
 
 
 def test_pii_suspect_counts_without_values(tmp_path, validators):
-    """비식별 의심 패턴은 건수만 센다. 기본은 경고, 허용치를 정하면 거부한다."""
+    """비식별 의심 패턴은 건수만 센다. 기본은 거부(2026-10-29, B14), tolerance.max_pii_suspect_rows: null이면 경고만, 허용 건수를 정하면 그 수까지 통과한다."""
     def pii(name, lines):
         if name == "lora_a_train.jsonl":
             lines[0] = set_utt(row("LORA_A", 1, "sc-t-p"), "연락처는 010-1234-5678 입니다")
@@ -304,7 +304,8 @@ def test_pii_suspect_counts_without_values(tmp_path, validators):
             lines[0] = set_utt(row("LORA_B", 3, "sc-t-r"), "901231-1234567")
         return lines
     write_input(tmp_path / "in", mutate=pii)
-    res = run_import(cfg_for(tmp_path), store=MemoryDatasetStore(validators), validators=validators)
+    warn = {"max_invalid_rows": 0, "max_invalid_rate": 0, "max_pii_suspect_rows": None}
+    res = run_import(cfg_for(tmp_path, tolerance=warn), store=MemoryDatasetStore(validators), validators=validators)
     assert res.status == "PUBLISHED"
     r = report(tmp_path)
     assert r["pii_suspect"]["rows_total"] == 3 and r["pii_suspect"]["rows_by_kind"] == {"email": 1, "phone_mobile": 1, "rrn": 1}

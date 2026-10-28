@@ -20,6 +20,7 @@ from . import __version__
 from .config import ConfigError, JobConfig, load_config
 from .context import QuestionSetContext
 from .package import dumps_line, package
+from .pii import PII_PATTERNS, pii_kinds
 from .publishing import publish_idempotent
 from .quality import check_lora_a_sample, check_lora_b_sample
 from .rng import derive_int
@@ -119,6 +120,7 @@ def _run_job(cfg, question_reader, store, failure_store, validators, clock, repo
             raise BoundaryError("FAILED_PRECONDITION", "seeds.enabled인데 failure_store가 없다")
         seeds, skipped = collect_seeds(failure_store, v, notes=report["notes"])
         report["skipped_seeds"] += skipped
+        _check_seed_pii(cfg, seeds, report)
         pool = {(c.ref["id"], c.ref["version"], c.ref["content_hash"]): c for c in ctxs if c.usage == "TRAIN_POOL"}
         fallback = sorted((c for c in pool.values() if c.ref["id"] == cfg.seeds_question_set_id),
                           key=lambda c: c.ref["version"])
@@ -194,6 +196,15 @@ def _run_job(cfg, question_reader, store, failure_store, validators, clock, repo
     report["result"] = {"status": res.status, "version": res.version, "content_hash": res.content_hash}
     res.report_path = _write_report(cfg, report)
     return res
+
+
+def _check_seed_pii(cfg: JobConfig, seeds: list, report: dict) -> None:
+    """시드의 입력·정답에 개인정보 의심 패턴이 있으면 기본으로 거부한다(import의 max_pii_suspect_rows와 같은 기본, 표준성 점검 C4). 값은 싣지 않는다."""
+    hits = {s.case_id: kinds for s in seeds if (kinds := pii_kinds({"input": s.input, "expected": s.expected}))}
+    report["pii_suspect"] = {"rows_total": len(hits), "patterns": sorted(PII_PATTERNS)}
+    if hits and cfg.seeds_max_pii_suspect is not None and len(hits) > cfg.seeds_max_pii_suspect:
+        raise BoundaryError("INVALID_RECORD", f"개인정보 의심 패턴이 있는 시드 사례 {len(hits)}건이 허용 {cfg.seeds_max_pii_suspect}건을 넘는다: "
+                            f"{sorted(hits)[:10]}")
 
 
 def _counts(final: list) -> dict:
