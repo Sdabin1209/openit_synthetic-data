@@ -38,7 +38,8 @@ echo "healthz: $(curl -fsS "$URL/healthz")"
 echo "readyz: $(curl -fsS "$URL/readyz")"
 echo "user: $(docker exec "$NAME" id -u)"
 echo "labels: $(docker inspect -f '{{json .Config.Labels}}' "$TAG")"
-[ "$(curl -s -o /dev/null -w '%{http_code}' "$URL/v1/datasets")" = 403 ]
+[ "$(curl -s -o /dev/null -w '%{http_code}' "$URL/v1/datasets")" = 401 ]
+curl -s -i "$URL/v1/datasets" | grep -qi "^www-authenticate: Bearer"
 [ "$(curl -s -o /dev/null -w '%{http_code}' -H "Authorization: Bearer $RT" "$URL/v1/datasets")" = 200 ]
 [ "$(curl -s -o /dev/null -w '%{http_code}' -X POST -H "Authorization: Bearer $RT" --data-binary x "$URL/v1/datasets")" = 403 ]
 # 게시와 조회(계약 클라이언트로). 개발 환경(.venv)의 boundary_contracts를 쓴다.

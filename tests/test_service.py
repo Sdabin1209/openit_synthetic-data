@@ -110,9 +110,9 @@ def test_version_is_immutable(srv, captured):
 
 def test_read_token_cannot_publish_and_no_token(srv, captured):
     assert publish(srv, captured, token=RT)[0] == 403
-    assert publish(srv, captured, token=None)[0] == 403
-    assert srv.call("GET", "/v1/datasets", token="x" * 40)[0] == 403
-    assert srv.call("GET", "/v1/datasets", token=None)[0] == 403
+    assert publish(srv, captured, token=None)[0] == 401      # 토큰 없음/틀림은 401, 권한 부족만 403(CONVENTIONS 9절, D106)
+    assert srv.call("GET", "/v1/datasets", token="x" * 40)[0] == 401
+    assert srv.call("GET", "/v1/datasets", token=None)[0] == 401
     assert srv.call("GET", "/v1/datasets")[0] == 200
     assert json.loads(srv.call("GET", "/v1/datasets")[1])["items"] == []       # 거절된 게시는 아무것도 남기지 않는다
 
@@ -203,7 +203,7 @@ def test_auth_failure_throttle_blocks_even_valid_token(tmp_path):
     s = Srv(tmp_path, auth_fail_limit=3)
     try:
         for _ in range(3):
-            assert s.call("GET", "/v1/datasets", token="y" * 40)[0] == 403
+            assert s.call("GET", "/v1/datasets", token="y" * 40)[0] == 401
         assert s.call("GET", "/v1/datasets", token="y" * 40)[0] == 503
         assert s.call("GET", "/v1/datasets")[0] == 503          # 차단 중에는 올바른 토큰도 거부(추측이 맞는지 알려 주지 않는다)
         assert s.call("GET", "/healthz", token=None)[0] == 200  # 살아 있음 확인은 인증 전이다

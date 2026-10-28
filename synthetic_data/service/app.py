@@ -44,6 +44,15 @@ DRAIN_CAP = 1 << 20                # 거절 응답 전에 버리는 본문의 �
 MIN_TOKEN_LEN = 32                 # 128비트 이상 무작위 16진수(OWASP 세션 관리 치트시트·NIST SP 800-63B 참고, 원문은 다시 확인하지 않았다)
 
 
+class Unauthenticated(BoundaryError):
+    """토큰이 없거나 틀림. 상태 401 + `WWW-Authenticate: Bearer`, 본문 code는 PERMISSION_DENIED(CONVENTIONS 9절 '401과 403', D106).
+    왜: RFC 9110 15.5.2는 인증 자격이 없거나 틀린 요청에 401과 WWW-Authenticate를 요구하고, RFC 6750 3절은 Bearer 스킴의 이 헤더를 정한다.
+    토큰은 맞지만 권한이 없을 때(읽기 토큰으로 게시)만 403이다(RFC 9110 15.5.4)."""
+
+    def __init__(self, message: str):
+        super().__init__("PERMISSION_DENIED", message)
+
+
 def parse_tokens(spec):
     """'역할=토큰,역할=토큰' -> {토큰: 역할}"""
     out = {}
@@ -119,9 +128,11 @@ class Service:
     def authorize(self, method: str, header) -> None:
         if method == "POST":
             if self._role(self.write, header) != WRITE_ROLE:
-                raise BoundaryError("PERMISSION_DENIED", "쓰기 권한이 없다")
+                if self.token_valid(header):
+                    raise BoundaryError("PERMISSION_DENIED", "쓰기 권한이 없다")      # 토큰은 맞지만 읽기 토큰: 403
+                raise Unauthenticated("토큰이 없거나 틀리다")
         elif not self.token_valid(header):
-            raise BoundaryError("PERMISSION_DENIED", "읽기 권한이 없다")
+            raise Unauthenticated("토큰이 없거나 틀리다")
 
     def auth_blocked(self, addr: str) -> bool:
         now = time.monotonic()
@@ -271,15 +282,17 @@ def make_handler(svc: Service):
             # 요청 줄이 잘못됐거나 URI가 너무 길면(414) self.path·command가 아직 없다
             svc.log(f"{getattr(self, 'command', None) or '-'} {urlparse(getattr(self, 'path', '-')).path} {args[1] if len(args) > 1 else ''}")
 
-        def _send(self, code, body: bytes, ctype="application/json"):
+        def _send(self, code, body: bytes, ctype="application/json", headers=()):
             self.send_response(code)
+            for k, v in headers:
+                self.send_header(k, v)
             self.send_header("Content-Type", ctype + ("; charset=utf-8" if ctype == "application/json" else ""))
             self.send_header("Content-Length", str(len(body)))
             self.end_headers()
             self.wfile.write(body)
 
-        def _json(self, code, obj):
-            self._send(code, json.dumps(obj, ensure_ascii=False).encode())
+        def _json(self, code, obj, headers=()):
+            self._send(code, json.dumps(obj, ensure_ascii=False).encode(), headers=headers)
 
         def _file(self, path: Path, ctype: str, size: int = None):
             self.send_response(200)
@@ -300,6 +313,8 @@ def make_handler(svc: Service):
             if self.command == "POST":
                 self.close_connection = True
                 self._drain()
+            if isinstance(e, Unauthenticated):
+                return self._json(401, e.to_record(), headers=(("WWW-Authenticate", "Bearer"),))
             self._json(STATUS[e.code], e.to_record())
 
         _consumed = False
