@@ -5,16 +5,13 @@
 from __future__ import annotations
 
 import json
-import re
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Optional
 
+from .contract_check import check_config
 from .store.spec import parse_store
 
-_ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:-]*$")
-USAGES = ("TRAIN_POOL", "HELD_OUT_EVAL")
-SPLITS = ("TRAIN", "VALIDATION", "EVAL")
 
 
 class ConfigError(ValueError):
@@ -59,83 +56,50 @@ class JobConfig:
     store_http: Optional[dict] = None     # kind=http일 때의 정규화된 설정(store/spec.py)
 
 
-def _req(d: dict, key: str, where: str):
-    if key not in d:
-        raise ConfigError(f"설정에 {where}{key}이(가) 필요하다")
-    return d[key]
-
-
-def _adapter(d: dict, where: str) -> AdapterSpec:
-    f = _req(d, "factory", where + ".")
-    if ":" not in f:
-        raise ConfigError(f"{where}.factory는 'module:function' 형식이어야 한다")
-    return AdapterSpec(f, dict(d.get("kwargs", {})))
-
-
-# 왜: v1 생성 키(scenarios, generators, style_guide_version)를 조용히 무시하면 설정이 동작과 어긋난 채 남는다. 알 수 없는 키는 거부한다(ADR 0014).
-KNOWN_KEYS = frozenset({"_comment", "dataset_id", "seed", "created_at", "version", "turn_engine_version", "survey_schema_dir", "adapters",
-                        "question_sets", "reviewed_only", "seeds", "split", "review", "regeneration", "output"})
+def _adapter(d: dict) -> AdapterSpec:
+    return AdapterSpec(d["factory"], dict(d.get("kwargs", {})))
 
 
 def parse_config(raw: dict, base_dir: Path) -> JobConfig:
-    unknown = sorted(set(raw) - KNOWN_KEYS)
-    if unknown:
-        raise ConfigError(f"설정에 알 수 없는 키가 있다: {unknown} (v1 생성 키 scenarios·generators·style_guide_version은 제거됨, ADR 0010·0014)")
+    # 왜: 키·형식 검사는 계약 스키마가 정본이다(D107). 모르는 키 거부(최상위·중첩), v1 생성 키 거부, 토큰 값 거부가 모두 여기서 걸린다.
+    #     아래는 스키마로 쓸 수 없는 불변식만 검사한다(R7: 스키마가 보증한 것은 다시 검사하지 않는다).
+    check_config("SyntheticJobConfigRun", raw, ConfigError)
     def path(s):
         p = Path(s)
         return p if p.is_absolute() else (base_dir / p).resolve()
 
-    did = _req(raw, "dataset_id", "")
-    if not _ID_RE.match(did) or len(did) > 128:
-        raise ConfigError("dataset_id 형식이 맞지 않는다")
-    seed = _req(raw, "seed", "")
-    if not isinstance(seed, int) or isinstance(seed, bool):
-        raise ConfigError("seed는 정수여야 한다")
-    ratios = _req(_req(raw, "split", ""), "ratios", "split.")
-    if set(ratios) != set(SPLITS) or any(not isinstance(x, (int, float)) or x < 0 for x in ratios.values()) or sum(ratios.values()) <= 0:
-        raise ConfigError("split.ratios는 TRAIN·VALIDATION·EVAL 세 키에 0 이상의 수를 적어야 하고 합이 0보다 커야 한다 (평가셋 구성은 O11, 사용자 결정)")
-    qsets = []
-    for q in _req(raw, "question_sets", ""):
-        usage = q.get("usage", "TRAIN_POOL")
-        if usage not in USAGES:
-            raise ConfigError(f"question_sets[].usage는 {USAGES} 중 하나여야 한다")
-        qsets.append(QuestionSetSpec(_req(q, "id", "question_sets[]."), q.get("version"), usage))
-    if not qsets:
-        raise ConfigError("question_sets가 비어 있다")
+    ratios = raw["split"]["ratios"]
+    if sum(ratios.values()) <= 0:
+        raise ConfigError("split.ratios의 합이 0보다 커야 한다 (평가셋 구성은 O11, 사용자 결정)")
+    qsets = [QuestionSetSpec(q["id"], q.get("version"), q.get("usage", "TRAIN_POOL")) for q in raw["question_sets"]]
     ids = {}
     for q in qsets:
         if ids.setdefault(q.id, q.usage) != q.usage:
             raise ConfigError(f"같은 문항 세트 {q.id}를 TRAIN_POOL과 HELD_OUT_EVAL에 함께 쓸 수 없다")
-    ad = _req(raw, "adapters", "")
+    ad = raw["adapters"]
     sd = raw.get("seeds", {})
-    out = _req(raw, "output", "")
-    store = _req(out, "store", "output.")
-    kind = _req(store, "kind", "output.store.")
-    http = parse_store(store, ConfigError)
-    reg = raw.get("regeneration", {}).get("mode", "full")
-    if reg not in ("full", "affected_only"):
-        raise ConfigError("regeneration.mode는 full 또는 affected_only")
+    out = raw["output"]
+    store = out["store"]
+    http = parse_store(store)
     seeds_on = bool(sd.get("enabled", False))
     # 왜: import의 tolerance.max_pii_suspect_rows와 같은 기본(거부)이다. 시드는 이웃이 비식별했다고 한 값이지만 의심 패턴 검사는 별개다(표준성 점검 C4)
     mpii = sd["max_pii_suspect_rows"] if "max_pii_suspect_rows" in sd else 0
-    if mpii is not None and (not isinstance(mpii, int) or isinstance(mpii, bool) or mpii < 0):
-        raise ConfigError("seeds.max_pii_suspect_rows는 0 이상의 정수(기본 0) 또는 null(경고만)")
     if seeds_on:
         if "failure_store" not in ad:
             raise ConfigError("seeds.enabled인데 adapters.failure_store가 없다")
         if sd.get("question_set_id") is not None and sd["question_set_id"] not in ids:
             raise ConfigError("seeds.question_set_id가 question_sets에 없다")
     return JobConfig(
-        dataset_id=did, seed=seed, created_at=raw.get("created_at"), version=raw.get("version"),
+        dataset_id=raw["dataset_id"], seed=raw["seed"], created_at=raw.get("created_at"), version=raw.get("version"),
         turn_engine_version=raw.get("turn_engine_version"),
-        survey_schema_dir=path(_req(raw, "survey_schema_dir", "")),
-        question_reader=_adapter(_req(ad, "question_reader", "adapters."), "adapters.question_reader"),
-        failure_store=_adapter(ad["failure_store"], "adapters.failure_store") if "failure_store" in ad else None,
+        survey_schema_dir=path(raw["survey_schema_dir"]),
+        question_reader=_adapter(ad["question_reader"]),
+        failure_store=_adapter(ad["failure_store"]) if "failure_store" in ad else None,
         question_sets=qsets, reviewed_only=bool(raw.get("reviewed_only", True)),
         seeds_enabled=seeds_on, seeds_question_set_id=sd.get("question_set_id"), seeds_max_pii_suspect=mpii,
         ratios={k: float(v) for k, v in ratios.items()},
-        review_per_kind=int(raw.get("review", {}).get("per_kind", 2)), regeneration_mode=reg,
-        work_dir=path(_req(out, "work_dir", "output.")), store_kind=kind,
+        review_per_kind=int(raw.get("review", {}).get("per_kind", 2)), regeneration_mode=raw.get("regeneration", {}).get("mode", "full"),
+        work_dir=path(out["work_dir"]), store_kind=store["kind"],
         store_root=path(store["root"]) if "root" in store else None, raw=raw, store_http=http)
 
 

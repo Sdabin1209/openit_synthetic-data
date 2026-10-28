@@ -23,7 +23,7 @@ trap 'rm -rf "${BUILT:-}" "$SECRETS"; docker rm -f "$NAME" >/dev/null 2>&1 || tr
 WCTX=$(mktemp -d); cp "$WHL" "$WCTX"/; trap 'rm -rf "${BUILT:-}" "$WCTX" "$SECRETS"; docker rm -f "$NAME" >/dev/null 2>&1 || true; docker volume rm "$NAME-data" >/dev/null 2>&1 || true; docker rmi "$TAG" >/dev/null 2>&1 || true' EXIT
 docker build -q --build-context wheels="$WCTX" --build-context survey_schema="$SCHEMA" \
   --build-arg "BC_SPEC=/wheels/$(basename "$WHL")" --build-arg "BC_VERSION=v$BC_VER" --build-arg "SURVEY_SCHEMA_VERSION=$(tr -d ' \n' < "$SCHEMA/CONTRACT_VERSION")" \
-  --build-arg "REVISION=$(git rev-parse --short HEAD 2>/dev/null || echo unknown)" -t "$TAG" .
+  --build-arg "REVISION=$(git rev-parse --short HEAD)" -t "$TAG" .
 docker volume create "$NAME-data" >/dev/null
 # 토큰은 환경 변수가 아니라 파일로 준다(D84). 시험 전용 무작위 값이고 끝나면 버려진다.
 RT=$(od -An -N24 -tx1 /dev/urandom | tr -d ' \n'); WT=$(od -An -N24 -tx1 /dev/urandom | tr -d ' \n')

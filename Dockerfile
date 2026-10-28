@@ -19,9 +19,11 @@ RUN --mount=type=ssh --mount=type=bind,from=wheels,target=/wheels \
     /opt/venv/bin/pip install --no-cache-dir -r /tmp/requirements-service.txt "${BC_SPEC}"
 
 FROM python:3.12-slim
-ARG REVISION=unknown
-ARG BC_VERSION=unknown
-ARG SURVEY_SCHEMA_VERSION=unknown
+# 왜: 값 없음의 표기는 n/a 하나다(계약 ImageLabels, D108). revision은 hex만 허용되므로 기본값 그대로(n/a) 빌드하면 아래 검사가 멈춘다.
+ARG REVISION=n/a
+ARG BC_VERSION=n/a
+ARG SURVEY_SCHEMA_VERSION=n/a
+RUN printf '%s' "${REVISION}" | grep -Eq '^[0-9a-f]{7,40}$' || { echo "REVISION은 소스 커밋 hex(7~40자)여야 한다(--build-arg REVISION=...)" >&2; exit 1; }
 COPY --from=build /opt/venv /opt/venv
 WORKDIR /app
 COPY synthetic_data /app/synthetic_data

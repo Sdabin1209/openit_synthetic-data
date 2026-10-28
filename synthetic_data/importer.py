@@ -23,7 +23,8 @@ from boundary_contracts import canonical
 from boundary_contracts.errors import BoundaryError
 
 from . import PIPELINE_SCHEMA_VERSION, __version__
-from .config import ConfigError, _ID_RE
+from .config import ConfigError
+from .contract_check import check_config, check_output
 from .package import EXT, dumps_line
 from .pii import PII_PATTERNS, PII_SCAN_LIMIT, pii_kinds   # noqa: F401  (옛 import 경로 호환)
 from .publishing import publish_idempotent
@@ -98,66 +99,25 @@ class ImportConfig:
     store_http: Optional[dict] = None
 
 
-# 왜: run 설정(config.KNOWN_KEYS)과 같은 이유로 알 수 없는 최상위 키(오타)를 거부한다. 무시하면 tolerance·pending_policy 같은 안전 설정이
-#     기본값으로 돌아간 채 남는다(ADR 0014). 새 최상위 키를 추가하면 여기에도 넣는다(시험이 예시 설정으로 확인).
-IMPORT_KNOWN_KEYS = frozenset({"_comment", "dataset_id", "input_dir", "survey_schema_dir", "question_sets", "source_label",
-                               "turn_engine_version", "tolerance", "pending_policy", "origin", "version", "created_at", "output"})
-
-
 def parse_import_config(raw: dict, base_dir: Path) -> ImportConfig:
-    unknown = sorted(set(raw) - IMPORT_KNOWN_KEYS)
-    if unknown:
-        raise ConfigError(f"import 설정에 알 수 없는 키가 있다: {unknown} (ADR 0014)")
+    # 왜: 키·형식·허용치 범위·origin·pending_policy 값 검사는 계약 스키마가 정본이다(D107, ADR 0014). 스키마로 쓸 수 없는 불변식은 없다.
+    check_config("SyntheticJobConfigImport", raw, ConfigError)
     def path(s):
         p = Path(s)
         return p if p.is_absolute() else (base_dir / p).resolve()
 
-    def req(d, k, where=""):
-        if k not in d:
-            raise ConfigError(f"설정에 {where}{k}이(가) 필요하다")
-        return d[k]
-
-    did = req(raw, "dataset_id")
-    if not isinstance(did, str) or not _ID_RE.match(did) or len(did) > 128:
-        raise ConfigError("dataset_id 형식이 맞지 않는다")
-    qs = req(raw, "question_sets")
-    if not isinstance(qs, list) or not qs:
-        raise ConfigError("question_sets는 ArtifactRef({id, version, content_hash}) 1개 이상의 목록이어야 한다 (CR-006)")
-    for r in qs:
-        if not isinstance(r, dict) or set(r) != {"id", "version", "content_hash"}:
-            raise ConfigError("question_sets[]는 id, version, content_hash 세 키만 가진 객체여야 한다")
-    label = req(raw, "source_label")
-    if not isinstance(label, str) or not label.strip():
-        raise ConfigError("source_label은 비어 있지 않은 문자열이어야 한다")
-    tol = req(raw, "tolerance")
-    mr, mx = req(tol, "max_invalid_rows", "tolerance."), req(tol, "max_invalid_rate", "tolerance.")
-    if not isinstance(mr, int) or isinstance(mr, bool) or mr < 0:
-        raise ConfigError("tolerance.max_invalid_rows는 0 이상의 정수")
-    if not isinstance(mx, (int, float)) or isinstance(mx, bool) or not 0 <= mx <= 1:
-        raise ConfigError("tolerance.max_invalid_rate는 0 이상 1 이하의 수")
-    mc = tol.get("max_cross_split_duplicate_inputs", 0)
-    if not isinstance(mc, int) or isinstance(mc, bool) or mc < 0:
-        raise ConfigError("tolerance.max_cross_split_duplicate_inputs는 0 이상의 정수(기본 0)")
-    # 왜: 기본은 거부(0건 허용)다. 경고만 하려면 null을 명시한다(ADR 0005 제목 '기본값은 가장 엄격하다', 표준성 점검 B14)
-    mp = tol["max_pii_suspect_rows"] if "max_pii_suspect_rows" in tol else 0
-    if mp is not None and (not isinstance(mp, int) or isinstance(mp, bool) or mp < 0):
-        raise ConfigError("tolerance.max_pii_suspect_rows는 0 이상의 정수(기본 0 = 하나라도 있으면 거부) 또는 null(경고만)")
-    pp = raw.get("pending_policy", "report")
-    if pp not in PENDING_POLICIES:
-        raise ConfigError(f"pending_policy는 {PENDING_POLICIES} 중 하나(기본 report: 보고만). 정책 값은 사용자 결정")
-    if raw.get("origin", "SYNTHETIC") != "SYNTHETIC":
-        raise ConfigError("origin은 SYNTHETIC만 지원한다(FAILURE_CASE_SEED는 seed_case_id가 필요해 외부 데이터에 맞지 않는다)")
-    out = req(raw, "output")
-    store = req(out, "store", "output.")
-    kind = req(store, "kind", "output.store.")
-    http = parse_store(store, ConfigError)
+    tol, out = raw["tolerance"], raw["output"]
+    store = out["store"]
     return ImportConfig(
-        dataset_id=did, input_dir=path(req(raw, "input_dir")), survey_schema_dir=path(req(raw, "survey_schema_dir")),
-        question_sets=qs, source_label=label.strip(), turn_engine_version=str(req(raw, "turn_engine_version")),
-        max_invalid_rows=mr, max_invalid_rate=float(mx), version=raw.get("version"), created_at=raw.get("created_at"),
-        work_dir=path(req(out, "work_dir", "output.")), max_cross_split_duplicates=mc,
-        max_pii_suspect_rows=mp, pending_policy=pp, store_kind=kind,
-        store_root=path(store["root"]) if "root" in store else None, store_http=http)
+        dataset_id=raw["dataset_id"], input_dir=path(raw["input_dir"]), survey_schema_dir=path(raw["survey_schema_dir"]),
+        question_sets=raw["question_sets"], source_label=raw["source_label"].strip(), turn_engine_version=raw["turn_engine_version"],
+        max_invalid_rows=tol["max_invalid_rows"], max_invalid_rate=float(tol["max_invalid_rate"]),
+        version=raw.get("version"), created_at=raw.get("created_at"),
+        work_dir=path(out["work_dir"]), max_cross_split_duplicates=tol.get("max_cross_split_duplicate_inputs", 0),
+        # 왜: 기본은 거부(0건 허용)다. 경고만 하려면 null을 명시한다(ADR 0005 제목 '기본값은 가장 엄격하다', 표준성 점검 B14)
+        max_pii_suspect_rows=tol["max_pii_suspect_rows"] if "max_pii_suspect_rows" in tol else 0,
+        pending_policy=raw.get("pending_policy", "report"), store_kind=store["kind"],
+        store_root=path(store["root"]) if "root" in store else None, store_http=parse_store(store))
 
 
 def load_import_config(config_path: Path) -> ImportConfig:
@@ -448,6 +408,7 @@ def _peek_splits(lines):
 
 
 def _write(cfg: ImportConfig, report: dict) -> str:
+    check_output("SyntheticImportReport", report)    # 왜: 계약 형식을 내보내기 전에 자기 검사한다(D107)
     p = cfg.work_dir / "import_report.json"
     p.write_text(json.dumps(report, ensure_ascii=False, sort_keys=True, indent=2) + "\n", encoding="utf-8")
     return str(p)

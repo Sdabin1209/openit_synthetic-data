@@ -12,8 +12,17 @@ from pathlib import Path
 from boundary_contracts.errors import BoundaryError
 
 from .config import ConfigError
+from .contract_check import check_output
 from .importer import import_from_config
 from .job import build_from_config
+
+
+def _result_line(res) -> str:
+    rec = asdict(res)
+    if rec.get("rejected_reasons") == [] and rec["status"] != "REJECTED":
+        del rec["rejected_reasons"]     # 왜: 계약은 이 필드를 import 거부 때만 요구한다. 빈 목록을 내지 않는다
+    check_output("SyntheticJobResult", rec)    # 왜: deploy가 읽는 형식이라 내보내기 전에 계약으로 자기 검사한다(D107)
+    return json.dumps(rec, ensure_ascii=False, sort_keys=True)
 
 
 def main(argv=None) -> int:
@@ -29,16 +38,18 @@ def main(argv=None) -> int:
     try:
         if args.cmd == "import":
             res = import_from_config(args.config, created_at=args.created_at)
-            print(json.dumps(asdict(res), ensure_ascii=False, sort_keys=True))
+            print(_result_line(res))
             return 4 if res.status == "REJECTED" else 0
         res = build_from_config(args.config, created_at=args.created_at)
     except ConfigError as e:
-        print(json.dumps({"error": "CONFIG", "message": str(e)}, ensure_ascii=False), file=sys.stderr)
+        err = {"error": "CONFIG", "message": str(e)}
+        check_output("SyntheticJobError", err)
+        print(json.dumps(err, ensure_ascii=False), file=sys.stderr)
         return 2
     except BoundaryError as e:
         print(json.dumps(e.to_record(), ensure_ascii=False), file=sys.stderr)
         return 75 if e.retryable else 3
-    print(json.dumps(asdict(res), ensure_ascii=False, sort_keys=True))
+    print(_result_line(res))
     return 0
 
 

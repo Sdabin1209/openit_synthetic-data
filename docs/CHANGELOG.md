@@ -1,5 +1,10 @@
 # 변경 이력
 
+## 미배포 (2026-10-29, 단위 3)
+- 의존: boundary-contracts v2.2.1, 문진 스키마 survey-schema-v1.1.0.
+- 변경: `run`·`import` 설정을 계약 스키마로 검사한다(중첩 객체의 모르는 키도 거부: `tolerance`, `split`, `output`, `seeds` 등). 이전에는 최상위만 거부했다. 잡 출력은 내보내기 전에 계약 스키마로 자기 검사한다. 빈 `rejected_reasons`는 거부가 아닐 때 결과 한 줄에서 뺀다(ADR 0016).
+- 변경: Dockerfile ARG 기본값 `unknown`을 `n/a`로, REVISION이 hex가 아니면 빌드 실패. 스모크는 `git rev-parse` 실패 시 unknown으로 빠지지 않고 멈춘다.
+
 ## 미배포 (2026-10-28)
 - 추가(D100): I2 HTTP 서버 `python -m synthetic_data.service`(dataset-store), `Dockerfile`, `scripts/smoke_service.sh`, 서버·계약 클라이언트 시험(ADR 0011, 0012). 계약 v2.1.0이 필요하다(태그 전에는 작업 트리 wheel로 확인).
 - 서버 보강(독립 검토 반영, ADR 0012): 인증 실패 제한을 인증 앞으로, 데이터셋 단위 게시 락(동시 같은 버전 200/409), Content-Length·tar 이름·sparse·항목 수 검사, 청크 스트리밍·다운로드 상한, 헤더 수신 마감, 시작 정리, 토큰 중복 거부, 스모크 비밀 검사 수정, Dockerfile 라벨 ARG와 `requirements-service.txt`.

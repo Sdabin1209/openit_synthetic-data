@@ -1,10 +1,13 @@
 # STATUS (synthetic-data)
 
-마지막 갱신: 2026-10-27. 현재 의존은 boundary-contracts v2.0.2(requirements.lock, 커밋 b1edd31, D84). 2.0.0 이전은 브랜치 migrate-contracts-2.0.0, push 전.
+마지막 갱신: 2026-10-29. 의존 버전의 정본은 `requirements.lock`이다(이 문서에 복사하지 않는다).
 
 **버전 표기(사실)**: `pyproject.toml`의 version은 0.2.0이고, `docs/CHANGELOG.md`는 0.2.1과 0.2.2를 '제안 버전'으로 적었다. pyproject는 올리지 않았으므로 두 값이 어긋난다. 어느 쪽이 맞는지는 헤드 결정 사항이며 이 문서에서 정하지 않는다.
 
 **시험 개수**: README 5절에만 적는다. 2026-10-28 v1 생성 경로와 보류 시험 15건을 제거했다(ADR 0010).
+
+## 단위 3 (2026-10-29)
+- 계약 v2.2.1, 문진 스키마 survey-schema-v1.1.0 핀. 잡 설정 두 가지와 잡 출력(결과 한 줄, report.json, import_report.json, 설정 오류 한 줄)을 계약 스키마(`SyntheticJobConfigRun/Import`, `SyntheticJobResult`, `SyntheticRunReport`, `SyntheticImportReport`, `SyntheticJobError`, `SyntheticDefs`)로 검사한다(ADR 0016). 손으로 쓴 키·형식 검사는 지웠다. Dockerfile ARG 기본값은 `n/a`이고 REVISION이 hex가 아니면 빌드가 멈춘다. 시험: `tests/test_contract_schemas.py`. turn-engine 코드 의존은 없다(`job.py`의 `resolve_turn_engine_version`이 설치돼 있으면 읽는 선택적 import만 있고 설정 값이 우선 대안이다).
 
 ## G02 방향 반영: 게시기(import) 모드 (2026-10-27)
 - 한 일: 사용자 결정(데이터셋 담당의 최종 학습 데이터를 그대로 가져와 검증 후 게시, 재생성 없음)에 따라 `synthetic_data/importer.py`, CLI `import`, `configs/import.example.json`, `tests/test_import.py`(가짜 입력 17건) 추가. 설계는 docs/design.md 부록 A. `pytest -q` 결과 106 passed, 15 skipped.
@@ -30,8 +33,7 @@
 - 이웃 영역의 읽기 SDK/메모리 구현이 나오면 `tests/doubles.py`를 그쪽으로 교체(설정 factory만 변경).
 - turn-engine 연동(원격이 생긴 뒤 다음 구간): Directive를 `plan()`으로. DialoguePlannerInput은 합성 또는 turn-engine 예시 사용(승인됨). 그때까지 hand-built 표시 유지.
 - O11 확정 후 평가셋 구성(합성·실제 비율, 지표, 임계치) 반영. 지금은 `split.ratios` 설정만 있다.
-- 컨테이너(D22): run-once 잡이라 이번 구간에서 Dockerfile을 만들지 않음. 필요 여부 확인.
-- 컨테이너: 서비스 없는 잡이라 Dockerfile 없이 requirements.lock 고정으로 승인됨.
+- 컨테이너(D22): I2 서버(dataset-store)는 `Dockerfile`과 `scripts/smoke_service.sh`가 있다. run-once 잡(`run`, `import`)은 이미지가 아니라 `requirements.lock` 환경이다(docs/runbook.md).
 
 ## 열림 (ADR 0010)
 - 시드 `run`은 유지(헤드 결정 2026-10-28, deploy 단계 7이 호출). 제거 여부는 데이터셋 담당 이전 계획과 함께 나중에 정한다. `regeneration.mode`·감수 샘플링: deploy는 설정 값(`regeneration.mode=full`, `review.per_kind=2`)을 써넣기만 하고 `review_sample.jsonl`이나 affected_only 동작을 읽는 곳은 grep으로 찾지 못했다. 삭제하지 않고 열림으로 둔다. 배포 E2E 설정이 v1 키(scenarios, generators, style_guide_version)를 아직 싣고 있어 무시하는 호환을 두었다(deploy가 고치면 제거).

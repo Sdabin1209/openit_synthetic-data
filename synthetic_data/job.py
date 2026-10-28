@@ -16,6 +16,7 @@ from boundary_contracts import canonical
 from boundary_contracts.errors import BoundaryError
 from boundary_contracts.sdk import DatasetStore, FailureStore, QuestionReader
 
+from .contract_check import check_output
 from . import __version__
 from .config import ConfigError, JobConfig, load_config
 from .context import QuestionSetContext
@@ -218,6 +219,7 @@ def _counts(final: list) -> dict:
 
 
 def _write_report(cfg: JobConfig, report: dict) -> str:
+    check_output("SyntheticRunReport", report)    # 왜: deploy와 사람이 읽는 형식이라 내보내기 전에 계약으로 자기 검사한다(D107)
     p = cfg.work_dir / "report.json"
     p.write_text(json.dumps(report, ensure_ascii=False, sort_keys=True, indent=2) + "\n", encoding="utf-8")
     return str(p)
