@@ -74,7 +74,7 @@ PYTHONPATH=tests python -m synthetic_data run --config configs/dev.job.json [--c
 
 ## 5. 시험 상태
 
-시험 상태(이 영역 시험 개수는 이 절에만 적는다). 2026-10-28, 이 PC 한 환경(가상환경 `.venv`, 이웃은 tests/doubles.py 대역·참조 서버): `python -m pytest -q -rs` -> 162 통과, 1 건너뜀, 0 실패(I2 HTTP 서버 시험 `tests/test_service.py` 40건, 계약 클라이언트 시험 3건, 잡의 HTTP 게시 통합 시험 `tests/test_job_http_publish.py` 9건(이 영역의 실제 서버를 포트 0으로 띄움), 스모크 비밀 검사 3건 포함; 계약 클라이언트는 boundary-contracts 작업 트리(태그 전 커밋)를 editable로 설치한 환경에서 실행). 이미지 스모크 `scripts/smoke_service.sh`는 같은 작업 트리에서 만든 wheel로 SMOKE_OK(태그 wheel로는 아직 돌리지 않음). 건너뜀 1건은 `SD_REFERENCE_DATA_DIR`(실제 학습 데이터 파일 경로)가 없어서다. v1 생성 경로 제거(ADR 0010)로 보류 시험 15건과 생성 전용 시험이 줄었다. 돌리지 않은 것: 깨끗한 두 번째 환경, 서비스끼리 도는 시험, 운영 이웃 영역과의 연동. 서비스끼리 도는 시험의 결과는 deploy/docs/E2E_RESULTS.md를 본다.
+시험 상태(이 영역 시험 개수는 이 절에만 적는다). 2026-10-28, 새 clone(`/home/user/cleanclone-sd-1805`, 이웃 폴더 없음, `bash scripts/setup-env.sh`로 설치한 `.venv`: boundary-contracts와 문진 스키마 모두 requirements.lock의 태그 설치, 이웃은 tests/doubles.py 대역·참조 서버): `python -m pytest -q -rs` -> 164 통과, 1 건너뜀, 0 실패(I2 HTTP 서버 시험, 계약 클라이언트 시험, 잡의 HTTP 게시 통합 시험, 스모크 비밀 검사 포함). 이미지 스모크 `scripts/smoke_service.sh`는 이전 환경(boundary-contracts 작업 트리에서 만든 wheel)에서 SMOKE_OK였고 새 clone에서는 돌리지 않았다. 건너뜀 1건은 `SD_REFERENCE_DATA_DIR`(실제 학습 데이터 파일 경로)가 없어서다. v1 생성 경로 제거(ADR 0010)로 보류 시험 15건과 생성 전용 시험이 줄었다. 돌리지 않은 것: 서비스끼리 도는 시험, 운영 이웃 영역과의 연동. 서비스끼리 도는 시험의 결과는 deploy/docs/E2E_RESULTS.md를 본다.
 
 ## 6. 이 영역의 열린 항목 (head/docs/OPEN_GAPS.md)
 
