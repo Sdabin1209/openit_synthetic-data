@@ -9,7 +9,7 @@
 - 앱은 WSGI 함수(`make_app`)이고 서버는 waitress 3.0.2다. 단일 프로세스·다중 스레드 설계(락과 세마포어가 프로세스 안에 있다)라 prefork 서버(gunicorn)가 아니라 waitress다.
 - 지운 자체 코드: `_DeadlineRaw`(헤더 마감), `_Server`(연결 상한 세마포어), `BaseHTTPRequestHandler` 서브클래스, 본문 drain, Content-Length 직접 검사, 본문 상한 직접 검사.
 - 남긴 것(서버가 아니라 서비스 로직): 토큰 인증과 역할, 인증 실패 제한, 데이터셋 ID 단위 락, 게시·다운로드 슬롯, 디스크 여유 검사, tar 검사.
-- 종료: `DatasetServer.serve_forever`가 종료 신호에 새 연결을 받지 않고 진행 중 요청을 `drain_grace`초까지 마저 처리한다. 왜 waitress `run()`을 그대로 쓰지 않나: 종료 신호에 주 루프를 먼저 끝내 작업 스레드가 쓴 응답이 소켓으로 나가지 못하고, 스레드는 5초만 기다린다(waitress 3.0.2 `server.py` `run()`, `task.py` `shutdown`을 읽어 확인).
+- 종료: `DatasetServer.serve_forever`가 종료 신호에 새 연결을 받지 않고 진행 중 요청을 `drain_grace`초까지 마저 처리한다. 왜 waitress `run()`을 그대로 쓰지 않나: 종료 신호에 주 루프를 먼저 끝내 작업 스레드가 쓴 응답이 소켓으로 나가지 못하고, 스레드는 5초만 기다린다(waitress 3.0.2 소스를 읽어 확인: `waitress/server.py:323-330` `BaseWSGIServer.run()`은 `wasyncore.loop`를 `except (SystemExit, KeyboardInterrupt)`로 빠져나온 뒤 `task_dispatcher.shutdown()`을 부르고, `waitress/task.py:117` `ThreadedTaskDispatcher.shutdown(cancel_pending=True, timeout=5)`는 스레드를 5초만 기다리고 대기 중 작업을 취소한다. 응답을 소켓에 쓰는 것은 주 루프(`wasyncore`)라 루프가 끝난 뒤에는 작업 스레드가 낸 응답이 나가지 않는다).
 
 ## 값과 출처 (모두 측정 안 함)
 | 값 | waitress 설정 | 출처 |

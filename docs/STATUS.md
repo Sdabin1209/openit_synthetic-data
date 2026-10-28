@@ -6,8 +6,11 @@
 
 **시험 개수**: README 5절에만 적는다. 2026-10-28 v1 생성 경로와 보류 시험 15건을 제거했다(ADR 0010).
 
+## 단위 4a (2026-10-29)
+- I2 서버를 WSGI 앱 + waitress 3.0.2로 옮겼다(ADR 0017). 계약 핀 v2.2.2(413/431 전송 한도 규칙). 인증 전 본문 수신은 내부망 전용이라 수용(헤드 OPEN_GAPS U28).
+
 ## 단위 3 (2026-10-29)
-- 계약 v2.2.1, 문진 스키마 survey-schema-v1.1.0 핀. 잡 설정 두 가지와 잡 출력(결과 한 줄, report.json, import_report.json, 설정 오류 한 줄)을 계약 스키마(`SyntheticJobConfigRun/Import`, `SyntheticJobResult`, `SyntheticRunReport`, `SyntheticImportReport`, `SyntheticJobError`, `SyntheticDefs`)로 검사한다(ADR 0016). 손으로 쓴 키·형식 검사는 지웠다. Dockerfile ARG 기본값은 `n/a`이고 REVISION이 hex가 아니면 빌드가 멈춘다. 시험: `tests/test_contract_schemas.py`. turn-engine 코드 의존은 없다(`job.py`의 `resolve_turn_engine_version`이 설치돼 있으면 읽는 선택적 import만 있고 설정 값이 우선 대안이다).
+- 계약 v2.2.1, 문진 스키마 survey-schema-v1.1.0 핀. 잡 설정 두 가지와 잡 출력(결과 한 줄, report.json, import_report.json, 설정 오류 한 줄)을 계약 스키마(`SyntheticJobConfigRun/Import`, `SyntheticJobResult`, `SyntheticRunReport`, `SyntheticImportReport`, `SyntheticJobError`, `SyntheticDefs`)로 검사한다(ADR 0016). 손으로 쓴 키·형식 검사는 지웠다. Dockerfile ARG 기본값은 `n/a`이고 REVISION이 hex가 아니면 빌드가 멈춘다. 시험: `tests/test_contract_schemas.py`. turn-engine 코드 의존은 없다(`turn_engine_version`은 설정의 고정 표지만 쓴다, D109).
 
 ## G02 방향 반영: 게시기(import) 모드 (2026-10-27)
 - 한 일: 사용자 결정(데이터셋 담당의 최종 학습 데이터를 그대로 가져와 검증 후 게시, 재생성 없음)에 따라 `synthetic_data/importer.py`, CLI `import`, `configs/import.example.json`, `tests/test_import.py`(가짜 입력 17건) 추가. 설계는 docs/design.md 부록 A. `pytest -q` 결과 106 passed, 15 skipped.
