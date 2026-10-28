@@ -25,7 +25,7 @@ HTTP 경로는 이 영역 문서에 없어 `../boundary-contracts/HTTP.md`로 �
 | `seeds.py`, `seed_samples.py` | 확정된 실패 사례(CONFIRMED) 수집(I7)과 시드 샘플 조립 |
 | `quality.py`, `split.py`, `package.py`, `context.py` | 품질 검사, 시나리오 단위 분할, 패키징, 문항 세트 묶음 |
 | `store/` | I2 구현(파일 `FileDatasetStore`, 메모리 `MemoryDatasetStore`) |
-| `service/` | I2 HTTP 서버(dataset-store, D100, ADR 0012). `Dockerfile`, `scripts/smoke_service.sh` |
+| `service/` | I2 HTTP 서버(dataset-store, D100, ADR 0012). `Dockerfile`, `requirements-service.txt`, `scripts/smoke_service.sh`. 잡은 `output.store.kind: http`로 게시(ADR 0013) |
 | `importer.py` | 게시기(import) 모드: 외부 학습 데이터 검증·게시 |
 | `adapters.py`, `schemas.py` | 이웃 HTTP 연결 공장, 스키마 검증 |
 | `configs/dev.job.json` | 이웃 대역을 쓰는 개발용 설정 |
@@ -75,7 +75,7 @@ PYTHONPATH=tests python -m synthetic_data run --config configs/dev.job.json [--c
 
 ## 5. 시험 상태
 
-시험 상태(이 영역 시험 개수는 이 절에만 적는다). 2026-10-28, 이 PC 한 환경(가상환경 `.venv`, 이웃은 tests/doubles.py 대역·참조 서버): `python -m pytest -q -rs` -> 129 통과, 1 건너뜀, 0 실패(I2 HTTP 서버 시험 `tests/test_service.py` 19건과 계약 클라이언트 시험 `tests/test_service_contract.py` 3건 포함; 계약 클라이언트는 boundary-contracts 작업 트리(v2.1.0, 태그 전)를 editable로 설치한 환경에서 실행). 이미지 스모크 `scripts/smoke_service.sh`는 같은 작업 트리에서 만든 wheel로 SMOKE_OK(v2.1.0 태그 wheel로는 아직 돌리지 않음). 건너뜀 1건은 `SD_REFERENCE_DATA_DIR`(실제 학습 데이터 파일 경로)가 없어서다. v1 생성 경로 제거(ADR 0010)로 보류 시험 15건과 생성 전용 시험이 줄었다. 돌리지 않은 것: 깨끗한 두 번째 환경, 서비스끼리 도는 시험, 운영 이웃 영역과의 연동. 서비스끼리 도는 시험의 결과는 deploy/docs/E2E_RESULTS.md를 본다.
+시험 상태(이 영역 시험 개수는 이 절에만 적는다). 2026-10-28, 이 PC 한 환경(가상환경 `.venv`, 이웃은 tests/doubles.py 대역·참조 서버): `python -m pytest -q -rs` -> 162 통과, 1 건너뜀, 0 실패(I2 HTTP 서버 시험 `tests/test_service.py` 40건, 계약 클라이언트 시험 3건, 잡의 HTTP 게시 통합 시험 `tests/test_job_http_publish.py` 9건(이 영역의 실제 서버를 포트 0으로 띄움), 스모크 비밀 검사 3건 포함; 계약 클라이언트는 boundary-contracts 작업 트리(2ec2849, v2.1.0 태그 전)를 editable로 설치한 환경에서 실행). 이미지 스모크 `scripts/smoke_service.sh`는 같은 작업 트리에서 만든 wheel로 SMOKE_OK(v2.1.0 태그 wheel로는 아직 돌리지 않음). 건너뜀 1건은 `SD_REFERENCE_DATA_DIR`(실제 학습 데이터 파일 경로)가 없어서다. v1 생성 경로 제거(ADR 0010)로 보류 시험 15건과 생성 전용 시험이 줄었다. 돌리지 않은 것: 깨끗한 두 번째 환경, 서비스끼리 도는 시험, 운영 이웃 영역과의 연동. 서비스끼리 도는 시험의 결과는 deploy/docs/E2E_RESULTS.md를 본다.
 
 ## 6. 이 영역의 열린 항목 (head/docs/OPEN_GAPS.md)
 

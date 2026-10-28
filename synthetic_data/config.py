@@ -10,6 +10,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Optional
 
+from .store.spec import parse_store
+
 _ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:-]*$")
 USAGES = ("TRAIN_POOL", "HELD_OUT_EVAL")
 SPLITS = ("TRAIN", "VALIDATION", "EVAL")
@@ -54,6 +56,7 @@ class JobConfig:
     store_kind: str
     store_root: Optional[Path]
     raw: dict = field(default_factory=dict)
+    store_http: Optional[dict] = None     # kind=http일 때의 정규화된 설정(store/spec.py)
 
 
 def _req(d: dict, key: str, where: str):
@@ -100,10 +103,7 @@ def parse_config(raw: dict, base_dir: Path) -> JobConfig:
     out = _req(raw, "output", "")
     store = _req(out, "store", "output.")
     kind = _req(store, "kind", "output.store.")
-    if kind not in ("file", "memory"):
-        raise ConfigError("output.store.kind는 file 또는 memory")
-    if kind == "file" and "root" not in store:
-        raise ConfigError("file 저장소에는 output.store.root가 필요하다")
+    http = parse_store(store, ConfigError)
     reg = raw.get("regeneration", {}).get("mode", "full")
     if reg not in ("full", "affected_only"):
         raise ConfigError("regeneration.mode는 full 또는 affected_only")
@@ -124,7 +124,7 @@ def parse_config(raw: dict, base_dir: Path) -> JobConfig:
         ratios={k: float(v) for k, v in ratios.items()},
         review_per_kind=int(raw.get("review", {}).get("per_kind", 2)), regeneration_mode=reg,
         work_dir=path(_req(out, "work_dir", "output.")), store_kind=kind,
-        store_root=path(store["root"]) if "root" in store else None, raw=raw)
+        store_root=path(store["root"]) if "root" in store else None, raw=raw, store_http=http)
 
 
 def load_config(config_path: Path) -> JobConfig:

@@ -1,6 +1,7 @@
 # dataset-store 서비스(I2 서버, D100). 생성·게시 잡(run-once)은 이미지가 아니라 requirements.lock 환경이다(D22).
 # 문진 스키마는 복사본을 리포지토리에 두지 않으므로 빌드 컨텍스트로 받는다(ADR 0011):
-#   docker build --ssh default --build-context survey_schema=../survey-service/schema -t synthetic-data-dataset-store:dev .
+#   docker build --ssh default --build-context survey_schema=../survey-service/schema \
+#     --build-arg BC_VERSION=v2.1.0 --build-arg SURVEY_SCHEMA_VERSION=$(cat ../survey-service/schema/CONTRACT_VERSION) -t synthetic-data-dataset-store:dev .
 # 로컬 확인(ssh 없이): scripts/smoke_service.sh
 FROM scratch AS wheels
 # 기본은 빈 컨텍스트. 로컬 확인에서는 --build-context wheels=<태그에서 만든 wheel 폴더> 로 바꾼다.
@@ -12,12 +13,14 @@ ARG BC_SPEC="boundary-contracts @ git+ssh://git@github.com/Sdabin1209/openit_bou
 RUN apt-get update && apt-get install -y --no-install-recommends git openssh-client && rm -rf /var/lib/apt/lists/* \
  && mkdir -p -m 0700 /root/.ssh && (ssh-keyscan github.com >> /root/.ssh/known_hosts 2>/dev/null || true)
 RUN python -m venv /opt/venv
+COPY requirements-service.txt /tmp/requirements-service.txt
 RUN --mount=type=ssh --mount=type=bind,from=wheels,target=/wheels \
-    /opt/venv/bin/pip install --no-cache-dir "${BC_SPEC}" "jsonschema==4.10.3"
+    /opt/venv/bin/pip install --no-cache-dir -r /tmp/requirements-service.txt "${BC_SPEC}"
 
 FROM python:3.12-slim
 ARG REVISION=unknown
-ARG BC_VERSION=v2.1.0
+ARG BC_VERSION=unknown
+ARG SURVEY_SCHEMA_VERSION=unknown
 COPY --from=build /opt/venv /opt/venv
 WORKDIR /app
 COPY synthetic_data /app/synthetic_data
@@ -33,8 +36,8 @@ EXPOSE 8080
 HEALTHCHECK --interval=15s --timeout=3s CMD python -c "import urllib.request as u; u.urlopen('http://127.0.0.1:8080/healthz', timeout=2)"
 LABEL io.openit.service="dataset-store" \
       io.openit.revision="${REVISION}" \
-      io.openit.contracts.boundary="v2.1.0" \
-      io.openit.contracts.survey-schema="1" \
+      io.openit.contracts.boundary="${BC_VERSION}" \
+      io.openit.contracts.survey-schema="${SURVEY_SCHEMA_VERSION}" \
       io.openit.turn-engine="n/a" \
       io.openit.model-runtime="n/a"
 CMD ["python", "-m", "synthetic_data.service"]

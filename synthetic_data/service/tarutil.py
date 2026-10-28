@@ -20,22 +20,30 @@ def pack(entries: dict[str, Path], out_path: Path) -> None:
 
 
 def _safe(name: str) -> bool:
-    p = Path(name)
-    return bool(name) and not p.is_absolute() and ".." not in p.parts and "\\" not in name and "\x00" not in name
+    """정규형만 허용한다: './', '//', '..', 절대 경로, 역슬래시, 컴포넌트 255바이트 초과(파일 시스템 한계)는 거부한다.
+    정규형이 아니면 'files/./x'와 'files/x'가 같은 파일로 겹쳐 쓴다."""
+    if not name or name.startswith("/") or "\\" in name or "\x00" in name or name.endswith("/"):
+        return False
+    parts = name.split("/")
+    return all(p not in ("", ".", "..") and len(p.encode("utf-8", "surrogateescape")) <= 255 for p in parts)
 
 
-def unpack(tar_path: Path, dest: Path, *, max_bytes: int) -> None:
-    """일반 파일만 푼다(디렉터리 항목은 무시). 합계가 max_bytes를 넘으면 푸는 도중에 멈춘다(압축 폭탄 방어는 아니지만 tar는 압축하지 않으므로 선언 크기 = 실제 크기)."""
+def unpack(tar_path: Path, dest: Path, *, max_bytes: int, max_entries: int = 1000) -> None:
+    """일반 파일만 푼다(디렉터리 항목은 무시, sparse·링크·장치 거부). 합계가 max_bytes, 항목이 max_entries를 넘으면 푸는 도중에 멈춘다.
+    tar는 압축하지 않으므로 선언 크기 = 실제 크기다. 항목 수 상한은 inode 고갈 방어다(ADR 0012)."""
     dest.mkdir(parents=True, exist_ok=True)
-    total = 0
+    total = n = 0
     seen: set[str] = set()
     try:
         with tarfile.open(tar_path, "r:") as tf:        # "r:"는 압축 없는 tar만(HTTP.md는 application/x-tar)
             for m in tf:
                 if m.isdir():
                     continue
-                if not m.isreg() or not _safe(m.name):
+                if not m.isreg() or m.issparse() or not _safe(m.name):
                     raise BoundaryError("INVALID_RECORD", "tar에 허용되지 않는 항목이 있다")
+                n += 1
+                if n > max_entries:
+                    raise BoundaryError("INVALID_RECORD", "tar의 항목이 너무 많다")
                 if m.name in seen:
                     raise BoundaryError("INVALID_RECORD", "tar에 같은 경로가 두 번 있다")
                 seen.add(m.name)
@@ -43,9 +51,16 @@ def unpack(tar_path: Path, dest: Path, *, max_bytes: int) -> None:
                 if total > max_bytes:
                     raise BoundaryError("INVALID_RECORD", "tar가 너무 크다")
                 out = dest / m.name
-                out.parent.mkdir(parents=True, exist_ok=True)
-                with tf.extractfile(m) as src, open(out, "wb") as dst:
-                    while chunk := src.read(1 << 20):
-                        dst.write(chunk)
+                try:
+                    out.parent.mkdir(parents=True, exist_ok=True)
+                    with tf.extractfile(m) as src, open(out, "wb") as dst:
+                        while chunk := src.read(1 << 20):
+                            dst.write(chunk)
+                except (FileExistsError, NotADirectoryError, IsADirectoryError):
+                    raise BoundaryError("INVALID_RECORD", "tar의 경로가 서로 충돌한다") from None
+                except OSError as e:
+                    if e.errno == 36:      # ENAMETOOLONG
+                        raise BoundaryError("INVALID_RECORD", "tar의 이름이 너무 길다") from None
+                    raise BoundaryError("UNAVAILABLE", "저장 공간에 쓸 수 없다") from None
     except tarfile.TarError:
         raise BoundaryError("INVALID_RECORD", "tar를 읽을 수 없다") from None

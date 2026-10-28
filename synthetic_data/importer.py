@@ -27,6 +27,7 @@ from .config import ConfigError, _ID_RE
 from .package import EXT, dumps_line
 from .schemas import Validators
 from .store import FileDatasetStore, MemoryDatasetStore
+from .store.spec import build_http_store, parse_store
 from .store.base import DatasetStoreBase
 
 # 왜: 매니페스트가 파일 단위로 분할을 요구하고 행의 split 값(실측: train/val/test, 파일 이름과 일치)이 파일 이름과 같은 정보라 파일 이름으로 정한다(docs/adr/0002). 파일 이름은 V2_DRAFT 기록의 추정.
@@ -107,6 +108,7 @@ class ImportConfig:
     pending_policy: str
     store_kind: str
     store_root: Optional[Path]
+    store_http: Optional[dict] = None
 
 
 def parse_import_config(raw: dict, base_dir: Path) -> ImportConfig:
@@ -151,17 +153,14 @@ def parse_import_config(raw: dict, base_dir: Path) -> ImportConfig:
     out = req(raw, "output")
     store = req(out, "store", "output.")
     kind = req(store, "kind", "output.store.")
-    if kind not in ("file", "memory"):
-        raise ConfigError("output.store.kind는 file 또는 memory")
-    if kind == "file" and "root" not in store:
-        raise ConfigError("file 저장소에는 output.store.root가 필요하다")
+    http = parse_store(store, ConfigError)
     return ImportConfig(
         dataset_id=did, input_dir=path(req(raw, "input_dir")), survey_schema_dir=path(req(raw, "survey_schema_dir")),
         question_sets=qs, source_label=label.strip(), turn_engine_version=str(req(raw, "turn_engine_version")),
         max_invalid_rows=mr, max_invalid_rate=float(mx), version=raw.get("version"), created_at=raw.get("created_at"),
         work_dir=path(req(out, "work_dir", "output.")), max_cross_split_duplicates=mc,
         max_pii_suspect_rows=mp, pending_policy=pp, store_kind=kind,
-        store_root=path(store["root"]) if "root" in store else None)
+        store_root=path(store["root"]) if "root" in store else None, store_http=http)
 
 
 def load_import_config(config_path: Path) -> ImportConfig:
@@ -470,5 +469,6 @@ def import_from_config(config_path: Path, *, created_at: Optional[str] = None) -
     if created_at:
         cfg.created_at = created_at
     v = Validators(cfg.survey_schema_dir)
-    store = FileDatasetStore(cfg.store_root, v) if cfg.store_kind == "file" else MemoryDatasetStore(v)
+    store = (build_http_store(cfg.store_http, ConfigError) if cfg.store_kind == "http" else
+             FileDatasetStore(cfg.store_root, v) if cfg.store_kind == "file" else MemoryDatasetStore(v))
     return run_import(cfg, store=store, validators=v)

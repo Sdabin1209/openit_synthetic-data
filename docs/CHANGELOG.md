@@ -2,6 +2,8 @@
 
 ## 미배포 (2026-10-28)
 - 추가(D100): I2 HTTP 서버 `python -m synthetic_data.service`(dataset-store), `Dockerfile`, `scripts/smoke_service.sh`, 서버·계약 클라이언트 시험(ADR 0011, 0012). 계약 v2.1.0이 필요하다(태그 전에는 작업 트리 wheel로 확인).
+- 서버 보강(독립 검토 반영, ADR 0012): 인증 실패 제한을 인증 앞으로, 데이터셋 단위 게시 락(동시 같은 버전 200/409), Content-Length·tar 이름·sparse·항목 수 검사, 청크 스트리밍·다운로드 상한, 헤더 수신 마감, 시작 정리, 토큰 중복 거부, 스모크 비밀 검사 수정, Dockerfile 라벨 ARG와 `requirements-service.txt`.
+- 추가(CR-D26, ADR 0013): `output.store.kind: http`(run·import 모두).
 - 제거: v1 생성 경로(scenario, plans, directives, generators, noise, labeler, bank, josa)와 보류 시험 15건, 생성 전용 시험(ADR 0010). `run`은 시드 잡으로 남는다. `generator_version`은 `seed-only+job@<버전>`. `scenarios`·`generators`·`style_guide_version` 설정 키는 무시하고 보고서에 남긴다. `pipeline.py`의 시드 조립은 `seed_samples.py`로, `QuestionSetContext`는 `context.py`로 옮겼다.
 
 ## 0.3.0 (제안 버전, 미적용: pyproject는 올리지 않음)

@@ -17,7 +17,7 @@ from boundary_contracts.errors import BoundaryError
 from boundary_contracts.sdk import DatasetStore, FailureStore, QuestionReader
 
 from . import __version__
-from .config import JobConfig, load_config
+from .config import ConfigError, JobConfig, load_config
 from .context import QuestionSetContext
 from .package import dumps_line, package
 from .quality import check_lora_a_sample, check_lora_b_sample
@@ -27,6 +27,7 @@ from .schemas import Validators
 from .seeds import collect_seeds
 from .split import assign_split
 from .store import FileDatasetStore, MemoryDatasetStore
+from .store.spec import build_http_store
 
 
 @dataclass
@@ -246,5 +247,6 @@ def build_from_config(config_path: Path, *, created_at: Optional[str] = None) ->
     v = Validators(cfg.survey_schema_dir)
     reader = load_factory(cfg.question_reader)(**cfg.question_reader.kwargs)
     fstore = load_factory(cfg.failure_store)(**cfg.failure_store.kwargs) if cfg.failure_store else None
-    store = FileDatasetStore(cfg.store_root, v) if cfg.store_kind == "file" else MemoryDatasetStore(v)
+    store = (build_http_store(cfg.store_http, ConfigError) if cfg.store_kind == "http" else
+             FileDatasetStore(cfg.store_root, v) if cfg.store_kind == "file" else MemoryDatasetStore(v))
     return run_job(cfg, question_reader=reader, failure_store=fstore, store=store, validators=v)

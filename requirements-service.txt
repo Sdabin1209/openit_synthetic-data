@@ -1,0 +1,5 @@
+# dataset-store 서비스 이미지의 의존(전이 의존 포함 고정, D22). boundary-contracts는 Dockerfile의 BC_SPEC(태그)로 따로 설치한다.
+# 값은 requirements.lock과 같다(서비스에 필요한 것만; pytest 등 시험 도구 제외).
+jsonschema==4.10.3
+attrs==26.1.0
+pyrsistent==0.20.0

@@ -6,6 +6,7 @@ import io
 import json
 import tarfile
 import threading
+import time
 import urllib.error
 import urllib.request
 from pathlib import Path
@@ -198,13 +199,29 @@ def test_disk_full_is_503(tmp_path, captured):
         s.close()
 
 
-def test_auth_failure_throttle_spares_valid_tokens(tmp_path):
+def test_auth_failure_throttle_blocks_even_valid_token(tmp_path):
     s = Srv(tmp_path, auth_fail_limit=3)
     try:
         for _ in range(3):
             assert s.call("GET", "/v1/datasets", token="y" * 40)[0] == 403
         assert s.call("GET", "/v1/datasets", token="y" * 40)[0] == 503
+        assert s.call("GET", "/v1/datasets")[0] == 503          # 차단 중에는 올바른 토큰도 거부(추측이 맞는지 알려 주지 않는다)
+        assert s.call("GET", "/healthz", token=None)[0] == 200  # 살아 있음 확인은 인증 전이다
+        assert len(s.svc._fails["127.0.0.1"]) == 3             # 차단 중에는 쌓이지 않는다
+    finally:
+        s.close()
+
+
+def test_auth_failure_window_expires_and_frees_memory(tmp_path):
+    s = Srv(tmp_path, auth_fail_limit=2)
+    s.svc.auth_fail_window = 0.3
+    try:
+        for _ in range(2):
+            s.call("GET", "/v1/datasets", token="y" * 40)
+        assert s.call("GET", "/v1/datasets")[0] == 503
+        time.sleep(0.4)
         assert s.call("GET", "/v1/datasets")[0] == 200
+        assert "127.0.0.1" not in s.svc._fails                  # 창이 지나면 주소 항목이 사라진다
     finally:
         s.close()
 
@@ -217,3 +234,182 @@ def test_write_role_must_be_synthetic_data(tmp_path):
 def test_secrets_not_in_responses(srv, captured):
     for st, body, _ in (srv.call("GET", "/v1/datasets", token="y" * 40), publish(srv, captured, token=RT)):
         assert RT.encode() not in body and WT.encode() not in body
+
+
+def test_concurrent_same_version_publish(srv, captured):
+    res = []
+    ts = [threading.Thread(target=lambda: res.append(publish(srv, captured)[0])) for _ in range(4)]
+    [t.start() for t in ts]
+    [t.join() for t in ts]
+    assert sorted(res) == [200, 200, 200, 201]
+
+
+def test_concurrent_same_version_different_content_is_409(srv, captured):
+    import copy
+    from boundary_contracts import canonical
+    m, blobs = captured
+    m2 = copy.deepcopy(m)
+    m2["created_at"] = "2026-10-16T00:00:00Z"
+    m2["content_hash"] = canonical.content_hash(m2)
+    res = []
+    bodies = [body_of(m, blobs), body_of(m2, blobs)] * 2
+    ts = [threading.Thread(target=lambda b=b: res.append(srv.call("POST", "/v1/datasets", b, WT)[0])) for b in bodies]
+    [t.start() for t in ts]
+    [t.join() for t in ts]
+    assert 503 not in res and res.count(201) == 1 and set(res) <= {200, 201, 409}
+
+
+def test_global_publish_limit_is_503(tmp_path, captured):
+    s = Srv(tmp_path)
+    for _ in range(8):
+        s.svc.publish_slots.acquire()
+    try:
+        assert publish(s, captured)[0] == 503
+    finally:
+        s.close()
+
+
+def _raw(srv, data: bytes, wait=0.3) -> bytes:
+    import socket
+    c = socket.create_connection(("127.0.0.1", srv.httpd.server_address[1]))
+    c.settimeout(3)
+    c.sendall(data)
+    time.sleep(wait)
+    try:
+        return c.recv(500)
+    except OSError:
+        return b""
+    finally:
+        c.close()
+
+
+@pytest.mark.parametrize("cl", ["abc", "-5", "1, 2", "+3", "1e3"])
+def test_bad_content_length_400(srv, cl):
+    r = _raw(srv, f"POST /v1/datasets HTTP/1.1\r\nHost: x\r\nAuthorization: Bearer {WT}\r\nContent-Length: {cl}\r\n\r\n".encode())
+    assert r.startswith(b"HTTP/1.1 400"), r
+
+
+def test_duplicate_content_length_400(srv):
+    r = _raw(srv, f"POST /v1/datasets HTTP/1.1\r\nHost: x\r\nAuthorization: Bearer {WT}\r\nContent-Length: 1\r\nContent-Length: 2\r\n\r\n".encode())
+    assert r.startswith(b"HTTP/1.1 400"), r
+
+
+def test_long_uri_and_bad_request_line_do_not_kill_logging(srv):
+    logs = []
+    srv.svc.log = logs.append
+    assert _raw(srv, b"GET /" + b"a" * 70000 + b" HTTP/1.1\r\nHost: x\r\n\r\n").startswith(b"HTTP/1.1 414")
+    assert b"400" in _raw(srv, b"GARBAGE\r\n\r\n")
+    assert not any("내부 오류" in x for x in logs)
+    assert srv.call("GET", "/v1/datasets")[0] == 200
+
+
+def test_tar_name_collisions_and_long_names(srv, captured):
+    for e in ({"manifest.json": b"{}", "manifest.json/x": b"1"},
+              {"manifest.json": b"{}", "files/a": b"1", "files/a/b": b"1"},
+              {"manifest.json": b"{}", "files/" + "a" * 300: b"1"},
+              {"manifest.json": b"{}", "./manifest.json": b"[]"},
+              {"manifest.json": b"{}", "files/./k": b"1", "files/k": b"2"}):
+        assert srv.call("POST", "/v1/datasets", tar_of(e), WT)[0] == 400, list(e)
+
+
+def test_alias_cannot_overwrite_listed_file(srv, captured):
+    m, blobs = captured
+    e = {"manifest.json": json.dumps(m).encode(), **{"files/" + k: v for k, v in blobs.items()}}
+    e["files/./" + list(blobs)[0]] = b"evil"
+    assert srv.call("POST", "/v1/datasets", tar_of(e), WT)[0] == 400
+
+
+def test_sparse_and_entry_limit(tmp_path, captured):
+    s = Srv(tmp_path, max_entries=3)
+    try:
+        assert s.call("POST", "/v1/datasets", tar_of({f"files/f{i}": b"x" for i in range(4)} | {"manifest.json": b"{}"}), WT)[0] == 400
+        buf = io.BytesIO()
+        with tarfile.open(fileobj=buf, mode="w:", format=tarfile.GNU_FORMAT) as tf:
+            i = tarfile.TarInfo("manifest.json"); i.type = tarfile.GNUTYPE_SPARSE; i.size = 0
+            tf.addfile(i)
+        assert s.call("POST", "/v1/datasets", buf.getvalue(), WT)[0] == 400
+    finally:
+        s.close()
+
+
+def test_disk_check_uses_three_times_body(tmp_path, captured):
+    m, blobs = captured
+    n = len(body_of(m, blobs))
+    s = Srv(tmp_path, min_free_gb=0, free_bytes=lambda: 3 * n - 1)
+    s2 = Srv(tmp_path / "b", min_free_gb=0, free_bytes=lambda: 3 * n)
+    try:
+        assert publish(s, captured)[0] == 503
+        assert publish(s2, captured)[0] == 201
+    finally:
+        s.close(); s2.close()
+
+
+def test_download_limit_503(srv, captured):
+    m, _ = captured
+    publish(srv, captured)
+    for _ in range(8):
+        srv.svc.download_slots.acquire()
+    base = f"/v1/datasets/{m['dataset_id']}/versions/{m['version']}"
+    assert srv.call("GET", base + "/files")[0] == 503
+    assert srv.call("GET", base + "/files/" + m["files"][0]["path"].replace("/", "%2F"))[0] == 503
+    assert srv.call("GET", base)[0] == 200                      # manifest 조회는 영향 없다
+
+
+def test_tampered_stored_file_is_integrity_error_not_served(srv, captured):
+    m, _ = captured
+    publish(srv, captured)
+    p0 = m["files"][0]["path"]
+    f = srv.svc.store._vdir(m["dataset_id"], m["version"]) / "files" / p0
+    f.write_bytes(f.read_bytes() + b"x")
+    base = f"/v1/datasets/{m['dataset_id']}/versions/{m['version']}"
+    assert srv.call("GET", base + "/files/" + p0.replace("/", "%2F"))[0] == 422
+    assert srv.call("GET", base + "/files")[0] == 422
+
+
+def test_empty_dataset_dir_hidden_and_startup_cleans_tmp(tmp_path, captured):
+    s = Srv(tmp_path)
+    try:
+        (s.svc.store.root / "ghost").mkdir()
+        (s.svc.store.root / "ghost" / ".tmp-abc").mkdir()
+        assert json.loads(s.call("GET", "/v1/datasets")[1])["items"] == []
+    finally:
+        s.close()
+    s2 = Srv(tmp_path)      # 같은 루트로 다시 시작
+    try:
+        assert not (s2.svc.store.root / "ghost" / ".tmp-abc").exists()
+    finally:
+        s2.close()
+
+
+def test_same_token_for_read_and_write_refused(tmp_path):
+    with pytest.raises(ValueError):
+        Service(tmp_path / "r", Validators(SURVEY_DIR), parse_tokens("model-lab=" + WT), parse_tokens("synthetic-data=" + WT),
+                log=lambda s: None)
+
+
+def test_write_token_may_read_by_design(srv):
+    assert srv.call("GET", "/v1/datasets", token=WT)[0] == 200
+
+
+def test_slowloris_header_deadline(tmp_path):
+    import socket
+    s = Srv(tmp_path, header_deadline=0.6)
+    try:
+        c = socket.create_connection(("127.0.0.1", s.httpd.server_address[1]))
+        c.settimeout(5)
+        t0 = time.monotonic()
+        try:
+            for ch in b"GET /v1/datasets HTTP/1.1\r\nHost: x\r\nX-A: ab":      # 헤더를 끝내지 않고 천천히 흘린다(약 2.4초)
+                c.sendall(bytes([ch]))
+                time.sleep(0.15)
+        except OSError:
+            pass                                 # 서버가 먼저 닫았다
+        try:
+            assert c.recv(100) == b""            # 마감(0.6초) 뒤 서버가 연결을 닫았다(소켓 timeout 30초 전에)
+        except ConnectionResetError:
+            pass
+        assert time.monotonic() - t0 < 4
+        c.close()
+        assert s.call("GET", "/v1/datasets")[0] == 200
+    finally:
+        s.close()
