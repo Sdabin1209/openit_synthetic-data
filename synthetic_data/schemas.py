@@ -15,10 +15,13 @@ warnings.filterwarnings("ignore", category=DeprecationWarning, module="jsonschem
 
 
 def _errors(validator, record) -> list[str]:
+    # 왜: jsonschema의 e.message에는 위반한 입력 값이 그대로 들어간다('값' is not one of ...). 환자 발화일 수 있는 값이 오류 메시지,
+    #     보고서, stderr, HTTP 오류 본문으로 나가면 안 된다(OWASP 로깅·오류 처리: 오류에 민감값 비노출, ADR 0003).
+    #     그래서 위치(경로)와 위반한 규칙 이름(스키마 키워드)만 싣는다.
     out = []
     for e in sorted(validator.iter_errors(record), key=lambda e: list(map(str, e.absolute_path))):
         loc = "/".join(map(str, e.absolute_path)) or "(루트)"
-        out.append(f"{loc}: {e.message[:200]}")
+        out.append(f"{loc}#{e.validator}")
     return out
 
 
