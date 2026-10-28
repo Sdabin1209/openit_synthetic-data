@@ -111,7 +111,16 @@ class ImportConfig:
     store_http: Optional[dict] = None
 
 
+# 왜: run 설정(config.KNOWN_KEYS)과 같은 이유로 알 수 없는 최상위 키(오타)를 거부한다. 무시하면 tolerance·pending_policy 같은 안전 설정이
+#     기본값으로 돌아간 채 남는다(ADR 0014). 새 최상위 키를 추가하면 여기에도 넣는다(시험이 예시 설정으로 확인).
+IMPORT_KNOWN_KEYS = frozenset({"_comment", "dataset_id", "input_dir", "survey_schema_dir", "question_sets", "source_label",
+                               "turn_engine_version", "tolerance", "pending_policy", "origin", "version", "created_at", "output"})
+
+
 def parse_import_config(raw: dict, base_dir: Path) -> ImportConfig:
+    unknown = sorted(set(raw) - IMPORT_KNOWN_KEYS)
+    if unknown:
+        raise ConfigError(f"import 설정에 알 수 없는 키가 있다: {unknown} (ADR 0014)")
     def path(s):
         p = Path(s)
         return p if p.is_absolute() else (base_dir / p).resolve()

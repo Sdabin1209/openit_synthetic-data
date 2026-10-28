@@ -10,7 +10,7 @@ import pytest
 
 import doubles
 from conftest import SURVEY_DIR, ROOT
-from synthetic_data.importer import INPUT_FILES, InputError, parse_import_config, run_import
+from synthetic_data.importer import INPUT_FILES, InputError, load_import_config, parse_import_config, run_import
 from synthetic_data.config import ConfigError
 from synthetic_data.store import MemoryDatasetStore
 
@@ -350,3 +350,15 @@ def test_real_reference_data_if_provided(tmp_path, validators):
     res = run_import(cfg, store=MemoryDatasetStore(validators), validators=validators)
     r = report(tmp_path)
     assert r["invalid_rows"] == 0 and r["total_rows"] == res.counts["rows_total"]
+
+
+def test_unknown_import_config_key_is_rejected(tmp_path):
+    """SD-01: import 설정도 run처럼 알 수 없는 최상위 키(오타)를 거부한다(ADR 0014). 오타 키가 조용히 무시되면 안 된다."""
+    for key in ("pending_polcy", "tolerence", "scenarios"):
+        with pytest.raises(ConfigError, match=key):
+            cfg_for(tmp_path, **{key: "report"})
+
+
+def test_shipped_import_example_has_only_known_keys():
+    """SD-01: 거부가 켜져도 리포에 있는 import 예시 설정은 통과해야 한다."""
+    load_import_config(Path(__file__).resolve().parent.parent / "configs" / "import.example.json")
