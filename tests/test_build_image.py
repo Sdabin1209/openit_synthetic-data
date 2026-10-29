@@ -58,7 +58,7 @@ def env(tmp_path):
     fake = tmp_path / "fake-docker"
     fake.write_text(FAKE_DOCKER)
     fake.chmod(fake.stat().st_mode | stat.S_IEXEC)
-    req = {"source_dir": str(src), "revision": "abc1234", "versions": {"boundary": "v2.7.0", "survey_schema": "v1.1.0", "turn_engine": "v0.4.3", "model_runtime": "v0.9.0"},
+    req = {"source_dir": str(src), "revision": "abc1234", "versions": {"boundary": "v2.8.0", "survey_schema": "v1.1.0", "turn_engine": "v0.4.3", "model_runtime": "v0.9.0"},
            "dependency_sources": {"boundary": str(bc), "survey_schema": str(ss)}, "image_tag": "synthetic-data-dataset-store:test"}
     return tmp_path, fake, req
 
@@ -80,7 +80,7 @@ def test_success_last_line_is_build_image_result_with_labels_from_request(env):
     res["labels"].pop("io.openit.exposure")
     jobs = res["labels"].pop("io.openit.jobs")
     assert json.loads(jobs) == json.loads((ROOT / "jobs.json").read_text(encoding="utf-8"))
-    assert res["labels"] == {"io.openit.service": "dataset-store", "io.openit.revision": "abc1234", "io.openit.contracts.boundary": "v2.7.0",
+    assert res["labels"] == {"io.openit.service": "dataset-store", "io.openit.revision": "abc1234", "io.openit.contracts.boundary": "v2.8.0",
                              "io.openit.contracts.survey-schema": "1", "io.openit.turn-engine": "n/a", "io.openit.model-runtime": "n/a"}
     validator("ImageLabels").validate(res["labels"])
 
