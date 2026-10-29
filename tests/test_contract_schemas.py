@@ -138,7 +138,7 @@ def _dockerfile_labels(revision: str, bc: str, survey: str) -> dict:
 
 
 def test_dockerfile_labels_satisfy_image_labels_contract():
-    labels = _dockerfile_labels("96d56ba", "v2.5.0", "1")
+    labels = _dockerfile_labels("96d56ba", "v2.5.1", "1")
     validator("ImageLabels").validate(labels)
     assert labels["io.openit.service"] == "dataset-store"
 

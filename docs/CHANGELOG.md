@@ -2,7 +2,7 @@
 
 ## 미배포 (2026-10-30, U42)
 - 추가: 영역 빌드 진입점 `scripts/build-image.sh`(계약 v2.5.0 BuildImageRequest/Result, ADR 0018), `scripts/smoke_build_image.sh`, 시험 `tests/test_build_image.py`.
-- 의존: boundary-contracts v2.5.0.
+- 의존: boundary-contracts v2.5.1.
 
 ## 미배포 (2026-10-29, 단위 4a, D111)
 - 변경: I2 서버를 `http.server` 직접 구현에서 WSGI 앱 + waitress 3.0.2로 옮겼다(ADR 0017). 지운 자체 코드: 헤더 마감 래퍼, 연결 상한 서버, 본문 drain, Content-Length 직접 검사.

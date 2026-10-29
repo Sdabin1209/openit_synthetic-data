@@ -7,7 +7,7 @@
 **시험 개수**: README 5절에만 적는다. 2026-10-28 v1 생성 경로와 보류 시험 15건을 제거했다(ADR 0010).
 
 ## U42 (2026-10-30)
-- 빌드 진입점 `scripts/build-image.sh` 추가(ADR 0018), 계약 핀 v2.5.0. 실제 도커 빌드는 `scripts/smoke_build_image.sh`로 확인했다. deploy의 기존 빌드와 이미지를 나란히 비교하지는 않았다.
+- 빌드 진입점 `scripts/build-image.sh` 추가(ADR 0018), 계약 핀 v2.5.1(진입점 계약은 v2.5.0). 실제 도커 빌드는 `scripts/smoke_build_image.sh`로 확인했다. deploy의 기존 빌드와 이미지를 나란히 비교하지는 않았다.
 
 ## 단위 4a (2026-10-29)
 - I2 서버를 WSGI 앱 + waitress 3.0.2로 옮겼다(ADR 0017). 계약 핀 v2.2.2(413/431 전송 한도 규칙). 인증 전 본문 수신은 내부망 전용이라 수용(헤드 OPEN_GAPS U28).
