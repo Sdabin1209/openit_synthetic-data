@@ -1,8 +1,8 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://openit.invalid/synthetic-data/training-data-row.schema.json",
-  "title": "외부 학습 데이터 jsonl 한 행 (초안)",
-  "description": "초안(CR-008). 데이터셋 담당이 만들고 synthetic-data import가 읽는다. 파일 6개: lora_{a,b}_{train,val,test}.jsonl (UTF-8, 한 줄에 객체 하나). 역할(LORA_A/B)과 분할(TRAIN/VALIDATION/EVAL)은 행이 아니라 파일 이름이 정한다(ADR 0002); 행의 split 값은 읽지 않는다(개수만 센다). 모르는 키 정책: 무시(읽기 모드; 데이터셋 담당이 필드를 더해도 import가 깨지지 않게). 이 스키마가 못 보는 것(코드가 검사): user content는 JSON 문자열로 LORA_A는 ActionExtractionInput, LORA_B는 ResponseRequest 스키마를 통과해야 하고, assistant content는 LORA_A면 ActionExtraction JSON 문자열, LORA_B면 ResponseText 평문이어야 한다.",
+  "title": "외부 학습 데이터 jsonl 한 행",
+  "description": "영역 소유 형식(U49: 외부 데이터셋 담당과의 형식이라 계약으로 승격하지 않았다). 데이터셋 담당이 만들고 synthetic-data import가 읽는다. 파일 6개: lora_{a,b}_{train,val,test}.jsonl (UTF-8, 한 줄에 객체 하나). 역할(LORA_A/B)과 분할(TRAIN/VALIDATION/EVAL)은 행이 아니라 파일 이름이 정한다(ADR 0002); 행의 split 값은 읽지 않는다(개수만 센다). 모르는 키 정책: 무시(읽기 모드; 데이터셋 담당이 필드를 더해도 import가 깨지지 않게). 이 스키마가 못 보는 것(코드가 검사): user content는 JSON 문자열로 LORA_A는 ActionExtractionInput, LORA_B는 ResponseRequest 스키마를 통과해야 하고, assistant content는 LORA_A면 ActionExtraction JSON 문자열, LORA_B면 ResponseText 평문이어야 한다.",
   "type": "object",
   "required": ["messages", "scenario_id"],
   "properties": {

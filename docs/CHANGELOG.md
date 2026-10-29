@@ -1,5 +1,18 @@
 # 변경 이력
 
+## 미배포 (2026-10-30, U49: 승격된 스키마 사본 정리)
+`docs/change-requests/` 아래 스키마 파일을 분류했다. (가) 계약 패키지(boundary-contracts)에 같은 이름이 있음 = 승격된 사본이라 삭제(내용은 git 기록), (나) 계약에 없음.
+
+| 파일 | 분류 | 처리 | 근거 |
+|---|---|---|---|
+| `contract-ready/schemas/Synthetic{Defs,ImportReport,JobConfigImport,JobConfigRun,JobError,JobResult,RunReport}.schema.json` (7) | (가) | 삭제 | 계약 `schemas/`에 같은 이름 7개가 있다(`ls` 대조) |
+| `contract-ready/examples/valid` 17, `examples/invalid` 21, `MANIFEST.json`, `make_examples.py`, `validate.py` | (가) | 삭제 | 같은 예시가 계약 `conformance/examples`·`examples_invalid`·`promoted`에 있다. 이 영역 시험은 이미 그 예시를 읽는다(`tests/test_contract_schemas.py`) |
+| `schemas/{_defs,job-config-run,job-config-import,job-result,job-error,import-report,run-report}.schema.json` (7) | (가) | 삭제 | 위 `Synthetic*`의 초안 원본이다(승격 후 계약 쪽이 정본) |
+| `schemas/examples/` 중 import-config, run-config, import-report 2, run-report, stderr-config-error, stdout 4 (10) , `schemas/validate_examples.py` | (가) | 삭제 | 초안 스키마용 예시·검증 스크립트 |
+| `schemas/training-data-row.schema.json` | (나) | `schemas/`로 이동 | 외부 데이터셋 담당과의 형식이라 승격하지 않고 영역이 소유(MANIFEST `not_promoted`). 정본 위치는 변경 요청 폴더가 아니라 영역의 `schemas/` |
+| `schemas/examples/row-lora-a.json`, `row-lora-b.json`, `row-invalid-two-messages.json` | (나) | `schemas/examples/`로 이동 | 위 스키마의 예시. 어긋나지 않게 `tests/test_training_data_row_schema.py`를 추가 |
+결과: 삭제 파일 수와 시험은 커밋 메시지 참고. 이 사본을 읽는 시험·스크립트는 없었다(grep: `change-requests/schemas`, `validate_examples`, `contract-ready` 참조는 CR-008 문서뿐).
+
 ## 미배포 (2026-10-30, U47)
 - 추가: 노출 선언 `deploy-exposure.json`(라벨 `io.openit.exposure`, 계약 Exposure로 검증해 `build-image.sh`가 싣는다). 이 서비스는 게이트웨이 밖으로 내지 않으므로 경로 전부 `denied`(ADR 0020).
 

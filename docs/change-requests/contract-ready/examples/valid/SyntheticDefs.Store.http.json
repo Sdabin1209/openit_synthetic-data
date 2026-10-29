@@ -1,6 +1,0 @@
-{
-  "base_url": "http://dataset-store:8080",
-  "kind": "http",
-  "timeout": 60,
-  "token_env": "DATASET_STORE_WRITE_TOKEN"
-}

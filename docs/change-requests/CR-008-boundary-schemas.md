@@ -1,6 +1,6 @@
 # CR-008: 영역 경계를 넘는 형식 5종의 스키마 초안 (SD-01, SD-03, SD-04, SD-05)
 
-상태: 초안, 헤드의 결정 대기 (2026-10-28, 작업 지시서 1 B). 코드는 이 스키마를 쓰도록 바꾸지 않았다. 근거: `docs/audit/structure-rules-2026-10-28.md` E절(R6).
+상태: 승격 완료(D107, 계약 v2.2.x). 스키마 사본·예시·검증 스크립트는 지웠다(U49, 아래 CHANGELOG 분류 표). 아래 본문은 당시 기록이다. 영역 소유로 남은 `training-data-row`는 `schemas/`로 옮겼다. (원래 상태: 초안, 헤드의 결정 대기 (2026-10-28, 작업 지시서 1 B). 코드는 이 스키마를 쓰도록 바꾸지 않았다. 근거: `docs/audit/structure-rules-2026-10-28.md` E절(R6).
 헤드에게 요청: 아래 형식을 boundary-contracts에 올릴지(올린다면 이름과 위치) 결정한다. 올리면 이 영역은 `parse_config`·`parse_import_config`의 손코드 검증을 스키마 검증으로 바꾼다(다음 단계).
 
 스키마 위치: `docs/change-requests/schemas/*.schema.json`(JSON Schema 2020-12), 예시 문서: `docs/change-requests/schemas/examples/`, 검증 스크립트: `docs/change-requests/schemas/validate_examples.py`.
