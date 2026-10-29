@@ -29,10 +29,13 @@ SS_MAJOR="${SS#v}"; SS_MAJOR="${SS_MAJOR%%.*}"
 # 잡 선언(계약 JobsDeclaration)을 라벨 io.openit.jobs로 싣는다: deploy는 argv·비밀 파일 이름·설정 파일 위치를 이 라벨에서 읽는다
 JOBS="$("$PY" -I "$HERE/scripts/build_image_request.py" --jobs "$SRC/jobs.json")" || { echo "build-image: jobs.json 검증 실패" >&2; exit 2; }
 
+# 노출 선언(계약 Exposure)을 라벨 io.openit.exposure로 싣는다: 게이트웨이 노출 표. 이 서비스는 게이트웨이 밖으로 내지 않으므로 전부 denied다
+EXPOSURE="$("$PY" -I "$HERE/scripts/build_image_request.py" --exposure "$SRC/deploy-exposure.json")" || { echo "build-image: deploy-exposure.json 검증 실패" >&2; exit 2; }
+
 # 3. 빌드. Dockerfile 인자 이름은 이 영역의 것이고 deploy는 모른다
 echo "build-image: 이미지 빌드 $TAG" >&2
 "$DOCKER" build -q -t "$TAG" --build-context "wheels=$WORK/wheels" --build-context "survey_schema=$SS_SRC" \
-  --label "io.openit.jobs=$JOBS" --build-arg "BC_SPEC=/wheels/$WHL" --build-arg "BC_VERSION=$BC" --build-arg "REVISION=$REV" \
+  --label "io.openit.jobs=$JOBS" --label "io.openit.exposure=$EXPOSURE" --build-arg "BC_SPEC=/wheels/$WHL" --build-arg "BC_VERSION=$BC" --build-arg "REVISION=$REV" \
   --build-arg "SURVEY_SCHEMA_VERSION=$SS_MAJOR" "$SRC" >&2
 
 # 4. 결과: docker가 준 ID와 이미지에 실제로 붙은 io.openit.* 라벨(요청 값을 되풀이하지 않고 inspect로 읽는다)

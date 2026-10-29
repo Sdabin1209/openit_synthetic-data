@@ -6,6 +6,9 @@
 
 **시험 개수**: README 5절에만 적는다. 2026-10-28 v1 생성 경로와 보류 시험 15건을 제거했다(ADR 0010).
 
+## U47 (2026-10-30)
+- 노출 선언 라벨 `io.openit.exposure` 추가(ADR 0020). deploy `config/Caddyfile`에는 dataset-store 블록이 없고 compose 네트워크 `datasets`는 게이트웨이에 연결되지 않아 코드·표·배치가 일치한다. deploy가 라벨로 Caddyfile을 대조하는 일은 이 영역 밖이다.
+
 ## U43 (2026-10-30)
 - 잡을 dataset-store 이미지에서 `io.openit.jobs` 선언으로 돌린다(ADR 0019). setup-env.sh가 SetupEnvReport를 낸다. 계약 핀 v2.6.0. 이미지에서 `import` 잡을 실제로 돌려 게시를 확인했다. `run` 잡은 이웃과 함께 이미지에서 돌리지 않았다. CR-009 제안.
 

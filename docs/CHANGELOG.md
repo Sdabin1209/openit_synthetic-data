@@ -1,5 +1,8 @@
 # 변경 이력
 
+## 미배포 (2026-10-30, U47)
+- 추가: 노출 선언 `deploy-exposure.json`(라벨 `io.openit.exposure`, 계약 Exposure로 검증해 `build-image.sh`가 싣는다). 이 서비스는 게이트웨이 밖으로 내지 않으므로 경로 전부 `denied`(ADR 0020).
+
 ## 미배포 (2026-10-30, U43)
 - 추가: 잡 선언 `jobs.json`(라벨 `io.openit.jobs`, 빌드 진입점이 계약 JobsDeclaration으로 검증해 싣는다), 이미지 ENV `SYNTHETIC_SURVEY_SCHEMA_DIR`(설정의 `survey_schema_dir`보다 우선, CR-009), `scripts/setup-env.sh`의 마지막 줄 SetupEnvReport(ADR 0019).
 - 의존: boundary-contracts v2.6.0.

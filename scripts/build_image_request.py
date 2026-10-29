@@ -33,19 +33,26 @@ def parse(path: str) -> list:
     return [req["source_dir"], req["revision"], v["boundary"], v["survey_schema"], d["boundary"], d["survey_schema"], req["image_tag"]]
 
 
-def jobs_label(path: str) -> str:
-    """리포의 jobs.json을 계약 JobsDeclaration으로 검증하고 라벨 io.openit.jobs에 넣을 한 줄 JSON을 낸다."""
+def label_json(path: str, schema: str) -> str:
+    """리포의 선언 파일(jobs.json, deploy-exposure.json)을 계약 스키마로 검증하고 이미지 라벨에 넣을 한 줄 JSON을 낸다."""
     with open(path, encoding="utf-8") as f:
         decl = json.load(f)
-    errs = sorted(f"{'.'.join(map(str, e.absolute_path)) or '(최상위)'}: {e.validator}" for e in validator("JobsDeclaration").iter_errors(decl))
+    errs = sorted(f"{'.'.join(map(str, e.absolute_path)) or '(최상위)'}: {e.validator}" for e in validator(schema).iter_errors(decl))
     if errs:
-        raise SystemExit("jobs.json이 JobsDeclaration을 어긴다: " + "; ".join(errs[:5]))
+        raise SystemExit(f"{path.rsplit('/', 1)[-1]}이 {schema}를 어긴다: " + "; ".join(errs[:5]))
     return json.dumps(decl, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+
+
+def jobs_label(path: str) -> str:
+    return label_json(path, "JobsDeclaration")
 
 
 if __name__ == "__main__":
     if len(sys.argv) == 3 and sys.argv[1] == "--jobs":
         print(jobs_label(sys.argv[2]))
+        raise SystemExit(0)
+    if len(sys.argv) == 3 and sys.argv[1] == "--exposure":
+        print(label_json(sys.argv[2], "Exposure"))
         raise SystemExit(0)
     if len(sys.argv) != 2:
         raise SystemExit("사용: build_image_request.py <요청 JSON 파일>")

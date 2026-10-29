@@ -54,6 +54,7 @@ def env(tmp_path):
     src.mkdir()
     (src / "Dockerfile").write_text("FROM scratch\n")
     (src / "jobs.json").write_text((ROOT / "jobs.json").read_text(encoding="utf-8"))
+    (src / "deploy-exposure.json").write_text((ROOT / "deploy-exposure.json").read_text(encoding="utf-8"))
     fake = tmp_path / "fake-docker"
     fake.write_text(FAKE_DOCKER)
     fake.chmod(fake.stat().st_mode | stat.S_IEXEC)
@@ -76,6 +77,7 @@ def test_success_last_line_is_build_image_result_with_labels_from_request(env):
     res = json.loads(r.stdout.strip().splitlines()[-1])
     validator("BuildImageResult").validate(res)
     assert res["image"] == req["image_tag"] and res["image_id"].startswith("sha256:")
+    res["labels"].pop("io.openit.exposure")
     jobs = res["labels"].pop("io.openit.jobs")
     assert json.loads(jobs) == json.loads((ROOT / "jobs.json").read_text(encoding="utf-8"))
     assert res["labels"] == {"io.openit.service": "dataset-store", "io.openit.revision": "abc1234", "io.openit.contracts.boundary": "v2.6.0",
@@ -153,3 +155,33 @@ def test_repo_jobs_json_matches_contract_and_code():
     from synthetic_data.store.spec import DEFAULT_TOKEN_ENV
     assert DEFAULT_TOKEN_ENV + "_FILE" in jobs["synthetic-run"]["secret_files"]
     assert DEFAULT_TOKEN_ENV + "_FILE" in jobs["synthetic-import"]["secret_files"]
+
+
+def test_exposure_label_is_in_result_and_valid_against_contract(env):
+    tmp, fake, req = env
+    res = json.loads(run(tmp, fake, req).stdout.strip().splitlines()[-1])
+    validator("ImageLabels").validate(res["labels"])
+    exp = json.loads(res["labels"]["io.openit.exposure"])
+    validator("Exposure").validate(exp)
+    assert exp == json.loads((ROOT / "deploy-exposure.json").read_text(encoding="utf-8"))
+
+
+def test_invalid_exposure_fails_before_docker(env):
+    tmp, fake, req = env
+    (Path(req["source_dir"]) / "deploy-exposure.json").write_text(json.dumps({"service": "dataset-store", "routes": [{"paths": ["/x"], "auth": {"kind": "account"}}]}))
+    r = run(tmp, fake, req)
+    assert r.returncode != 0 and not (tmp / "fake-docker.state").exists()      # account는 roles가 필수
+
+
+def test_exposure_table_matches_code_routes():
+    """표(deploy-exposure.json)와 서버 코드의 라우트가 일치한다. 이 서비스는 게이트웨이 밖으로 내지 않는다(compose 네트워크 datasets는 internal, 게이트웨이 미연결):
+    코드의 모든 경로는 표의 denied 경로에 들어가야 하고, 표에는 코드에 없는 경로가 없어야 한다."""
+    import re
+    exp = json.loads((ROOT / "deploy-exposure.json").read_text(encoding="utf-8"))
+    assert all(r["auth"]["kind"] == "denied" for r in exp["routes"])
+    table = {p for r in exp["routes"] for p in r["paths"]}
+    src = (ROOT / "synthetic_data" / "service" / "app.py").read_text(encoding="utf-8")
+    code = set(re.findall(r'path (?:==|!=) "(/[^"]*)"', src))                    # /healthz, /readyz, /v1/datasets
+    if re.search(r'compile\(r"\^/v1/datasets/', src):                          # 데이터셋 하위 경로 정규식들
+        code.add("/v1/datasets/*")
+    assert code == {"/healthz", "/readyz", "/v1/datasets", "/v1/datasets/*"} == table

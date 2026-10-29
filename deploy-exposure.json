@@ -1,0 +1,10 @@
+{
+  "service": "dataset-store",
+  "routes": [
+    {
+      "paths": ["/v1/datasets", "/v1/datasets/*", "/healthz", "/readyz"],
+      "methods": [],
+      "auth": {"kind": "denied"}
+    }
+  ]
+}

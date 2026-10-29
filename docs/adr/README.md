@@ -21,3 +21,4 @@ Nygard 형식. 영역 내부 구조 선택의 정본이다. 근거를 모르는 
 - [ADR 0017: I2 서버를 WSGI 앱과 waitress로 옮긴다](0017-I2-서버를-WSGI-앱과-waitress로-옮긴다.md)
 - [ADR 0018: 영역 빌드 진입점 build-image.sh](0018-영역-빌드-진입점-build-image-sh.md)
 - [ADR 0019: 잡을 dataset-store 이미지에서 선언으로 돌린다](0019-잡을-dataset-store-이미지에서-선언으로-돌린다.md)
+- [ADR 0020: 노출 선언은 전 경로 denied다](0020-노출-선언은-전부-denied다.md)
