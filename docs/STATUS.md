@@ -6,6 +6,9 @@
 
 **시험 개수**: README 5절에만 적는다. 2026-10-28 v1 생성 경로와 보류 시험 15건을 제거했다(ADR 0010).
 
+## U43 (2026-10-30)
+- 잡을 dataset-store 이미지에서 `io.openit.jobs` 선언으로 돌린다(ADR 0019). setup-env.sh가 SetupEnvReport를 낸다. 계약 핀 v2.6.0. 이미지에서 `import` 잡을 실제로 돌려 게시를 확인했다. `run` 잡은 이웃과 함께 이미지에서 돌리지 않았다. CR-009 제안.
+
 ## U42 (2026-10-30)
 - 빌드 진입점 `scripts/build-image.sh` 추가(ADR 0018), 계약 핀 v2.5.1(진입점 계약은 v2.5.0). 실제 도커 빌드는 `scripts/smoke_build_image.sh`로 확인했다. deploy의 기존 빌드와 이미지를 나란히 비교하지는 않았다.
 

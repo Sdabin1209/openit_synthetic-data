@@ -1,0 +1,18 @@
+{
+  "jobs": [
+    {
+      "name": "synthetic-run",
+      "argv": ["python", "-m", "synthetic_data", "run", "--config", "/config/run.json"],
+      "idempotent": true,
+      "secret_files": ["QUESTION_READER_TOKEN_FILE", "FAILURE_STORE_TOKEN_FILE", "DATASET_STORE_WRITE_TOKEN_FILE"],
+      "config": {"container_path": "/config/run.json", "schema": "SyntheticJobConfigRun"}
+    },
+    {
+      "name": "synthetic-import",
+      "argv": ["python", "-m", "synthetic_data", "import", "--config", "/config/import.json"],
+      "idempotent": true,
+      "secret_files": ["DATASET_STORE_WRITE_TOKEN_FILE"],
+      "config": {"container_path": "/config/import.json", "schema": "SyntheticJobConfigImport"}
+    }
+  ]
+}

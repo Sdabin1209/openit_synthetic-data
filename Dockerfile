@@ -32,7 +32,7 @@ COPY --from=survey_schema schemas /app/survey_schema/schemas
 RUN useradd --uid 10001 --no-create-home --shell /usr/sbin/nologin dataset && mkdir /data && chown dataset /data \
  && find /app -name __pycache__ -prune -exec rm -rf {} +
 ENV PATH=/opt/venv/bin:$PATH PYTHONUNBUFFERED=1 PYTHONDONTWRITEBYTECODE=1 DATASET_STORE_ROOT=/data DATASET_STORE_PORT=8080 \
-    DATASET_STORE_SURVEY_SCHEMA_DIR=/app/survey_schema
+    DATASET_STORE_SURVEY_SCHEMA_DIR=/app/survey_schema SYNTHETIC_SURVEY_SCHEMA_DIR=/app/survey_schema
 VOLUME /data
 USER 10001
 EXPOSE 8080

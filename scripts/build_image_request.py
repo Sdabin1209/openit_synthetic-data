@@ -33,7 +33,20 @@ def parse(path: str) -> list:
     return [req["source_dir"], req["revision"], v["boundary"], v["survey_schema"], d["boundary"], d["survey_schema"], req["image_tag"]]
 
 
+def jobs_label(path: str) -> str:
+    """리포의 jobs.json을 계약 JobsDeclaration으로 검증하고 라벨 io.openit.jobs에 넣을 한 줄 JSON을 낸다."""
+    with open(path, encoding="utf-8") as f:
+        decl = json.load(f)
+    errs = sorted(f"{'.'.join(map(str, e.absolute_path)) or '(최상위)'}: {e.validator}" for e in validator("JobsDeclaration").iter_errors(decl))
+    if errs:
+        raise SystemExit("jobs.json이 JobsDeclaration을 어긴다: " + "; ".join(errs[:5]))
+    return json.dumps(decl, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+
+
 if __name__ == "__main__":
+    if len(sys.argv) == 3 and sys.argv[1] == "--jobs":
+        print(jobs_label(sys.argv[2]))
+        raise SystemExit(0)
     if len(sys.argv) != 2:
         raise SystemExit("사용: build_image_request.py <요청 JSON 파일>")
     print("\n".join(parse(sys.argv[1])))

@@ -1,5 +1,9 @@
 # 변경 이력
 
+## 미배포 (2026-10-30, U43)
+- 추가: 잡 선언 `jobs.json`(라벨 `io.openit.jobs`, 빌드 진입점이 계약 JobsDeclaration으로 검증해 싣는다), 이미지 ENV `SYNTHETIC_SURVEY_SCHEMA_DIR`(설정의 `survey_schema_dir`보다 우선, CR-009), `scripts/setup-env.sh`의 마지막 줄 SetupEnvReport(ADR 0019).
+- 의존: boundary-contracts v2.6.0.
+
 ## 미배포 (2026-10-30, U42)
 - 추가: 영역 빌드 진입점 `scripts/build-image.sh`(계약 v2.5.0 BuildImageRequest/Result, ADR 0018), `scripts/smoke_build_image.sh`, 시험 `tests/test_build_image.py`.
 - 의존: boundary-contracts v2.5.1.

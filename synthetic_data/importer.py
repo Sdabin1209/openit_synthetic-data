@@ -23,7 +23,7 @@ from boundary_contracts import canonical
 from boundary_contracts.errors import BoundaryError
 
 from . import PIPELINE_SCHEMA_VERSION, __version__
-from .config import ConfigError
+from .config import ConfigError, survey_dir
 from .contract_check import check_config, check_output
 from .package import EXT, dumps_line
 from .pii import PII_PATTERNS, PII_SCAN_LIMIT, pii_kinds   # noqa: F401  (옛 import 경로 호환)
@@ -109,7 +109,7 @@ def parse_import_config(raw: dict, base_dir: Path) -> ImportConfig:
     tol, out = raw["tolerance"], raw["output"]
     store = out["store"]
     return ImportConfig(
-        dataset_id=raw["dataset_id"], input_dir=path(raw["input_dir"]), survey_schema_dir=path(raw["survey_schema_dir"]),
+        dataset_id=raw["dataset_id"], input_dir=path(raw["input_dir"]), survey_schema_dir=survey_dir(raw["survey_schema_dir"], base_dir),
         question_sets=raw["question_sets"], source_label=raw["source_label"].strip(), turn_engine_version=raw["turn_engine_version"],
         max_invalid_rows=tol["max_invalid_rows"], max_invalid_rate=float(tol["max_invalid_rate"]),
         version=raw.get("version"), created_at=raw.get("created_at"),

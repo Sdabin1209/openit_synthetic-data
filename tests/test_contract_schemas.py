@@ -138,7 +138,7 @@ def _dockerfile_labels(revision: str, bc: str, survey: str) -> dict:
 
 
 def test_dockerfile_labels_satisfy_image_labels_contract():
-    labels = _dockerfile_labels("96d56ba", "v2.5.1", "1")
+    labels = _dockerfile_labels("96d56ba", "v2.6.0", "1")
     validator("ImageLabels").validate(labels)
     assert labels["io.openit.service"] == "dataset-store"
 
@@ -172,3 +172,15 @@ def test_turn_engine_version_comes_from_config_even_if_turn_engine_is_installed(
     st = MemoryDatasetStore(validators)
     _, res = run_job_helper(make_cfg_raw(tmp_path, turn_engine_version="0.4.3"), st, validators)
     assert st.get_manifest(res.dataset_id, res.version)["turn_engine_version"] == "0.4.3"
+
+
+def test_survey_schema_dir_env_overrides_config(tmp_path, monkeypatch):
+    """이미지가 ENV로 정한 문진 스키마 위치가 설정값보다 우선한다(잡 선언으로 돌리는 쪽이 이미지 내부 경로를 몰라도 되게)."""
+    from synthetic_data.config import SURVEY_DIR_ENV
+    from synthetic_data.importer import parse_import_config
+    monkeypatch.setenv(SURVEY_DIR_ENV, "/app/survey_schema")
+    assert parse_config(make_cfg_raw(tmp_path), tmp_path).survey_schema_dir == Path("/app/survey_schema")
+    imp = load(EX / "SyntheticJobConfigImport.json")
+    assert parse_import_config(imp, tmp_path).survey_schema_dir == Path("/app/survey_schema")
+    monkeypatch.delenv(SURVEY_DIR_ENV)
+    assert parse_config(make_cfg_raw(tmp_path), tmp_path).survey_schema_dir == Path(make_cfg_raw(tmp_path)["survey_schema_dir"])

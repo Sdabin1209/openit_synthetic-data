@@ -25,7 +25,8 @@ a = sys.argv[1:]
 if a[0] == "build":
     args = {{a[i + 1].split("=", 1)[0]: a[i + 1].split("=", 1)[1] for i, x in enumerate(a) if x == "--build-arg"}}
     ctx = {{a[i + 1].split("=", 1)[0]: a[i + 1].split("=", 1)[1] for i, x in enumerate(a) if x == "--build-context"}}
-    state.write_text(json.dumps({{"args": args, "ctx": ctx, "tag": a[a.index("-t") + 1], "src": a[-1]}}))
+    labels = {{a[i + 1].split("=", 1)[0]: a[i + 1].split("=", 1)[1] for i, x in enumerate(a) if x == "--label"}}
+    state.write_text(json.dumps({{"args": args, "ctx": ctx, "labels": labels, "tag": a[a.index("-t") + 1], "src": a[-1]}}))
     print("sha256:" + "ab" * 32)
 elif a[0] == "image":
     st = json.loads(state.read_text())
@@ -35,7 +36,7 @@ elif a[0] == "image":
         g = st["args"]
         print(json.dumps({{"io.openit.service": "dataset-store", "io.openit.revision": g["REVISION"],
             "io.openit.contracts.boundary": g["BC_VERSION"], "io.openit.contracts.survey-schema": g["SURVEY_SCHEMA_VERSION"],
-            "io.openit.turn-engine": "n/a", "io.openit.model-runtime": "n/a", "org.opencontainers.x": "ignored"}}))
+            "io.openit.turn-engine": "n/a", "io.openit.model-runtime": "n/a", "org.opencontainers.x": "ignored", **st["labels"]}}))
 """
 
 
@@ -52,10 +53,11 @@ def env(tmp_path):
     src = tmp_path / "src"
     src.mkdir()
     (src / "Dockerfile").write_text("FROM scratch\n")
+    (src / "jobs.json").write_text((ROOT / "jobs.json").read_text(encoding="utf-8"))
     fake = tmp_path / "fake-docker"
     fake.write_text(FAKE_DOCKER)
     fake.chmod(fake.stat().st_mode | stat.S_IEXEC)
-    req = {"source_dir": str(src), "revision": "abc1234", "versions": {"boundary": "v2.5.1", "survey_schema": "v1.1.0", "turn_engine": "v0.4.3", "model_runtime": "v0.9.0"},
+    req = {"source_dir": str(src), "revision": "abc1234", "versions": {"boundary": "v2.6.0", "survey_schema": "v1.1.0", "turn_engine": "v0.4.3", "model_runtime": "v0.9.0"},
            "dependency_sources": {"boundary": str(bc), "survey_schema": str(ss)}, "image_tag": "synthetic-data-dataset-store:test"}
     return tmp_path, fake, req
 
@@ -74,7 +76,9 @@ def test_success_last_line_is_build_image_result_with_labels_from_request(env):
     res = json.loads(r.stdout.strip().splitlines()[-1])
     validator("BuildImageResult").validate(res)
     assert res["image"] == req["image_tag"] and res["image_id"].startswith("sha256:")
-    assert res["labels"] == {"io.openit.service": "dataset-store", "io.openit.revision": "abc1234", "io.openit.contracts.boundary": "v2.5.1",
+    jobs = res["labels"].pop("io.openit.jobs")
+    assert json.loads(jobs) == json.loads((ROOT / "jobs.json").read_text(encoding="utf-8"))
+    assert res["labels"] == {"io.openit.service": "dataset-store", "io.openit.revision": "abc1234", "io.openit.contracts.boundary": "v2.6.0",
                              "io.openit.contracts.survey-schema": "1", "io.openit.turn-engine": "n/a", "io.openit.model-runtime": "n/a"}
     validator("ImageLabels").validate(res["labels"])
 
@@ -118,3 +122,34 @@ def test_script_has_no_neighbor_paths_or_version_defaults():
     text = SCRIPT.read_text(encoding="utf-8") + (ROOT / "scripts" / "build_image_request.py").read_text(encoding="utf-8")
     assert "../" not in text.replace("../..", "")            # 이웃 리포 경로 없음
     assert "git@" not in text and "ssh://" not in text        # 빌드 중 네트워크(SSH) 없음
+
+
+def test_jobs_label_is_in_result_and_valid_against_contract(env):
+    tmp, fake, req = env
+    r = run(tmp, fake, req)
+    res = json.loads(r.stdout.strip().splitlines()[-1])
+    validator("ImageLabels").validate(res["labels"])                      # io.openit.jobs의 contentSchema(JobsDeclaration)까지 확인된다
+    validator("JobsDeclaration").validate(json.loads(res["labels"]["io.openit.jobs"]))
+
+
+def test_invalid_jobs_json_fails_before_docker(env):
+    tmp, fake, req = env
+    (Path(req["source_dir"]) / "jobs.json").write_text(json.dumps({"jobs": [{"name": "x", "argv": ["a"], "idempotent": False}]}))
+    r = run(tmp, fake, req)
+    assert r.returncode != 0 and not (tmp / "fake-docker.state").exists()
+
+
+def test_repo_jobs_json_matches_contract_and_code():
+    decl = json.loads((ROOT / "jobs.json").read_text(encoding="utf-8"))
+    validator("JobsDeclaration").validate(decl)
+    jobs = {j["name"]: j for j in decl["jobs"]}
+    assert set(jobs) == {"synthetic-run", "synthetic-import"}
+    for name, sub, schema in (("synthetic-run", "run", "SyntheticJobConfigRun"), ("synthetic-import", "import", "SyntheticJobConfigImport")):
+        j = jobs[name]
+        assert j["argv"][:4] == ["python", "-m", "synthetic_data", sub] and j["config"]["schema"] == schema
+        assert j["argv"][-1] == j["config"]["container_path"] and j["idempotent"] is True
+        validator(schema)                                                   # 선언한 설정 스키마가 계약에 있다
+    # 비밀 파일 이름은 설정의 token_env 기본·예시와 맞는다(NAME_FILE = NAME + _FILE, D84)
+    from synthetic_data.store.spec import DEFAULT_TOKEN_ENV
+    assert DEFAULT_TOKEN_ENV + "_FILE" in jobs["synthetic-run"]["secret_files"]
+    assert DEFAULT_TOKEN_ENV + "_FILE" in jobs["synthetic-import"]["secret_files"]

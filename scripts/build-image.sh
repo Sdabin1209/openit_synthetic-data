@@ -26,10 +26,13 @@ WHL="$(basename "$(ls "$WORK"/wheels/boundary_contracts-*.whl | head -1)")"
 # 왜 요청의 survey_schema(vX.Y.Z)에서 주 버전을 뽑나: 라벨 io.openit.contracts.survey-schema는 주 버전 정수다(ImageLabels)
 SS_MAJOR="${SS#v}"; SS_MAJOR="${SS_MAJOR%%.*}"
 
+# 잡 선언(계약 JobsDeclaration)을 라벨 io.openit.jobs로 싣는다: deploy는 argv·비밀 파일 이름·설정 파일 위치를 이 라벨에서 읽는다
+JOBS="$("$PY" -I "$HERE/scripts/build_image_request.py" --jobs "$SRC/jobs.json")" || { echo "build-image: jobs.json 검증 실패" >&2; exit 2; }
+
 # 3. 빌드. Dockerfile 인자 이름은 이 영역의 것이고 deploy는 모른다
 echo "build-image: 이미지 빌드 $TAG" >&2
 "$DOCKER" build -q -t "$TAG" --build-context "wheels=$WORK/wheels" --build-context "survey_schema=$SS_SRC" \
-  --build-arg "BC_SPEC=/wheels/$WHL" --build-arg "BC_VERSION=$BC" --build-arg "REVISION=$REV" \
+  --label "io.openit.jobs=$JOBS" --build-arg "BC_SPEC=/wheels/$WHL" --build-arg "BC_VERSION=$BC" --build-arg "REVISION=$REV" \
   --build-arg "SURVEY_SCHEMA_VERSION=$SS_MAJOR" "$SRC" >&2
 
 # 4. 결과: docker가 준 ID와 이미지에 실제로 붙은 io.openit.* 라벨(요청 값을 되풀이하지 않고 inspect로 읽는다)

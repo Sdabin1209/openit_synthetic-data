@@ -74,6 +74,8 @@ PYTHONPATH=tests python -m synthetic_data run --config configs/dev.job.json [--c
 
 ## 컨테이너
 
+잡 실행: 이미지 라벨 `io.openit.jobs`(소스는 리포 루트 `jobs.json`, ADR 0019)가 argv, 설정 파일 위치, 비밀 파일 이름을 선언한다. 예: `docker run --rm -v <설정>:/config/import.json:ro -v <입력>:/in:ro ... <이미지> python -m synthetic_data import --config /config/import.json`.
+
 영역 빌드 진입점: `bash scripts/build-image.sh <BuildImageRequest 파일>`(ADR 0018). 실제 빌드 확인은 `scripts/smoke_build_image.sh`(소스 경로는 환경 변수로 받는다).
 
 run-once 잡(`run`, `import`)은 이미지 없이 `requirements.lock`으로 환경을 고정한다(헤드 승인, D22 (2)). I2 서버(dataset-store)는 `Dockerfile`이 있고 `scripts/smoke_service.sh`로 확인한다. 이미지 빌드에는 `--build-arg REVISION=<커밋 hex>`가 필요하다(기본 n/a이면 빌드가 멈춘다, 계약 ImageLabels).

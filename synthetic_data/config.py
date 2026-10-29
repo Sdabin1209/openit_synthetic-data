@@ -60,6 +60,19 @@ def _adapter(d: dict) -> AdapterSpec:
     return AdapterSpec(d["factory"], dict(d.get("kwargs", {})))
 
 
+SURVEY_DIR_ENV = "SYNTHETIC_SURVEY_SCHEMA_DIR"
+
+
+def survey_dir(configured: str, base_dir: Path) -> Path:
+    """문진 스키마 디렉터리. 환경 변수가 있으면 설정 값보다 우선한다.
+    왜: 이미지 안의 스키마 위치는 이미지의 내부 사항이다. 잡 선언(io.openit.jobs)으로 이미지를 돌리는 쪽(deploy)이 그 경로를 몰라도 되게,
+    이미지가 ENV로 위치를 정해 두고 설정의 survey_schema_dir(계약 스키마가 필수로 요구)보다 이것을 쓴다. 설정 쪽을 생략 가능하게 하는 것은 CR-009."""
+    import os
+    v = os.environ.get(SURVEY_DIR_ENV)
+    p = Path(v or configured)
+    return p if p.is_absolute() else (base_dir / p).resolve()
+
+
 def parse_config(raw: dict, base_dir: Path) -> JobConfig:
     # 왜: 키·형식 검사는 계약 스키마가 정본이다(D107). 모르는 키 거부(최상위·중첩), v1 생성 키 거부, 토큰 값 거부가 모두 여기서 걸린다.
     #     아래는 스키마로 쓸 수 없는 불변식만 검사한다(R7: 스키마가 보증한 것은 다시 검사하지 않는다).
@@ -92,7 +105,7 @@ def parse_config(raw: dict, base_dir: Path) -> JobConfig:
     return JobConfig(
         dataset_id=raw["dataset_id"], seed=raw["seed"], created_at=raw.get("created_at"), version=raw.get("version"),
         turn_engine_version=raw.get("turn_engine_version"),
-        survey_schema_dir=path(raw["survey_schema_dir"]),
+        survey_schema_dir=survey_dir(raw["survey_schema_dir"], base_dir),
         question_reader=_adapter(ad["question_reader"]),
         failure_store=_adapter(ad["failure_store"]) if "failure_store" in ad else None,
         question_sets=qsets, reviewed_only=bool(raw.get("reviewed_only", True)),
