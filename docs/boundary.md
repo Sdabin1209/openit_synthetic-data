@@ -44,9 +44,9 @@ store = FileDatasetStore(root, v)     # 또는 MemoryDatasetStore(v)
 | 실패 사례, 비식별 trace | I7 `FailureStore`(`question_set`, `expected_kind` 사용, 없으면 폴백) | `list_cases(review_status=CONFIRMED)`, `get_trace` | `adapters.failure_store.factory` |
 
 2026-10-28(헤드 허가, ADR 0010): 위 I1·I7은 시드 잡 `run`만 소비한다. `import` 모드는 이웃 읽기 SDK를 쓰지 않고 파일 jsonl 6개를 읽는다. v1 합성 생성은 제거돼 I1은 문항 세트 참조·본문 확인용이다.
-| 정답 구성 규칙, 버전 | I8 turn-engine | 버전만(`ENGINE_VERSION`). 호출은 아직 없음(CR-002) | `import turn_engine`이 되면 사용, 아니면 설정 값 |
+| LoRA-A 출력 규칙의 세대 | 계약 규칙 데이터 | `boundary_contracts.action_rules.load_rules()["rules_version"]` | 매니페스트 `action_rules_version`. 설정 값은 기대값이라 다르면 거부 |
 
-- 이웃 코드를 가져오지 않는다. 의존은 boundary-contracts(Protocol, 오류, 해시), 문진 스키마(읽기 전용 파일), turn-engine(예정)뿐이다.
+- 이웃 코드를 가져오지 않는다. 의존은 boundary-contracts(Protocol, 오류, 해시), 문진 스키마(읽기 전용 파일)뿐이다.
 - 사용하는 비밀(D84: `NAME_FILE`로 파일 경로를 받고 `read_secret(NAME)`으로 읽는다. 환경 변수 `NAME`은 개발용):
   - 서버(dataset-store) 쪽, 복수형(역할=토큰 목록 파일): `DATASET_STORE_READ_TOKENS_FILE`, `DATASET_STORE_WRITE_TOKENS_FILE`.
   - 잡(`run`/`import`의 `store.kind=http`) 쪽, 단수형(쓰기 토큰 값 하나): `DATASET_STORE_WRITE_TOKEN_FILE`(`token_env` 설정으로 이름을 바꿀 수 있다).
@@ -75,7 +75,6 @@ store = FileDatasetStore(root, v)     # 또는 MemoryDatasetStore(v)
 | I1이 `UNAVAILABLE` | 잡이 `BoundaryError`로 끝나고 종료 코드 75, 아무것도 게시하지 않음 | 스케줄러가 재시도 |
 | I1/I7 데이터가 스키마·해시 위반 | `INVALID_RECORD`/`INTEGRITY_ERROR`로 잡 중단 | 상대 영역 확인 |
 | 비식별 안 된 사례 | 실행 거부 | ops-feedback에 알림 |
-| turn-engine 부재 | 매니페스트 버전은 설정 값. Directive 불일치 위험(CR-002) | 변경 요청 |
 
 잡의 종료 코드: 0 성공(게시, 이미 게시됨, 할 일 없음), 2 설정 오류, 3 경계 오류(재시도 불가), 75 경계 오류(재시도 가능).
 

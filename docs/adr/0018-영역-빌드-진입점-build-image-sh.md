@@ -25,3 +25,6 @@ deploy의 `build-images.sh`가 이 영역의 Dockerfile 인자 이름(`BC_SPEC`,
 
 ## 되돌리는 조건
 계약이 빌드 요청 형식을 바꾸면(3.0.0에서 `turn_engine` 삭제 등) 이 스크립트도 맞춘다.
+
+## 갱신 기록
+- 3.0.0(U300, U50): `versions.turn_engine`은 계약에서 없어졌다. 라벨 `contracts.boundary`·`survey-schema`는 요청이 아니라 실제로 설치·사용한 버전(wheel 버전, `CONTRACT_VERSION`)에서 찍고, 요청이 이 리포의 `requirements.lock`이나 실제 소스와 다르면 멈춘다.

@@ -49,13 +49,6 @@ def load_factory(spec) -> Callable:
     return getattr(importlib.import_module(mod), fn)
 
 
-def resolve_turn_engine_version(cfg: JobConfig) -> str:
-    """설정의 turn_engine_version(매니페스트 필수 필드). 왜: 2.x에서 이 값은 설치본이 아니라 고정 표지다(D109). 코드는 turn-engine에 의존하지 않는다."""
-    if cfg.turn_engine_version:
-        return cfg.turn_engine_version
-    raise BoundaryError("FAILED_PRECONDITION", "turn-engine 버전 표지를 알 수 없다: 설정 turn_engine_version이 없다")
-
-
 def _find_ref(reader: QuestionReader, qid: str, version: str) -> dict:
     cursor = None
     while True:
@@ -84,7 +77,6 @@ def run_job(cfg: JobConfig, *, question_reader: QuestionReader, store: DatasetSt
 def _run_job(cfg, question_reader, store, failure_store, validators, clock, report) -> JobResult:
     v = validators or Validators(cfg.survey_schema_dir)
     contract = v.runtime_contract_version
-    te_version = resolve_turn_engine_version(cfg)
     # 1. 문항 읽기 (I1)
     ctxs = []
     for spec in cfg.question_sets:
@@ -184,7 +176,7 @@ def _run_job(cfg, question_reader, store, failure_store, validators, clock, repo
     created_at = cfg.created_at or (clock() if clock else datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"))
     with tempfile.TemporaryDirectory(prefix="dsbuild-", dir=cfg.work_dir) as td:
         manifest, files, digest = package(final, ctxs, cfg, staging=Path(td) / "files", contract=contract,
-                                          generator_version=gv, turn_engine_version=te_version, created_at=created_at)
+                                          generator_version=gv, action_rules_version=cfg.action_rules_version, created_at=created_at)
         report["counts"] = _counts(final)
         report["dataset_digest"] = digest
         res = JobResult("PUBLISHED", cfg.dataset_id, manifest["version"], None, digest, report["counts"])

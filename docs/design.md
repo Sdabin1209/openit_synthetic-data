@@ -37,7 +37,7 @@ v1 `ParserOutput` 라벨 기준 구현이었다. v2 정답은 데이터셋 담�
 ## 7. 품질 검사기 (`quality.py`)와 중복 제거
 
 샘플마다 사유 코드를 낸다. 하나라도 있으면 그 샘플을 빼고 `report.json`의 `dropped`에 센다.
-- 공통(2.0.0): 경계 스키마(ActionExtractionSample/ResponseSample)만 검사한다. v1의 의미 검사(아래 파서·생성기 항목)는 v1 필드에 묶여 있어 빠졌고, v2 의미 검사는 turn-engine `validate_extraction`(D75) 몫으로 **미정**이다. 아래 파서·생성기 항목은 v1 시점의 설계 기록이다.
+- 공통(2.0.0): 경계 스키마(ActionExtractionSample/ResponseSample)만 검사한다. v1의 의미 검사(아래 파서·생성기 항목)는 v1 필드에 묶여 있어 빠졌고, v2 의미 검사는 계약의 규칙 검사기(`check_action_extraction`) 연결 여부가 **미정**이다. 아래 파서·생성기 항목은 v1 시점의 설계 기록이다.
 - (제거됨, 역사) 파서(합성): 원문이 발화 안에 있다, 값이 원문 안에 있다, 대상 문항·슬롯이 정의에 있다, 의도별 대상·값 규칙(4절 표), 값이 슬롯 정의(선택지·단위·예/아니요)와 모순되지 않는다, 같은 슬롯에 값과 모름·거절이 함께 없다, 빈 발화는 빈 목록.
 - (제거됨, 역사) 생성기(합성): 응답 문장의 수가 응답 지시에 있는 것뿐이다, 고정 문장 행동은 재료 그대로, 질문 문장이 포함된다, `is_fallback=false`.
 - 중복 제거: (역할, 입력)이 같은 샘플은 하나만 남긴다. 같은 입력에 다른 정답이면(라벨 잡음) 합성끼리는 모두 빼고, 시드가 있으면 시드를 남긴다. 분할 **전에** 하므로 같은 입력이 학습과 평가에 걸치지 않는다.
@@ -53,12 +53,12 @@ v1 `ParserOutput` 라벨 기준 구현이었다. v2 정답은 데이터셋 담�
 
 ## 9. 패키징 (`package.py`)
 
-`<role>/<split>.jsonl`(lora_a/lora_b, train/validation/eval/eval_unseen). 줄은 키 정렬·구분자 고정 JSON, 샘플 ID 순이라 같은 샘플 집합은 같은 바이트다. 파일 해시는 `canonical.file_hash`, 매니페스트 해시는 `canonical.content_hash`. 매니페스트는 계약 버전, 문항 세트 ArtifactRef 목록, 생성기 버전, 시드 사례 ID, 분할별 파일과 개수, turn-engine 버전을 담는다. 샘플은 쓰기 전에 경계 스키마와 문진 스키마로 검증한다(품질 검사 단계).
+`<role>/<split>.jsonl`(lora_a/lora_b, train/validation/eval/eval_unseen). 줄은 키 정렬·구분자 고정 JSON, 샘플 ID 순이라 같은 샘플 집합은 같은 바이트다. 파일 해시는 `canonical.file_hash`, 매니페스트 해시는 `canonical.content_hash`. 매니페스트는 계약 버전, 문항 세트 ArtifactRef 목록, 생성기 버전, 시드 사례 ID, 분할별 파일과 개수, 규칙 세대을 담는다. 샘플은 쓰기 전에 경계 스키마와 문진 스키마로 검증한다(품질 검사 단계).
 
 ## 10. 재현성
 
 - 난수: 전역 `random`을 쓰지 않고 `rng.derive_int(seed, 용도, ...)`로만 파생. 시각·프로세스 상태를 내용에 쓰지 않는다. 딕셔너리는 정렬해서 직렬화한다.
-- `dataset_digest`: 파일 해시 목록, 문항 세트, 계약 버전, `generator_version`(게시 도구 식별자), 시드 사례 ID, turn-engine 버전의 `canonical` 해시. `created_at`·`version`·`ext`는 뺀다. 같은 입력과 시드는 같은 digest다(시험: `test_reproducible_*`, 메모리/파일 저장소와 작업 디렉터리가 달라도 같음).
+- `dataset_digest`: 파일 해시 목록, 문항 세트, 계약 버전, `generator_version`(게시 도구 식별자), 시드 사례 ID, `action_rules_version`의 `canonical` 해시. `created_at`·`version`·`ext`는 뺀다. 같은 입력과 시드는 같은 digest다(시험: `test_reproducible_*`, 메모리/파일 저장소와 작업 디렉터리가 달라도 같음).
 - 매니페스트 `content_hash`에는 `created_at`이 들어간다. 설정에서 고정하면 `content_hash`도 같다. 지정하지 않으면 실행 시각이다. 이 때문에 같은 digest의 버전이 저장소에 이미 있으면 잡이 다시 게시하지 않고 `ALREADY_PUBLISHED`로 끝난다(CR-005).
 - `version`을 생략하면 `v<digest 앞 32자>`다.
 

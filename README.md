@@ -12,7 +12,6 @@
 |---|---|---|---|
 | 입력 | question-authoring | I1 `QuestionReader`(HTTP 클라이언트) | 문항 세트, 검수 결과, 변경 분류(`REGENERATE_SAMPLES`) |
 | 입력 | ops-feedback | I7 `FailureStore`(HTTP 클라이언트) | 확정된 비식별 실패 사례(시드) |
-| 입력 | turn-engine | I8 | 버전(`ENGINE_VERSION`)만. 호출은 아직 없음(CR-002) |
 | 출력 | model-lab | I2 `DatasetStore` | `ActionExtractionSample`, `ResponseSample`, `DatasetManifest` |
 
 HTTP 경로는 이 영역 문서에 없어 `../boundary-contracts/HTTP.md`로 확인해야 하며 이번에 읽지 않았습니다(미확인). 비식별되지 않은 사례를 받으면 실행을 거부합니다.
@@ -70,7 +69,7 @@ PYTHONPATH=tests python -m synthetic_data run --config configs/dev.job.json [--c
 - D84(NAME_FILE)와 boundary-contracts 갱신 반영, 비밀이 산출물에 안 나오는 시험 추가(CHANGELOG 0.2.2, 제안 버전). 버전은 pyproject 0.2.0, CHANGELOG는 0.2.2(제안)로 어긋나 있다(docs/STATUS.md).
 - 변경 요청 CR-001~005는 헤드가 결정(docs/STATUS.md). CR-007(v1 생성 경로 제거 제안)은 시드 경로를 남기는 범위까지 ADR 0010으로 실행했다.
 
-확인 못 한 것: 게시기를 운영 저장소에 게시한 적 없음, v2 의미 검사 미수행(CR-006), 이웃 영역과의 실제 HTTP 연동(운영 환경), 이미지·E2E(해당 없음 또는 미실행), turn-engine 연동(미구현).
+확인 못 한 것: 게시기를 운영 저장소에 게시한 적 없음, v2 의미 검사 미수행(CR-006), 이웃 영역과의 실제 HTTP 연동(운영 환경), 이미지·E2E(해당 없음 또는 미실행).
 
 ## 5. 시험 상태
 
@@ -91,7 +90,7 @@ GPU가 막는 항목은 이 영역에 없습니다(잡은 CPU만 사용).
 
 ## 7. 남은 일 (docs/STATUS.md)
 
-v2 의미 검사는 turn-engine `validate_extraction` 이후(미정), turn-engine 연동(CR-002), 이웃 대역을 실제 SDK로 교체.
+v2 의미 검사는 계약의 `boundary_contracts.action_rules.check_action_extraction` 연결 여부 미정(CR-006), 이웃 대역을 실제 SDK로 교체.
 
 ## 8. 더 자세한 문서
 

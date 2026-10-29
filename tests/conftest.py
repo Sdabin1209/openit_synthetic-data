@@ -17,11 +17,14 @@ from synthetic_data.store import FileDatasetStore, MemoryDatasetStore
 ROOT = Path(__file__).resolve().parent.parent
 # 왜: 문진 스키마는 형제 폴더가 아니라 설치된 패키지(requirements.lock의 태그)에서 읽는다. 새 머신에는 이웃 폴더가 없다.
 SURVEY_DIR = survey_schema.contract_version_dir(1)
+# 왜: 규칙 세대는 계약의 규칙 데이터가 정본이다. 시험에도 리터럴을 두지 않는다(계약 3.0.0)
+from boundary_contracts.action_rules import load_rules  # noqa: E402
+RULES_VERSION = str(load_rules()["rules_version"])
 
 
 def make_cfg_raw(tmp_path: Path, **over) -> dict:
     raw = {
-        "dataset_id": "ds-test", "seed": 7, "created_at": "2026-10-15T00:00:00Z", "turn_engine_version": "0.0.0-test",
+        "dataset_id": "ds-test", "seed": 7, "created_at": "2026-10-15T00:00:00Z", 
         "survey_schema_dir": str(SURVEY_DIR),
         "adapters": {"question_reader": {"factory": "doubles:make_question_reader"},
                      "failure_store": {"factory": "doubles:make_failure_store_factory"}},
@@ -80,7 +83,7 @@ def build_v2_dataset(tmp: Path):
                 samples.append(v2_sample(role, n, split, ref))
     cfg = parse_config(make_cfg_raw(tmp), Path("."))
     manifest, files, _ = package(samples, ctxs, cfg, staging=tmp / "stage", contract=1, generator_version="test-hand@0",
-                                 turn_engine_version="0.0.0-test", created_at="2026-10-15T00:00:00Z")
+                                 action_rules_version=cfg.action_rules_version, created_at="2026-10-15T00:00:00Z")
     return manifest, {k: Path(p).read_bytes() for k, p in files.items()}
 
 

@@ -3,7 +3,6 @@
   "dataset_id": "ds-dev",
   "seed": 20261015,
   "created_at": "2026-10-15T00:00:00Z",
-  "turn_engine_version": "0.0.0-unpinned",
   "survey_schema_dir": "../../survey-service/schema",
   "adapters": {
     "question_reader": {

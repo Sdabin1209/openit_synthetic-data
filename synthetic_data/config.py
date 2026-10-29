@@ -37,7 +37,7 @@ class JobConfig:
     seed: int
     created_at: Optional[str]
     version: Optional[str]
-    turn_engine_version: Optional[str]
+    action_rules_version: str       # 설치된 계약 ActionExtractionRules.rules_version(설정 값은 검사만 한다)
     survey_schema_dir: Path
     question_reader: AdapterSpec
     failure_store: Optional[AdapterSpec]
@@ -61,6 +61,17 @@ def _adapter(d: dict) -> AdapterSpec:
 
 
 SURVEY_DIR_ENV = "SYNTHETIC_SURVEY_SCHEMA_DIR"
+
+
+def action_rules_version(configured: Optional[str]) -> str:
+    """매니페스트에 적을 LoRA-A 출력 규칙의 세대. 정본은 설치된 계약의 규칙 데이터(ActionExtractionRules.rules_version)이고
+    코드에 리터럴을 두지 않는다(계약 3.0.0, D109). 설정에 값이 있으면 기대값이라 설치본과 다르면 거부한다:
+    다른 규칙 세대로 만든 데이터에 이 세대의 표지를 붙이면 계보가 거짓이 된다."""
+    from boundary_contracts.action_rules import load_rules
+    installed = str(load_rules()["rules_version"])
+    if configured is not None and configured != installed:
+        raise ConfigError(f"설정의 action_rules_version이 설치된 계약의 규칙 세대({installed})와 다르다")
+    return installed
 
 
 def survey_dir(configured: str, base_dir: Path) -> Path:
@@ -104,7 +115,7 @@ def parse_config(raw: dict, base_dir: Path) -> JobConfig:
             raise ConfigError("seeds.question_set_id가 question_sets에 없다")
     return JobConfig(
         dataset_id=raw["dataset_id"], seed=raw["seed"], created_at=raw.get("created_at"), version=raw.get("version"),
-        turn_engine_version=raw.get("turn_engine_version"),
+        action_rules_version=action_rules_version(raw.get("action_rules_version")),
         survey_schema_dir=survey_dir(raw["survey_schema_dir"], base_dir),
         question_reader=_adapter(ad["question_reader"]),
         failure_store=_adapter(ad["failure_store"]) if "failure_store" in ad else None,

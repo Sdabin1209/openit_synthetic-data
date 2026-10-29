@@ -41,6 +41,5 @@ LABEL io.openit.service="dataset-store" \
       io.openit.revision="${REVISION}" \
       io.openit.contracts.boundary="${BC_VERSION}" \
       io.openit.contracts.survey-schema="${SURVEY_SCHEMA_VERSION}" \
-      io.openit.turn-engine="n/a" \
       io.openit.model-runtime="n/a"
 CMD ["python", "-m", "synthetic_data.service"]

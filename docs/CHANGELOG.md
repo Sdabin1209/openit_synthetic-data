@@ -1,5 +1,10 @@
 # 변경 이력
 
+## 미배포 (2026-10-30, U300: 계약 3.0.0 전환)
+- 의존: boundary-contracts v3.0.0.
+- 변경(깨짐): 매니페스트·잡 설정의 `turn_engine_version`을 `action_rules_version`으로 바꿨다. 값은 설치된 계약 규칙 데이터의 `rules_version`이고, 설정 값은 기대값이라 다르면 거부한다(`run`은 선택, `import`는 필수). 이미지 라벨 `io.openit.turn-engine`을 뺐다. 2.x 매니페스트는 읽지 않는다(`SUPPORTED_PIPELINE_MAJOR`가 하드코딩 2였던 것을 계약의 MAJOR에서 읽게 고침).
+- 변경: `build-image.sh` 라벨 정직성(U50). 라벨은 실제 설치한 wheel 버전과 `CONTRACT_VERSION`에서 찍고, 요청이 `requirements.lock`·실제 소스와 다르면 멈춘다.
+
 ## 미배포 (2026-10-30, U49: 승격된 스키마 사본 정리)
 `docs/change-requests/` 아래 스키마 파일을 분류했다. (가) 계약 패키지(boundary-contracts)에 같은 이름이 있음 = 승격된 사본이라 삭제(내용은 git 기록), (나) 계약에 없음.
 

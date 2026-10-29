@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import stat
 import subprocess
 import sys
@@ -16,6 +17,10 @@ import pytest
 from boundary_contracts import validator
 
 ROOT = Path(__file__).resolve().parent.parent
+_LOCK = (ROOT / "requirements.lock").read_text(encoding="utf-8")
+# 왜 고정 버전을 lock에서 읽나: 요청 버전은 이 리포의 고정 버전과 같아야 한다(U50). 시험에 리터럴을 두면 핀을 올릴 때마다 고쳐야 한다
+LOCK_BC = re.search(r"^boundary-contracts @ .*@(v[\d.]+)$", _LOCK, re.M).group(1)
+LOCK_SS = re.search(r"^openit-survey-schema @ .*@survey-schema-(v[\d.]+)#", _LOCK, re.M).group(1)
 SCRIPT = ROOT / "scripts" / "build-image.sh"
 
 FAKE_DOCKER = f"""#!{sys.executable}
@@ -36,7 +41,7 @@ elif a[0] == "image":
         g = st["args"]
         print(json.dumps({{"io.openit.service": "dataset-store", "io.openit.revision": g["REVISION"],
             "io.openit.contracts.boundary": g["BC_VERSION"], "io.openit.contracts.survey-schema": g["SURVEY_SCHEMA_VERSION"],
-            "io.openit.turn-engine": "n/a", "io.openit.model-runtime": "n/a", "org.opencontainers.x": "ignored", **st["labels"]}}))
+            "io.openit.model-runtime": "n/a", "org.opencontainers.x": "ignored", **st["labels"]}}))
 """
 
 
@@ -44,7 +49,7 @@ elif a[0] == "image":
 def env(tmp_path):
     bc = tmp_path / "bc-src"
     bc.mkdir()
-    (bc / "pyproject.toml").write_text('[build-system]\nrequires=["setuptools"]\nbuild-backend="setuptools.build_meta"\n[project]\nname="boundary-contracts"\nversion="9.9.9"\n')
+    (bc / "pyproject.toml").write_text('[build-system]\nrequires=["setuptools"]\nbuild-backend="setuptools.build_meta"\n[project]\nname="boundary-contracts"\nversion="' + LOCK_BC[1:] + '"\n')
     (bc / "boundary_contracts").mkdir()
     (bc / "boundary_contracts" / "__init__.py").write_text("")
     ss = tmp_path / "ss-src"
@@ -58,7 +63,7 @@ def env(tmp_path):
     fake = tmp_path / "fake-docker"
     fake.write_text(FAKE_DOCKER)
     fake.chmod(fake.stat().st_mode | stat.S_IEXEC)
-    req = {"source_dir": str(src), "revision": "abc1234", "versions": {"boundary": "v2.8.0", "survey_schema": "v1.1.0", "turn_engine": "v0.4.3", "model_runtime": "v0.9.0"},
+    req = {"source_dir": str(src), "revision": "abc1234", "versions": {"boundary": LOCK_BC, "survey_schema": LOCK_SS, "model_runtime": "v0.9.0"},
            "dependency_sources": {"boundary": str(bc), "survey_schema": str(ss)}, "image_tag": "synthetic-data-dataset-store:test"}
     return tmp_path, fake, req
 
@@ -80,8 +85,8 @@ def test_success_last_line_is_build_image_result_with_labels_from_request(env):
     res["labels"].pop("io.openit.exposure")
     jobs = res["labels"].pop("io.openit.jobs")
     assert json.loads(jobs) == json.loads((ROOT / "jobs.json").read_text(encoding="utf-8"))
-    assert res["labels"] == {"io.openit.service": "dataset-store", "io.openit.revision": "abc1234", "io.openit.contracts.boundary": "v2.8.0",
-                             "io.openit.contracts.survey-schema": "1", "io.openit.turn-engine": "n/a", "io.openit.model-runtime": "n/a"}
+    assert res["labels"] == {"io.openit.service": "dataset-store", "io.openit.revision": "abc1234", "io.openit.contracts.boundary": LOCK_BC,
+                             "io.openit.contracts.survey-schema": "1", "io.openit.model-runtime": "n/a"}
     validator("ImageLabels").validate(res["labels"])
 
 
@@ -185,3 +190,40 @@ def test_exposure_table_matches_code_routes():
     if re.search(r'compile\(r"\^/v1/datasets/', src):                          # 데이터셋 하위 경로 정규식들
         code.add("/v1/datasets/*")
     assert code == {"/healthz", "/readyz", "/v1/datasets", "/v1/datasets/*"} == table
+
+
+def test_label_comes_from_installed_wheel_not_from_request_and_stale_request_fails(env):
+    """U50: 라벨은 요청이 아니라 실제로 설치·사용한 버전에서 찍는다. 요청 버전이 고정 버전이나 실제 소스와 다르면 도커 전에 멈춘다."""
+    tmp, fake, req = env
+    req["versions"]["boundary"] = "v9.9.9"                       # 고정 버전과 다른 요청
+    r = run(tmp, fake, req)
+    assert r.returncode != 0 and "고정 버전" in r.stderr and not (tmp / "fake-docker.state").exists()
+
+
+def test_survey_schema_version_differing_from_lock_fails(env):
+    tmp, fake, req = env
+    req["versions"]["survey_schema"] = "v9.9.9"
+    r = run(tmp, fake, req)
+    assert r.returncode != 0 and "고정 버전" in r.stderr and not (tmp / "fake-docker.state").exists()
+
+
+def test_source_wheel_version_differing_from_request_fails(env):
+    """요청과 고정 버전은 같지만 dependency_sources의 실제 소스가 다른 버전이면 라벨을 찍지 않는다."""
+    tmp, fake, req = env
+    pp = Path(req["dependency_sources"]["boundary"]) / "pyproject.toml"
+    pp.write_text(pp.read_text().replace(LOCK_BC[1:], "9.9.9"))
+    r = run(tmp, fake, req)
+    assert r.returncode != 0 and "wheel의 버전" in r.stderr and not (tmp / "fake-docker.state").exists()
+
+
+def test_survey_schema_source_major_differing_from_request_fails(env):
+    tmp, fake, req = env
+    (Path(req["dependency_sources"]["survey_schema"]) / "CONTRACT_VERSION").write_text("7\n")
+    r = run(tmp, fake, req)
+    assert r.returncode != 0 and "CONTRACT_VERSION" in r.stderr and not (tmp / "fake-docker.state").exists()
+
+
+def test_turn_engine_request_key_is_rejected_by_contract(env):
+    tmp, fake, req = env
+    req["versions"]["turn_engine"] = "v0.4.3"                    # 3.0.0에서 BuildImageRequest.versions에서 빠졌다
+    assert run(tmp, fake, req).returncode != 0

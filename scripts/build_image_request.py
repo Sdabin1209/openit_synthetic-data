@@ -3,7 +3,7 @@
 왜 파이썬인가: 요청 검증은 계약 validator가 정본이고(boundary_contracts.validator), 쉘로 JSON을 파싱하면 경계 입력 검사가 흩어진다.
 출력 순서: source_dir, revision, boundary, survey_schema, bc_src, ss_src, image_tag
 이 영역이 쓰는 키(versions.boundary, versions.survey_schema, dependency_sources.boundary, dependency_sources.survey_schema)가 없으면 실패한다.
-기본값을 영역 안에 두지 않는다(배포 기준표와 어긋나지 않게). model_runtime·turn_engine은 이 이미지가 쓰지 않으므로 무시한다(라벨 n/a)."""
+기본값을 영역 안에 두지 않는다(배포 기준표와 어긋나지 않게). model_runtime은 이 이미지가 쓰지 않으므로 무시한다(라벨 n/a). turn_engine은 계약 3.0.0에서 없어졌다."""
 from __future__ import annotations
 
 import json

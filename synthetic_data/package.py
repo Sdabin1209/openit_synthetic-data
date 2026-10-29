@@ -26,7 +26,7 @@ def _ref_sort(refs):
 
 
 def package(samples: list, ctxs: list[QuestionSetContext], cfg: JobConfig, *, staging: Path, contract: int,
-            generator_version: str, turn_engine_version: str, created_at: str) -> tuple[dict, dict, str]:
+            generator_version: str, action_rules_version: str, created_at: str) -> tuple[dict, dict, str]:
     usage = {c.ref["id"]: c.usage for c in ctxs}
     groups: dict[str, list] = {}
     meta: dict[str, tuple] = {}
@@ -57,12 +57,12 @@ def package(samples: list, ctxs: list[QuestionSetContext], cfg: JobConfig, *, st
     digest = canonical.sha256_hash({
         "files": [[e["path"], e["content_hash"]] for e in entries], "question_sets": qsets,
         "runtime_contract_version": contract, "generator_version": generator_version,
-        "seed_case_ids": sorted(seeds), "turn_engine_version": turn_engine_version})
+        "seed_case_ids": sorted(seeds), "action_rules_version": action_rules_version})
     manifest = {
         "pipeline_schema_version": PIPELINE_SCHEMA_VERSION, "dataset_id": cfg.dataset_id,
         "version": cfg.version or ("v" + digest[7:39]), "created_at": created_at,
         "runtime_contract_version": contract, "question_sets": qsets, "generator_version": generator_version,
-        "seed_case_ids": sorted(seeds), "turn_engine_version": turn_engine_version,
+        "seed_case_ids": sorted(seeds), "action_rules_version": action_rules_version,
         "scenario_disjoint_across_splits": True, "files": entries,
         "ext": {EXT: {"dataset_digest": digest,
                       "unseen_eval_files": [e["path"] for e in entries if e["path"].endswith("eval_unseen.jsonl")]}}}

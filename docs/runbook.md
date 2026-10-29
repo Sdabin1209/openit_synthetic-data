@@ -46,7 +46,7 @@ python -m pytest -q          # 적합성(파일·메모리 저장소), 잡 종�
 PYTHONPATH=tests python -m synthetic_data run --config configs/dev.job.json [--created-at 2026-10-15T00:00:00Z]
 ```
 - `configs/dev.job.json`은 이웃 영역 대역(`tests/doubles.py`)을 쓰는 개발용 설정이다. 운영 설정은 `adapters.*.factory`를 소유 영역의 읽기 SDK 공장으로 바꾼다.
-- 설정 필드: `dataset_id`, `seed`(정수), `created_at`(생략하면 실행 시각), `version`(생략하면 `v<digest 32자>`), `turn_engine_version`(turn-engine이 없을 때 필수), `survey_schema_dir`(문진 스키마 `schema` 디렉터리; 경계 스키마는 boundary_contracts 패키지에서 읽는다), `adapters`, `question_sets[{id, version?, usage: TRAIN_POOL|HELD_OUT_EVAL}]`, `reviewed_only`, `seeds{enabled, question_set_id?}`(question_set_id는 1.0 사례 폴백용), `split.ratios`(필수, O11 사용자 결정 전까지 예시 값만), `review.per_kind`, `regeneration.mode`(full|affected_only), `output{work_dir, store{kind: file|memory|http, root | base_url, token_env?, timeout?}}`(운영 `http`: dataset-store로 게시, 쓰기 토큰은 `<token_env>_FILE`(기본 이름 `DATASET_STORE_WRITE_TOKEN`)이 가리키는 파일에서 읽는다, ADR 0013). 옛 키 `scenarios`, `generators`, `style_guide_version`은 받되 무시하고 report.json notes에 남긴다(ADR 0010). 상대 경로는 설정 파일 위치 기준이다.
+- 설정 필드: `dataset_id`, `seed`(정수), `created_at`(생략하면 실행 시각), `version`(생략하면 `v<digest 32자>`), `action_rules_version`(`run`은 선택, `import`는 필수. 값은 기대값이며 설치된 계약의 규칙 세대와 다르면 거부), `survey_schema_dir`(문진 스키마 `schema` 디렉터리; 경계 스키마는 boundary_contracts 패키지에서 읽는다), `adapters`, `question_sets[{id, version?, usage: TRAIN_POOL|HELD_OUT_EVAL}]`, `reviewed_only`, `seeds{enabled, question_set_id?}`(question_set_id는 1.0 사례 폴백용), `split.ratios`(필수, O11 사용자 결정 전까지 예시 값만), `review.per_kind`, `regeneration.mode`(full|affected_only), `output{work_dir, store{kind: file|memory|http, root | base_url, token_env?, timeout?}}`(운영 `http`: dataset-store로 게시, 쓰기 토큰은 `<token_env>_FILE`(기본 이름 `DATASET_STORE_WRITE_TOKEN`)이 가리키는 파일에서 읽는다, ADR 0013). 옛 키 `scenarios`, `generators`, `style_guide_version`은 받되 무시하고 report.json notes에 남긴다(ADR 0010). 상대 경로는 설정 파일 위치 기준이다.
 - 출력(표준 출력, JSON 한 줄): `status`(PUBLISHED, ALREADY_PUBLISHED, NOTHING_TO_DO), `version`, `content_hash`, `dataset_digest`, `counts`, `report_path`.
 - 종료 코드: 0 성공, 2 설정 오류, 3 경계 오류(재시도 불가), 75 경계 오류(재시도 가능, 스케줄러가 다시 실행).
 
@@ -67,7 +67,7 @@ PYTHONPATH=tests python -m synthetic_data run --config configs/dev.job.json [--c
 | `CONFLICT` | 같은 `version`을 고정했는데 입력·시드가 바뀌었다. `version`을 비우거나 올린다 |
 | `UNSUPPORTED_VERSION` | `survey_schema_dir/CONTRACT_VERSION`이 읽는 문항 세트의 계약과 다르다 |
 | `INVALID_RECORD`(비식별) | 실패 사례 저장소가 `deidentified=false`를 냈다. 실행이 거부된 것이 정상이다. ops-feedback에 알린다 |
-| `FAILED_PRECONDITION` | 지정한 문항 세트 버전에 검수 승인이 없다(`reviewed_only`), 또는 turn-engine 버전을 알 수 없다 |
+| `FAILED_PRECONDITION` | 지정한 문항 세트 버전에 검수 승인이 없다(`reviewed_only`),  |
 | `NOTHING_TO_DO` | `affected_only`인데 `REGENERATE_SAMPLES`가 없거나 품질 검사 뒤 샘플이 없다. `report.json`의 `notes`, `dropped` |
 | `dropped` 비율이 큼 | `reasons` 코드는 `synthetic_data/quality.py`. 시드 사례 또는 문항 정의 문제 |
 | 해시 불일치 | 저장된 파일이 바뀌었다. 새 버전으로 다시 게시 |

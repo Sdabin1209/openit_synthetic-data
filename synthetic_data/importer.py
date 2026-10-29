@@ -23,7 +23,7 @@ from boundary_contracts import canonical
 from boundary_contracts.errors import BoundaryError
 
 from . import PIPELINE_SCHEMA_VERSION, __version__
-from .config import ConfigError, survey_dir
+from .config import ConfigError, action_rules_version, survey_dir
 from .contract_check import check_config, check_output
 from .package import EXT, dumps_line
 from .pii import PII_PATTERNS, PII_SCAN_LIMIT, pii_kinds   # noqa: F401  (옛 import 경로 호환)
@@ -85,7 +85,7 @@ class ImportConfig:
     survey_schema_dir: Path
     question_sets: list            # ArtifactRef 목록. 외부 데이터에는 문항 세트 출처가 없어 설정으로 받는다(CR-006)
     source_label: str              # 데이터 출처 표시(예: 데이터셋 담당이 정한 버전 이름). generator_version에 들어간다
-    turn_engine_version: str
+    action_rules_version: str
     max_invalid_rows: int
     max_invalid_rate: float
     version: Optional[str]
@@ -110,7 +110,7 @@ def parse_import_config(raw: dict, base_dir: Path) -> ImportConfig:
     store = out["store"]
     return ImportConfig(
         dataset_id=raw["dataset_id"], input_dir=path(raw["input_dir"]), survey_schema_dir=survey_dir(raw["survey_schema_dir"], base_dir),
-        question_sets=raw["question_sets"], source_label=raw["source_label"].strip(), turn_engine_version=raw["turn_engine_version"],
+        question_sets=raw["question_sets"], source_label=raw["source_label"].strip(), action_rules_version=action_rules_version(raw["action_rules_version"]),
         max_invalid_rows=tol["max_invalid_rows"], max_invalid_rate=float(tol["max_invalid_rate"]),
         version=raw.get("version"), created_at=raw.get("created_at"),
         work_dir=path(out["work_dir"]), max_cross_split_duplicates=tol.get("max_cross_split_duplicate_inputs", 0),
@@ -371,13 +371,13 @@ def _run_import(cfg, store, validators, clock, report) -> ImportResult:
         digest = canonical.sha256_hash({
             "inputs": {k: inputs[k]["sha256"] for k in sorted(inputs)},
             "files": [[e["path"], e["content_hash"]] for e in entries], "question_sets": qsets,
-            "runtime_contract_version": contract, "generator_version": gv, "turn_engine_version": cfg.turn_engine_version,
+            "runtime_contract_version": contract, "generator_version": gv, "action_rules_version": cfg.action_rules_version,
             "pending_policy": cfg.pending_policy})
         # 왜 digest 앞 32자리(128비트): 48비트(12자리)는 근거가 없어 바꿨다(docs/adr/0006 보강, 2026-10-29)
         manifest = {
             "pipeline_schema_version": PIPELINE_SCHEMA_VERSION, "dataset_id": cfg.dataset_id,
             "version": cfg.version or ("v" + digest[7:39]), "created_at": created_at, "runtime_contract_version": contract,
-            "question_sets": qsets, "generator_version": gv, "seed_case_ids": [], "turn_engine_version": cfg.turn_engine_version,
+            "question_sets": qsets, "generator_version": gv, "seed_case_ids": [], "action_rules_version": cfg.action_rules_version,
             "scenario_disjoint_across_splits": True, "files": entries,
             "ext": {EXT: {"dataset_digest": digest, "import": {
                 "inputs": inputs, "rows_total": total, "rows_valid": total - bad, "rows_invalid": bad,

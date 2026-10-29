@@ -23,7 +23,7 @@
 ## 3. 소비하는 것
 
 - 소비하는 계약: `QuestionBank`, `ChangeClassification`, `FailureCase`, 런타임 입출력 계약(샘플의 입력·정답 형식).
-- 소비하는 SDK: 문항 읽기 SDK(question-authoring), 실패 사례 읽기 SDK(ops-feedback). 문진 스키마. turn-engine은 버전 기록만(호출 없음, CR-002).
+- 소비하는 SDK: 문항 읽기 SDK(question-authoring), 실패 사례 읽기 SDK(ops-feedback). 문진 스키마. turn-engine은 퇴역했다(D109). 규칙 세대는 계약 규칙 데이터에서 읽는다.
 - 지원하는 계약 버전: 문진 스키마 정수 버전, 경계 계약 `MAJOR.MINOR`.
 
 ## 3-1. 경계 명세 (블랙박스 기준)
@@ -38,7 +38,7 @@
 
 - 평가셋은 합성 학습 데이터와 분리해 관리한다(경계 규칙 9). 같은 시나리오가 두 쪽에 걸치지 않는다.
 - 모든 샘플이 해당 계약 스키마를 통과한다. 샘플의 `input`·`expected`는 문진 스키마(`ActionExtractionInput`/`ActionExtraction`, `ResponseRequest`/`ResponseText`)를 통과한다.
-- `DatasetManifest`에 계약 버전, 문항 버전 목록, `generator_version`(게시 도구 식별자, 합성 생성기가 아니다), 시드 사례 ID, 분할별 개수, 파일 해시, turn-engine 버전이 들어간다.
+- `DatasetManifest`에 계약 버전, 문항 버전 목록, `generator_version`(게시 도구 식별자, 합성 생성기가 아니다), 시드 사례 ID, 분할별 개수, 파일 해시, `action_rules_version`이 들어간다.
 - 같은 입력과 시드로 다시 만들면 같은 데이터셋 내용 해시가 나온다(재현성).
 - 데이터셋 버전은 불변이다.
 - 생성은 설정 파일 하나로 반복 실행되는 잡이다(D39). 새 문항 세트 버전이나 실패 사례가 저장소에 생기면 정해진 설정으로 자동 실행할 수 있다. 같은 입력과 시드는 같은 데이터셋을 낸다.

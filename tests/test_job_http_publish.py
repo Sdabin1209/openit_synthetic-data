@@ -5,7 +5,7 @@ import json
 
 import pytest
 
-from conftest import SURVEY_DIR, make_cfg_raw
+from conftest import RULES_VERSION, SURVEY_DIR, make_cfg_raw
 from synthetic_data.__main__ import main
 from synthetic_data.config import ConfigError, parse_config
 from test_import import QS, write_input
@@ -21,7 +21,7 @@ def srv(tmp_path):
 
 def import_cfg(tmp, url, **store):
     raw = {"dataset_id": "ds-http", "input_dir": str(tmp / "in"), "survey_schema_dir": str(SURVEY_DIR), "question_sets": QS,
-           "source_label": "fake-test", "turn_engine_version": "0.0.0-test", "created_at": "2026-10-27T00:00:00Z",
+           "source_label": "fake-test", "action_rules_version": RULES_VERSION, "created_at": "2026-10-27T00:00:00Z",
            "tolerance": {"max_invalid_rows": 0, "max_invalid_rate": 0.0},
            "output": {"work_dir": str(tmp / "work"), "store": {"kind": "http", "base_url": url, "token_env": "SD_TEST_WRITE_TOKEN", **store}}}
     p = tmp / "imp.json"

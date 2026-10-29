@@ -5,7 +5,7 @@
   "survey_schema_dir": "../../survey-service/schema",
   "question_sets": [{"id": "qs-external", "version": "1", "content_hash": "sha256:0000000000000000000000000000000000000000000000000000000000000000"}],
   "source_label": "dataset-team-example",
-  "turn_engine_version": "0.0.0-unpinned",
+  "action_rules_version": "2",
   "tolerance": {"max_invalid_rows": 0, "max_invalid_rate": 0.0},
   "output": {"work_dir": "../work/import", "store": {"kind": "file", "root": "../work/store"}}
 }

@@ -9,7 +9,7 @@ from pathlib import Path
 import pytest
 
 import doubles
-from conftest import SURVEY_DIR, ROOT
+from conftest import RULES_VERSION, SURVEY_DIR, ROOT
 from synthetic_data.importer import INPUT_FILES, InputError, load_import_config, parse_import_config, run_import
 from synthetic_data.config import ConfigError
 from synthetic_data.store import MemoryDatasetStore
@@ -43,7 +43,7 @@ def write_input(d: Path, per_file=3, mutate=None):
 
 def cfg_for(tmp, **over):
     raw = {"dataset_id": "ds-imp", "input_dir": str(tmp / "in"), "survey_schema_dir": str(SURVEY_DIR), "question_sets": QS,
-           "source_label": "fake-test", "turn_engine_version": "0.0.0-test", "created_at": "2026-10-27T00:00:00Z",
+           "source_label": "fake-test", "action_rules_version": RULES_VERSION, "created_at": "2026-10-27T00:00:00Z",
            "tolerance": {"max_invalid_rows": 0, "max_invalid_rate": 0.0},
            "output": {"work_dir": str(tmp / "work"), "store": {"kind": "memory"}}}
     raw.update(over)
@@ -176,7 +176,7 @@ def test_example_config_parses():
 def test_cli_exit_codes(tmp_path):
     write_input(tmp_path / "in", mutate=bad_mutator)
     raw = {"dataset_id": "ds-cli", "input_dir": str(tmp_path / "in"), "survey_schema_dir": str(SURVEY_DIR), "question_sets": QS,
-           "source_label": "fake", "turn_engine_version": "0.0.0-test", "tolerance": {"max_invalid_rows": 0, "max_invalid_rate": 0},
+           "source_label": "fake", "action_rules_version": RULES_VERSION, "tolerance": {"max_invalid_rows": 0, "max_invalid_rate": 0},
            "output": {"work_dir": str(tmp_path / "w"), "store": {"kind": "file", "root": str(tmp_path / "s")}}}
     cfgp = tmp_path / "c.json"
     cfgp.write_text(json.dumps(raw), encoding="utf-8")

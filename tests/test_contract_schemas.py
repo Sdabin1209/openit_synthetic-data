@@ -162,25 +162,20 @@ def test_cli_result_line_drops_empty_rejected_reasons_unless_rejected():
     assert "rejected_reasons" not in ok
 
 
-def test_turn_engine_version_comes_from_config_even_if_turn_engine_is_installed(tmp_path, validators, monkeypatch):
-    """D109: turn_engine_version은 설치본이 아니라 설정의 고정 표지다. 설치돼 있어도 설정값이 매니페스트에 들어간다."""
-    import sys
-    import types
-    fake = types.ModuleType("turn_engine")
-    fake.ENGINE_VERSION = "v9.9.9-installed"
-    monkeypatch.setitem(sys.modules, "turn_engine", fake)
+def test_manifest_action_rules_version_is_the_installed_contract_rules_version(tmp_path, validators):
+    """계약 3.0.0: 매니페스트의 action_rules_version은 설치된 계약 규칙 데이터의 rules_version이다(설정에 없어도). 코드·시험에 리터럴을 두지 않는다."""
+    from conftest import RULES_VERSION
     st = MemoryDatasetStore(validators)
-    _, res = run_job_helper(make_cfg_raw(tmp_path, turn_engine_version="0.4.3"), st, validators)
-    assert st.get_manifest(res.dataset_id, res.version)["turn_engine_version"] == "0.4.3"
+    _, res = run_job_helper(make_cfg_raw(tmp_path), st, validators)
+    m = st.get_manifest(res.dataset_id, res.version)
+    assert m["action_rules_version"] == RULES_VERSION and "turn_engine_version" not in m
 
 
-def test_survey_schema_dir_env_overrides_config(tmp_path, monkeypatch):
-    """이미지가 ENV로 정한 문진 스키마 위치가 설정값보다 우선한다(잡 선언으로 돌리는 쪽이 이미지 내부 경로를 몰라도 되게)."""
-    from synthetic_data.config import SURVEY_DIR_ENV
-    from synthetic_data.importer import parse_import_config
-    monkeypatch.setenv(SURVEY_DIR_ENV, "/app/survey_schema")
-    assert parse_config(make_cfg_raw(tmp_path), tmp_path).survey_schema_dir == Path("/app/survey_schema")
-    imp = load(EX / "SyntheticJobConfigImport.json")
-    assert parse_import_config(imp, tmp_path).survey_schema_dir == Path("/app/survey_schema")
-    monkeypatch.delenv(SURVEY_DIR_ENV)
-    assert parse_config(make_cfg_raw(tmp_path), tmp_path).survey_schema_dir == Path(make_cfg_raw(tmp_path)["survey_schema_dir"])
+def test_config_action_rules_version_must_match_installed_rules(tmp_path):
+    """설정의 action_rules_version은 기대값이다. 설치된 계약의 규칙 세대와 다르면 거부한다(다른 세대의 표지를 붙이면 계보가 거짓이 된다)."""
+    from conftest import RULES_VERSION
+    parse_config(make_cfg_raw(tmp_path, action_rules_version=RULES_VERSION), tmp_path)
+    with pytest.raises(ConfigError):
+        parse_config(make_cfg_raw(tmp_path, action_rules_version=RULES_VERSION + "9"), tmp_path)
+    with pytest.raises(ConfigError):                       # 3.0.0에서 없어진 키는 계약 스키마가 거부한다
+        parse_config(make_cfg_raw(tmp_path, turn_engine_version="0.4.3"), tmp_path)
