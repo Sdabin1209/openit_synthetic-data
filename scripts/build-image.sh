@@ -1,0 +1,43 @@
+#!/usr/bin/env bash
+# 영역 빌드 진입점(계약 v2.5.0 BuildImageRequest/BuildImageResult, OPEN_GAPS U42, ADR 0018).
+# 사용: bash scripts/build-image.sh <요청 JSON 파일>   (영역 리포 루트에서)
+# 결과: 표준 출력 마지막 줄에 BuildImageResult JSON 한 줄. 진행 기록은 표준 오류. 종료 0 성공.
+# 환경 변수: DOCKER(기본 docker), PYTHON(기본: 리포의 .venv/bin/python, 없으면 python3. boundary_contracts가 설치돼 있어야 한다)
+set -euo pipefail
+[ $# -eq 1 ] || { echo "사용: bash scripts/build-image.sh <요청 JSON 파일>" >&2; exit 2; }
+HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+DOCKER="${DOCKER:-docker}"
+PY="${PYTHON:-}"; [ -n "$PY" ] || { [ -x "$HERE/.venv/bin/python" ] && PY="$HERE/.venv/bin/python" || PY=python3; }
+
+# 1. 요청 검증(계약 validator). 값은 요청에서만 온다: 이 스크립트에 버전 기본값이 없다
+REQ="$("$PY" -I "$HERE/scripts/build_image_request.py" "$1")" || { echo "build-image: 요청 검증 실패" >&2; exit 2; }
+mapfile -t R <<<"$REQ"
+SRC="${R[0]}"; REV="${R[1]}"; BC="${R[2]}"; SS="${R[3]}"; BC_SRC="${R[4]}"; SS_SRC="${R[5]}"; TAG="${R[6]}"
+[ -d "$SRC" ] && [ -f "$SRC/Dockerfile" ] || { echo "build-image: source_dir에 Dockerfile이 없다" >&2; exit 2; }
+[ -f "$BC_SRC/pyproject.toml" ] || { echo "build-image: dependency_sources.boundary에 pyproject.toml이 없다" >&2; exit 2; }
+[ -f "$SS_SRC/CONTRACT_VERSION" ] && [ -d "$SS_SRC/schemas" ] || { echo "build-image: dependency_sources.survey_schema가 문진 스키마 디렉터리(CONTRACT_VERSION, schemas/)가 아니다" >&2; exit 2; }
+
+# 2. 계약 wheel을 소스 트리에서 만든다(빌드 중 SSH·이웃 리포 경로 없이). 소스 트리를 더럽히지 않게 사본에서 빌드한다
+WORK="$(mktemp -d)"; trap 'rm -rf "$WORK"' EXIT
+mkdir "$WORK/bc" "$WORK/wheels"; cp -a "$BC_SRC/." "$WORK/bc/"
+echo "build-image: 계약 wheel 만들기 ($BC)" >&2
+"$PY" -m pip wheel -q --no-deps --disable-pip-version-check -w "$WORK/wheels" "$WORK/bc" >&2
+WHL="$(basename "$(ls "$WORK"/wheels/boundary_contracts-*.whl | head -1)")"
+# 왜 요청의 survey_schema(vX.Y.Z)에서 주 버전을 뽑나: 라벨 io.openit.contracts.survey-schema는 주 버전 정수다(ImageLabels)
+SS_MAJOR="${SS#v}"; SS_MAJOR="${SS_MAJOR%%.*}"
+
+# 3. 빌드. Dockerfile 인자 이름은 이 영역의 것이고 deploy는 모른다
+echo "build-image: 이미지 빌드 $TAG" >&2
+"$DOCKER" build -q -t "$TAG" --build-context "wheels=$WORK/wheels" --build-context "survey_schema=$SS_SRC" \
+  --build-arg "BC_SPEC=/wheels/$WHL" --build-arg "BC_VERSION=$BC" --build-arg "REVISION=$REV" \
+  --build-arg "SURVEY_SCHEMA_VERSION=$SS_MAJOR" "$SRC" >&2
+
+# 4. 결과: docker가 준 ID와 이미지에 실제로 붙은 io.openit.* 라벨(요청 값을 되풀이하지 않고 inspect로 읽는다)
+ID="$("$DOCKER" image inspect -f '{{.Id}}' "$TAG")"
+"$DOCKER" image inspect -f '{{json .Config.Labels}}' "$TAG" | "$PY" -I -c '
+import json, sys
+from boundary_contracts import validator
+labels = {k: v for k, v in json.load(sys.stdin).items() if k.startswith("io.openit.")}
+res = {"image": sys.argv[1], "image_id": sys.argv[2], "labels": labels}
+validator("BuildImageResult").validate(res)
+print(json.dumps(res, ensure_ascii=False, sort_keys=True))' "$TAG" "$ID"

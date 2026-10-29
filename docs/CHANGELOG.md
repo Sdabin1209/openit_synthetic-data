@@ -1,5 +1,9 @@
 # 변경 이력
 
+## 미배포 (2026-10-30, U42)
+- 추가: 영역 빌드 진입점 `scripts/build-image.sh`(계약 v2.5.0 BuildImageRequest/Result, ADR 0018), `scripts/smoke_build_image.sh`, 시험 `tests/test_build_image.py`.
+- 의존: boundary-contracts v2.5.0.
+
 ## 미배포 (2026-10-29, 단위 4a, D111)
 - 변경: I2 서버를 `http.server` 직접 구현에서 WSGI 앱 + waitress 3.0.2로 옮겼다(ADR 0017). 지운 자체 코드: 헤더 마감 래퍼, 연결 상한 서버, 본문 drain, Content-Length 직접 검사.
 - 동작 변화: 본문 상한 초과는 413(text/plain), 연결 상한 초과는 503이 아니라 대기, 헤더 총 마감 없음, 인증 전에 본문을 받는다, 긴 요청 줄은 401/431. 환경 변수 `DATASET_STORE_HEADER_DEADLINE`은 없어졌다. 추가: `DATASET_STORE_THREADS`, `DATASET_STORE_DRAIN_GRACE`.
