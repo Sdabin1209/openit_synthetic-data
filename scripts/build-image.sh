@@ -34,9 +34,12 @@ LOCK_SS="$(sed -n 's/^openit-survey-schema @ .*@survey-schema-\(v[0-9][0-9.]*\)#
 [ "$SS" = "$LOCK_SS" ] || die "요청의 survey_schema 버전($SS)이 이 리포의 고정 버전($LOCK_SS)과 다르다. 라벨을 찍지 않는다"
 BC_ACTUAL="v$(printf '%s' "$WHL" | sed -n 's/^boundary_contracts-\([0-9][0-9.]*\)-.*/\1/p')"
 [ "$BC_ACTUAL" = "$BC" ] || die "dependency_sources.boundary에서 만든 wheel의 버전($BC_ACTUAL)이 요청($BC)과 다르다. 라벨을 찍지 않는다"
-SS_ACTUAL="$(tr -d ' \n' < "$SS_SRC/CONTRACT_VERSION")"      # 라벨 io.openit.contracts.survey-schema는 주 버전 정수다(ImageLabels)
-SS_REQ_MAJOR="${SS#v}"; SS_REQ_MAJOR="${SS_REQ_MAJOR%%.*}"
-[ "$SS_ACTUAL" = "$SS_REQ_MAJOR" ] || die "dependency_sources.survey_schema의 CONTRACT_VERSION($SS_ACTUAL)이 요청($SS)의 주 버전과 다르다. 라벨을 찍지 않는다"
+# 왜 pyproject의 version인가: 라벨 io.openit.contracts.survey-schema는 문진 스키마 패키지의 주 버전이다(ImageLabels). CONTRACT_VERSION은 런타임 계약의
+# 정수 버전이라 다른 개념이다(v2.0.0 패키지의 CONTRACT_VERSION은 1이다).
+SS_PKG="$(sed -n 's/^version = "\([0-9][0-9.]*\)"$/\1/p' "$SS_SRC/pyproject.toml" | head -1)"
+[ -n "$SS_PKG" ] || die "dependency_sources.survey_schema/pyproject.toml에서 version을 읽지 못했다"
+[ "v$SS_PKG" = "$SS" ] || die "dependency_sources.survey_schema의 패키지 버전(v$SS_PKG)이 요청($SS)과 다르다. 라벨을 찍지 않는다"
+SS_ACTUAL="${SS_PKG%%.*}"
 
 # 잡 선언(계약 JobsDeclaration)을 라벨 io.openit.jobs로 싣는다: deploy는 argv·비밀 파일 이름·설정 파일 위치를 이 라벨에서 읽는다
 JOBS="$("$PY" -I "$HERE/scripts/build_image_request.py" --jobs "$SRC/jobs.json")" || { echo "build-image: jobs.json 검증 실패" >&2; exit 2; }

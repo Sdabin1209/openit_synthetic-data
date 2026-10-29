@@ -55,6 +55,7 @@ def env(tmp_path):
     ss = tmp_path / "ss-src"
     (ss / "schemas").mkdir(parents=True)
     (ss / "CONTRACT_VERSION").write_text("1\n")
+    (ss / "pyproject.toml").write_text('[project]\nname = "openit-survey-schema"\nversion = "' + LOCK_SS[1:] + '"\n')
     src = tmp_path / "src"
     src.mkdir()
     (src / "Dockerfile").write_text("FROM scratch\n")
@@ -86,7 +87,7 @@ def test_success_last_line_is_build_image_result_with_labels_from_request(env):
     jobs = res["labels"].pop("io.openit.jobs")
     assert json.loads(jobs) == json.loads((ROOT / "jobs.json").read_text(encoding="utf-8"))
     assert res["labels"] == {"io.openit.service": "dataset-store", "io.openit.revision": "abc1234", "io.openit.contracts.boundary": LOCK_BC,
-                             "io.openit.contracts.survey-schema": "1", "io.openit.model-runtime": "n/a"}
+                             "io.openit.contracts.survey-schema": LOCK_SS[1:].split(".")[0], "io.openit.model-runtime": "n/a"}
     validator("ImageLabels").validate(res["labels"])
 
 
@@ -216,11 +217,12 @@ def test_source_wheel_version_differing_from_request_fails(env):
     assert r.returncode != 0 and "wheel의 버전" in r.stderr and not (tmp / "fake-docker.state").exists()
 
 
-def test_survey_schema_source_major_differing_from_request_fails(env):
+def test_survey_schema_source_version_differing_from_request_fails(env):
     tmp, fake, req = env
-    (Path(req["dependency_sources"]["survey_schema"]) / "CONTRACT_VERSION").write_text("7\n")
+    pp = Path(req["dependency_sources"]["survey_schema"]) / "pyproject.toml"
+    pp.write_text(pp.read_text().replace(LOCK_SS[1:], "7.0.0"))
     r = run(tmp, fake, req)
-    assert r.returncode != 0 and "CONTRACT_VERSION" in r.stderr and not (tmp / "fake-docker.state").exists()
+    assert r.returncode != 0 and "패키지 버전" in r.stderr and not (tmp / "fake-docker.state").exists()
 
 
 def test_turn_engine_request_key_is_rejected_by_contract(env):
