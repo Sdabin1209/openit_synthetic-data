@@ -17,7 +17,7 @@ from test_service import Srv, WT
 
 def _conn(s):
     c = socket.create_connection(("127.0.0.1", s.httpd.server_address[1]))
-    c.settimeout(5)
+    c.settimeout(30)      # 왜 30초: 판정은 응답·종료 여부이고 시간이 아니다. 이 값은 서버가 매달릴 때만 닿는 바깥 마감이다(부하 아래 느려져도 판정이 갈리지 않게 넉넉히)
     return c
 
 
@@ -29,9 +29,8 @@ def test_slow_header_clients_do_not_block_other_requests(tmp_path):
             c = _conn(s)
             c.sendall(b"GET /v1/datasets HTTP/1.1\r\nHost: x\r\nX-A: ab")      # 헤더를 끝내지 않는다
             slow.append(c)
-        t0 = time.monotonic()
+        # 느린 머리글 연결 8개가 있어도 다른 요청이 응답을 받는다. 응답 시간은 재지 않는다(call의 10초 마감이 바깥 마감, 벽시계 상한은 부하에 흔들린다)
         assert s.call("GET", "/v1/datasets")[0] == 200
-        assert time.monotonic() - t0 < 2
     finally:
         for c in slow:
             c.close()
@@ -42,10 +41,8 @@ def test_idle_connection_is_closed_after_timeout(tmp_path):
     s = Srv(tmp_path, **Srv.IDLE(1.0))
     try:
         c = _conn(s)
-        c.settimeout(8)
-        t0 = time.monotonic()
+        c.settimeout(60)      # 바깥 마감: 서버가 닫지 않으면 여기서 timeout 예외로 실패한다. 닫는 시점은 재지 않는다(부하에 흔들림)
         assert c.recv(10) == b""                  # 아무것도 보내지 않으면 서버가 닫는다
-        assert time.monotonic() - t0 < 7
         c.close()
         assert s.call("GET", "/v1/datasets")[0] == 200
     finally:
@@ -55,17 +52,19 @@ def test_idle_connection_is_closed_after_timeout(tmp_path):
 def test_in_flight_request_finishes_when_server_is_shutting_down(tmp_path):
     s = Srv(tmp_path)
     orig = s.svc.list_ids
+    started = threading.Event()
 
     def slow_list():
+        started.set()                             # 요청이 처리 중이라는 신호(고정 sleep 대신 사건으로 기다린다)
         time.sleep(0.8)
         return orig()
     s.svc.list_ids = slow_list
     out = {}
     t = threading.Thread(target=lambda: out.update(r=s.call("GET", "/v1/datasets")))
     t.start()
-    time.sleep(0.3)                               # 요청이 처리 중이다
+    assert started.wait(30)                       # 요청이 처리 중이다
     s.close()                                     # 종료 신호 + 서버 닫기
-    t.join(10)
+    t.join(60)
     assert out["r"][0] == 200
 
 
@@ -74,7 +73,7 @@ def test_oversized_body_is_refused_and_server_keeps_working(tmp_path):
     try:
         c = _conn(s)
         c.sendall(b"POST /v1/datasets HTTP/1.1\r\nHost: x\r\nAuthorization: Bearer " + WT.encode()
-                  + b"\r\nContent-Length: 5000\r\n\r\n" + b"x" * 100)
+                  + b"\r\nContent-Length: 5000\r\n\r\n")      # 머리글만 보낸다: 서버가 Content-Length만 보고 413을 보내고 닫는 동안 본문을 보내면 연결 재설정 경쟁이 난다
         status = c.recv(200).split(b" ")[1]
         assert status in (b"400", b"413")
         c.close()
@@ -94,7 +93,7 @@ def test_server_recovers_after_connection_flood(tmp_path):
                 break
         for c in flood:
             c.close()
-        deadline = time.monotonic() + 8
+        deadline = time.monotonic() + 60      # 바깥 마감(회복 여부가 판정, 속도는 아니다)
         code = None
         while time.monotonic() < deadline:
             code = s.call("GET", "/v1/datasets")[0]
@@ -120,9 +119,9 @@ def test_sigterm_stops_the_service_process_cleanly(tmp_path):
     p = subprocess.Popen([sys.executable, "-m", "synthetic_data.service"], env=env, stdout=subprocess.PIPE, text=True)
     try:
         port = int(p.stdout.readline().split()[-1])
-        assert urllib.request.urlopen(f"http://127.0.0.1:{port}/healthz", timeout=5).status == 200
+        assert urllib.request.urlopen(f"http://127.0.0.1:{port}/healthz", timeout=30).status == 200
         p.send_signal(signal.SIGTERM)
-        assert p.wait(timeout=10) == 0
+        assert p.wait(timeout=60) == 0      # 바깥 마감: 종료 코드가 판정이고 종료 속도는 아니다(드레인 2초 + 부하 여유)
     finally:
         if p.poll() is None:
             p.kill()

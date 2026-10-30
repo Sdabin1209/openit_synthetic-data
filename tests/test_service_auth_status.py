@@ -17,7 +17,7 @@ def raw(srv, method, path, token=None, body=b"", scheme="Bearer"):
     h = f"{method} {path} HTTP/1.1\r\nHost: x\r\nConnection: close\r\nContent-Length: {len(body)}\r\n"
     if token is not None:
         h += f"Authorization: {scheme} {token}\r\n"
-    with socket.create_connection((host, port), timeout=5) as s:
+    with socket.create_connection((host, port), timeout=30) as s:      # 바깥 마감(부하 여유)
         s.sendall(h.encode() + b"\r\n" + body)
         buf = b""
         while chunk := s.recv(65536):

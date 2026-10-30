@@ -22,7 +22,7 @@ def rnd_text(r, n=12):
 
 def raw(srv, method, target, headers, body=None):
     host, port = srv.url.replace("http://", "").split(":")
-    c = http.client.HTTPConnection(host, int(port), timeout=5)
+    c = http.client.HTTPConnection(host, int(port), timeout=30)
     try:
         c.putrequest(method, target, skip_host=False, skip_accept_encoding=True)
         for k, v in headers:

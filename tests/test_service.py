@@ -222,14 +222,19 @@ def test_auth_failure_throttle_blocks_even_valid_token(tmp_path):
         s.close()
 
 
-def test_auth_failure_window_expires_and_frees_memory(tmp_path):
+def test_auth_failure_window_expires_and_frees_memory(tmp_path, monkeypatch):
+    # 왜 주입한 시계: 벽시계 0.3초 창은 부하에서 요청이 늦으면 차단 확인 전에 창이 닫혀 결과가 갈렸다. 서버 모듈의 monotonic을 시험이 쥔 시계로 바꾼다
+    import types
+    from synthetic_data.components import link_dataset_store_server as mod
+    now = [1000.0]
+    monkeypatch.setattr(mod, "time", types.SimpleNamespace(monotonic=lambda: now[0]))
     s = Srv(tmp_path, auth_fail_limit=2)
     s.svc.auth_fail_window = 0.3
     try:
         for _ in range(2):
             s.call("GET", "/v1/datasets", token="y" * 40)
         assert s.call("GET", "/v1/datasets")[0] == 503
-        time.sleep(0.4)
+        now[0] += 0.4
         assert s.call("GET", "/v1/datasets")[0] == 200
         assert "127.0.0.1" not in s.svc._fails                  # 창이 지나면 주소 항목이 사라진다
     finally:
@@ -279,12 +284,11 @@ def test_global_publish_limit_is_503(tmp_path, captured):
         s.close()
 
 
-def _raw(srv, data: bytes, wait=0.3) -> bytes:
+def _raw(srv, data: bytes) -> bytes:
     import socket
     c = socket.create_connection(("127.0.0.1", srv.httpd.server_address[1]))
-    c.settimeout(3)
+    c.settimeout(30)      # 바깥 마감. 응답이 올 때까지 recv가 기다리므로 고정 sleep이 필요 없다
     c.sendall(data)
-    time.sleep(wait)
     try:
         return c.recv(500)
     except OSError:

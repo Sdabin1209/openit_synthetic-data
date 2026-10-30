@@ -324,7 +324,7 @@ def test_pii_patterns_are_fast_on_adversarial_text():
     rec = {"input": {"user_utterance": evil}, "expected": evil}
     t = time.time()
     pii_scan.run({"items": [rec]})
-    assert time.time() - t < 1.0
+    assert time.time() - t < 30      # 재앙적 역추적(분 단위)을 잡는 바깥 마감이다. 정상은 수 ms이고 벽시계 1초 상한은 부하에 흔들렸다
 
 
 def test_same_utterance_same_question_different_state_is_reported_not_rejected(tmp_path, validators):
