@@ -2,7 +2,7 @@
 
 ## 미배포 (2026-10-30, U400: 영역 구조 개편 D117·D118)
 - 의존: boundary-contracts v3.1.1, openit-link v0.4.1(통신 기반). 동작(와이어 형식, 잡 출력, 종료 코드, digest·version)은 바꾸지 않았다.
-- 변경: 코드를 `components/`(29개), `wiring/`, `types/`로 옮겼다. `schemas/`에 영역 내부 타입 58개와 통과·거부 예시. 옛 모듈 경로(`synthetic_data.importer`, `.job`, `.store`, `.schemas`, `.service.app` 등)는 없어졌다. 설정 값으로 쓰이는 `synthetic_data.adapters:http_question_reader`·`http_failure_store`만 별칭으로 남겼다(CR-S-001).
+- 변경: 코드를 `components/`(29개), `wiring/`, `types/`로 옮겼다. `schemas/`에 영역 내부 타입 58개와 통과·거부 예시. 옛 모듈 경로(`synthetic_data.importer`, `.job`, `.store`, `.schemas`, `.service.app` 등)는 없어졌다. 설정 값으로 쓰이는 `synthetic_data.adapters:http_question_reader`·`http_failure_store`는 공개 진입점으로 유지한다(ADR 0022).
 - 변경(서버 면): dataset-store가 `openit_link.App/Route` 위로 옮겨 인증·413·계약 검증·오류 본문·/healthz·/readyz를 라이브러리가 한다. 동작 차이: 없는 경로는 인증 전에 404(ADR 0021). 다운로드는 1MiB 청크 스트리밍을 유지한다(link v0.2.0, CR-S-002).
 - 변경: 저장소 생성자가 `Validators` 대신 문진 스키마 정수 버전을 받는다. 개발 도구(datamodel-code-generator 등)를 `requirements.lock`에 고정했다.
 

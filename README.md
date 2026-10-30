@@ -26,7 +26,7 @@ HTTP 경로는 이 영역 문서에 없어 `../boundary-contracts/HTTP.md`로 �
 | `synthetic_data/types/` | `schemas/`에서 생성한 코드 타입과 스키마 사본(손으로 고치지 않는다, 4절 생성 명령) |
 | `synthetic_data/components/` | 컴포넌트마다 파일 하나(29개). 통신은 `link_*`(받는 쪽 `link_dataset_store_server`, 보내는 쪽 `link_question_reader`·`link_failure_reader`·`link_dataset_publish`), 저장소는 `dataset_store` |
 | `synthetic_data/wiring/` | 컴포넌트 연결(`import_job.py`, `run_job.py`)과 주입(`stores.py`, `survey.py`), 설정→계획(`plans.py`), 서비스 기동(`service.py`) |
-| `synthetic_data/__main__.py`, `config.py`, `service/__main__.py`, `adapters/__init__.py` | 진입점, 설정 읽기, 설정 값 호환 별칭(변경 요청 CR-S-001) |
+| `synthetic_data/__main__.py`, `config.py`, `service/__main__.py`, `adapters/__init__.py` | 진입점, 설정 읽기, 공개 진입점(factory 이름, ADR 0022) |
 | `Dockerfile`, `requirements-service.txt`, `scripts/smoke_service.sh` | I2 HTTP 서버 이미지(dataset-store, D100, ADR 0012·0017). 잡은 `output.store.kind: http`로 게시(ADR 0013) |
 | `configs/dev.job.json` | 이웃 대역을 쓰는 개발용 설정 |
 | `tests/` | 적합성·잡 종단·HTTP 통합·단위·구조 시험(`test_structure.py`), 이웃 대역 `doubles.py` |

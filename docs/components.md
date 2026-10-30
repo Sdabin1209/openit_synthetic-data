@@ -59,6 +59,6 @@
 |---|---|
 | `synthetic_data/__main__.py`, `service/__main__.py` | 진입점 |
 | `synthetic_data/config.py` | 설정 파일 읽기, 환경 변수에서 값 가져오기 |
-| `synthetic_data/adapters/__init__.py` | 설정 값 호환 별칭(`synthetic_data.adapters:http_question_reader`가 deploy의 배포 설정에 있다). 로직 없음. 변경 요청 CR-S-001 |
+| `synthetic_data/adapters/__init__.py` | 공개 진입점(`synthetic_data.adapters:http_question_reader`가 배포 설정에 있다, ADR 0022). 로직 없음 |
 | `synthetic_data/wiring/` | 컴포넌트 연결(`import_job.py`, `run_job.py`), 주입(`stores.py`, `survey.py`, `publishing.py`), 설정→계획(`plans.py`), 서비스 기동(`service.py`) |
 | `synthetic_data/types/` | `schemas/`에서 생성(손으로 고치지 않는다) |

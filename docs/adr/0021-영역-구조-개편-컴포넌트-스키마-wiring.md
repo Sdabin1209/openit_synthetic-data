@@ -32,7 +32,7 @@
 - 경로 해석 순서가 라이브러리의 것이다: 없는 경로는 인증 전에 404가 나온다(이전에는 401). 시험을 이 동작에 맞췄다(`tests/test_service.py`).
 - 서버 겉옷 한 겹이 남는다: 인증 실패 횟수 제한(ADR 0012)과 처리하지 못한 예외의 503. 둘 다 규약이 아니라 이 서버만의 방어라 라이브러리 몫이 아니다(코드 주석에 이유).
 - 처음에는 link v0.1.0이 스트리밍과 `%2F` 보존을 지원하지 않아 메모리 적재와 REQUEST_URI 재인코딩 겉옷을 뒀다. 요청(CR-S-002)에 따라 link v0.2.0이 반복자 본문, 원래 경로 매칭, 405 `Allow`를 지원해 1MiB 청크 스트리밍을 되살리고 겉옷을 걷어냈다.
-- 설정 값 `synthetic_data.adapters:http_question_reader`가 배포 설정(deploy)에 있어 `adapters/__init__.py`를 별칭으로 남겼다(CR-S-001).
+- 설정 값 `synthetic_data.adapters:http_question_reader`가 배포 설정(deploy)에 있어 `adapters/__init__.py`를 별칭으로 남겼다(ADR 0022).
 
 ## 되돌리는 조건
 (스트리밍·경로 인코딩은 link v0.2.0으로 해소됨.) 컴포넌트 분할이 실제로 어긋나면(같이만 바뀌는 컴포넌트 쌍이 반복되면) 합친다.
