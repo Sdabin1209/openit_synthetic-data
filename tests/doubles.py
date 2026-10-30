@@ -21,6 +21,8 @@ def _slot(slot_id, *, units=None, choices=None, yes_no=None, catalog=None, requi
     if catalog:
         s["choice_catalog"] = catalog
         s["choices"] = []
+    # 문진 스키마 3.0.0: 칸 data_type 필수. 선택지가 있으면 option, 예/아니오 맵이면 boolean, 단위가 있으면 integer
+    s["data_type"] = "option" if (choices or catalog) else "boolean" if yes_no else "integer"
     return s
 
 
