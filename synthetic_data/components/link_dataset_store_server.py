@@ -312,7 +312,7 @@ def make_routes(svc: Service) -> list[Route]:
         if not svc.publish_slots.acquire(blocking=False):
             raise BoundaryError("UNAVAILABLE", "다른 게시가 진행 중이다. 잠시 뒤 다시 시도한다")
         try:
-            return _publish_locked(r.stream, int(r.headers.get("x-declared-length") or 0))      # 선언된 본문 크기(디스크 여유 검사용)
+            return _publish_locked(r.stream, r.content_length or 0)      # 선언된 본문 크기(디스크 여유 검사용, link 0.4.1)
         finally:
             svc.publish_slots.release()
 
@@ -381,7 +381,6 @@ def make_app(svc: Service):
     def app(environ, start_response):
         path = environ.get("PATH_INFO", "/")
         addr = environ.get("REMOTE_ADDR", "-")
-        environ["HTTP_X_DECLARED_LENGTH"] = environ.get("CONTENT_LENGTH") or "0"      # 왜: WSGI의 CONTENT_LENGTH는 link의 Request.headers에 없다. 라이브러리 내부 속성에 기대지 않고 겉옷이 읽어 넘긴다(클라이언트가 보낸 같은 이름은 여기서 덮인다)
         status = []
         if path not in ("/healthz", "/readyz") and svc.auth_blocked(addr):
             out = respond_unavailable(start_response, "인증 시도가 너무 많다. 잠시 뒤 다시 시도한다")

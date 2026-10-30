@@ -1,7 +1,7 @@
 # STATUS (synthetic-data)
 
 ## U400 (2026-10-30, 영역 구조 개편)
-- 한 일: 컴포넌트 분해(`docs/components.md`), `schemas/` 58개, `types/` 생성, `components/`·`wiring/` 이동, `tests/test_structure.py`, 통신을 openit-link 위로(ADR 0021). 계약 핀 v3.1.1, openit-link v0.4.0(게시 본문도 스트리밍). 변경 요청 CR-S-001(adapters factory가 영역 내부 경로: 계약 고정 중이라 별칭 유지, 헤드 대장 항목), CR-S-002(해소).
+- 한 일: 컴포넌트 분해(`docs/components.md`), `schemas/` 58개, `types/` 생성, `components/`·`wiring/` 이동, `tests/test_structure.py`, 통신을 openit-link 위로(ADR 0021). 계약 핀 v3.1.1, openit-link v0.4.1(게시 본문도 스트리밍). 변경 요청 CR-S-001(adapters factory가 영역 내부 경로: 계약 고정 중이라 별칭 유지, 헤드 대장 항목), CR-S-002(해소).
 - 남은 일: 없음(구조 개편 범위). 스키마 밖 조건 25건은 `schemas/README.md`에 이유와 함께 있다.
 - 열린 것: CR-S-001, 실제 C1 데이터(64k행)로 개편 후 속도는 재지 않았다(줄마다 스키마 검증이 들어갔다).
 
