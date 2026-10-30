@@ -312,16 +312,17 @@ def make_routes(svc: Service) -> list[Route]:
         if not svc.publish_slots.acquire(blocking=False):
             raise BoundaryError("UNAVAILABLE", "다른 게시가 진행 중이다. 잠시 뒤 다시 시도한다")
         try:
-            return _publish_locked(r.raw)
+            return _publish_locked(r.stream, r.stream.remaining)    # remaining: 읽기 전 Content-Length
         finally:
             svc.publish_slots.release()
 
-    def _publish_locked(raw: bytes):
-        svc.check_free_space(len(raw))
+    def _publish_locked(src, n: int):
+        svc.check_free_space(n)
         with tempfile.TemporaryDirectory(dir=svc.tmp) as td:
             td = Path(td)
             body = td / "body.tar"
-            body.write_bytes(raw)
+            with open(body, "wb") as f:
+                shutil.copyfileobj(src, f, 1 << 20)       # 본문을 메모리에 올리지 않고 디스크로 옮긴다(link 0.3.0 Request.stream)
             unpack(body, td / "in", max_bytes=svc.max_body, max_entries=svc.max_entries)
             body.unlink()
             mp = td / "in" / "manifest.json"
@@ -356,7 +357,7 @@ def make_routes(svc: Service) -> list[Route]:
     readers = svc.roles()
     base = "/v1/datasets"
     return [
-        Route("POST", base, publish, roles=frozenset({WRITE_ROLE}), raw_body=True, max_body=svc.max_body, response_schema="DatasetManifest"),
+        Route("POST", base, publish, roles=frozenset({WRITE_ROLE}), stream_body=True, max_body=svc.max_body, response_schema="DatasetManifest"),
         Route("GET", base, list_datasets, roles=readers),
         Route("GET", base + "/{d}/versions", list_versions, roles=readers),
         Route("GET", base + "/{d}/versions/{v}", get_manifest, roles=readers, response_schema="DatasetManifest"),
