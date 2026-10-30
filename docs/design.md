@@ -9,7 +9,7 @@ run:    설정(JSON) ─▶ 문항 읽기(I1) ─▶ 시드 수집(I7) ─▶ �
 import: 설정(JSON) + jsonl 6개 ─▶ 행 검증 ─▶ 허용치 판정 ─▶ 패키징 ─▶ 게시(I2)   (부록 A)
 ```
 
-코드 위치(`synthetic_data/`): `seeds.py`, `seed_samples.py`(시드 샘플 조립), `quality.py`, `split.py`, `package.py`, `context.py`, `job.py`(`run` 잡), `importer.py`(`import` 모드), `store/`(I2 구현), `schemas.py`(검증), `config.py`.
+코드 위치(`synthetic_data/`, D117 개편 후): 컴포넌트는 `components/`(표: `docs/components.md`), 연결은 `wiring/`(`run_job.py`가 `run` 잡, `import_job.py`가 `import` 모드), 코드 타입은 `types/`(`schemas/`에서 생성).
 
 > 2026-10-28(ADR 0010): v1 생성 경로(시나리오 설계, 정답 구성, 발화·문장 생성기, STT 노이즈)를 제거했다. 아래 2, 4, 5, 6절은 제거한 설계의 요약만 남긴 역사 기록이다. 코드는 git 기록(제거 직전 커밋)에 있다.
 
@@ -76,7 +76,7 @@ v1 `ParserOutput` 라벨 기준 구현이었다. v2 정답은 데이터셋 담�
 - 게시 검증 순서: 매니페스트 스키마 -> pipeline 버전 -> content_hash -> (이미 있으면 멱등/CONFLICT) -> 문진 스키마 정수 버전 -> files 키 일치 -> 파일 복사 후 해시 -> 줄마다 스키마·분할·문항 세트·시드 ID -> sample_count -> 분할 간 시나리오 분리. 어느 하나라도 실패하면 아무것도 저장되지 않는다.
 - 읽기: `get_manifest`는 content_hash를 다시 확인하고, `open_file`은 파일 해시를 다시 확인한다(`INTEGRITY_ERROR`).
 
-## 부록 A. 게시기(import) 모드 (G02 방향, 코드: `synthetic_data/importer.py`)
+## 부록 A. 게시기(import) 모드 (G02 방향, 코드: `wiring/import_job.py`와 `components/import_*.py`)
 
 사용자 결정: 데이터셋 담당이 서버에서 만든 최종 학습 데이터를 재생성 없이 가져와 검증하고 게시한다. 정본은 데이터셋 담당의 파이프라인이다. 아래 1~12절의 생성 파이프라인(v1 내용)은 이 모드와 무관하며 쓰지 않는다.
 

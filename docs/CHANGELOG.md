@@ -1,5 +1,11 @@
 # 변경 이력
 
+## 미배포 (2026-10-30, U400: 영역 구조 개편 D117·D118)
+- 의존: boundary-contracts v3.1.1, openit-link v0.1.0(통신 기반). 동작(와이어 형식, 잡 출력, 종료 코드, digest·version)은 바꾸지 않았다.
+- 변경: 코드를 `components/`(29개), `wiring/`, `types/`로 옮겼다. `schemas/`에 영역 내부 타입 58개와 통과·거부 예시. 옛 모듈 경로(`synthetic_data.importer`, `.job`, `.store`, `.schemas`, `.service.app` 등)는 없어졌다. 설정 값으로 쓰이는 `synthetic_data.adapters:http_question_reader`·`http_failure_store`만 별칭으로 남겼다(CR-S-001).
+- 변경(서버 면): dataset-store가 `openit_link.App/Route` 위로 옮겨 인증·413·계약 검증·오류 본문·/healthz·/readyz를 라이브러리가 한다. 동작 차이: 없는 경로는 인증 전에 404, 지원하지 않는 메서드 405에 `Allow` 없음, 다운로드를 메모리에 올린다(CR-S-002, ADR 0021).
+- 변경: 저장소 생성자가 `Validators` 대신 문진 스키마 정수 버전을 받는다. 개발 도구(datamodel-code-generator 등)를 `requirements.lock`에 고정했다.
+
 ## 미배포 (2026-10-30, U300: 계약 3.0.0 전환)
 - 의존: boundary-contracts v3.0.0.
 - 변경(깨짐): 매니페스트·잡 설정의 `turn_engine_version`을 `action_rules_version`으로 바꿨다. 값은 설치된 계약 규칙 데이터의 `rules_version`이고, 설정 값은 기대값이라 다르면 거부한다(`run`은 선택, `import`는 필수). 이미지 라벨 `io.openit.turn-engine`을 뺐다. 2.x 매니페스트는 읽지 않는다(`SUPPORTED_PIPELINE_MAJOR`가 하드코딩 2였던 것을 계약의 MAJOR에서 읽게 고침).

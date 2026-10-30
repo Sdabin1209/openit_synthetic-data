@@ -18,18 +18,19 @@ HTTP 경로는 이 영역 문서에 없어 `../boundary-contracts/HTTP.md`로 �
 
 ## 2. 구조
 
+영역 내부는 컴포넌트·스키마·wiring으로 나눈다(D117, ADR 0021). 컴포넌트 표(입력·출력 타입, 하는 일)는 `docs/components.md`, 스키마와 "스키마 밖 조건" 표는 `schemas/README.md`.
+
 | 경로 | 역할 |
 |---|---|
-| `synthetic_data/job.py`, `__main__.py`, `config.py` | 잡 진입점(`run`)과 설정 |
-| `seeds.py`, `seed_samples.py` | 확정된 실패 사례(CONFIRMED) 수집(I7)과 시드 샘플 조립 |
-| `quality.py`, `split.py`, `package.py`, `context.py` | 품질 검사, 시나리오 단위 분할, 패키징, 문항 세트 묶음 |
-| `store/` | I2 구현(파일 `FileDatasetStore`, 메모리 `MemoryDatasetStore`) |
-| `service/` | I2 HTTP 서버(dataset-store, D100, ADR 0012, WSGI+waitress는 ADR 0017). `Dockerfile`, `requirements-service.txt`, `scripts/smoke_service.sh`. 잡은 `output.store.kind: http`로 게시(ADR 0013) |
-| `importer.py` | 게시기(import) 모드: 외부 학습 데이터 검증·게시 |
-| `adapters.py`, `schemas.py` | 이웃 HTTP 연결 공장, 스키마 검증 |
+| `schemas/` | 영역 내부 타입의 JSON Schema(draft 2020-12)와 통과·거부 예시(`schemas/examples/`) |
+| `synthetic_data/types/` | `schemas/`에서 생성한 코드 타입과 스키마 사본(손으로 고치지 않는다, 4절 생성 명령) |
+| `synthetic_data/components/` | 컴포넌트마다 파일 하나(29개). 통신은 `link_*`(받는 쪽 `link_dataset_store_server`, 보내는 쪽 `link_question_reader`·`link_failure_reader`·`link_dataset_publish`), 저장소는 `dataset_store` |
+| `synthetic_data/wiring/` | 컴포넌트 연결(`import_job.py`, `run_job.py`)과 주입(`stores.py`, `survey.py`), 설정→계획(`plans.py`), 서비스 기동(`service.py`) |
+| `synthetic_data/__main__.py`, `config.py`, `service/__main__.py`, `adapters/__init__.py` | 진입점, 설정 읽기, 설정 값 호환 별칭(변경 요청 CR-S-001) |
+| `Dockerfile`, `requirements-service.txt`, `scripts/smoke_service.sh` | I2 HTTP 서버 이미지(dataset-store, D100, ADR 0012·0017). 잡은 `output.store.kind: http`로 게시(ADR 0013) |
 | `configs/dev.job.json` | 이웃 대역을 쓰는 개발용 설정 |
-| `tests/` | 적합성·잡 종단·HTTP 통합·단위 시험, 이웃 대역 `doubles.py` |
-| `requirements.lock` | 의존 고정(boundary-contracts 태그의 정본. Dockerfile·스모크가 여기서 읽는다) |
+| `tests/` | 적합성·잡 종단·HTTP 통합·단위·구조 시험(`test_structure.py`), 이웃 대역 `doubles.py` |
+| `requirements.lock` | 의존 고정(boundary-contracts·openit-link 태그의 정본. Dockerfile·스모크가 여기서 읽는다) |
 | `docs/` | 8절 참고 |
 
 ```
@@ -71,9 +72,19 @@ PYTHONPATH=tests python -m synthetic_data run --config configs/dev.job.json [--c
 
 확인 못 한 것: 게시기를 운영 저장소에 게시한 적 없음, v2 의미 검사 미수행(CR-006), 이웃 영역과의 실제 HTTP 연동(운영 환경), 이미지·E2E(해당 없음 또는 미실행).
 
+### 타입 생성 (손으로 고치지 않는다)
+
+`schemas/*.schema.json`을 고치면 아래로 `synthetic_data/types/`를 다시 만든다(도구 버전은 `requirements.lock`에 고정: datamodel-code-generator, black, isort). `tests/test_structure.py`가 다시 만든 결과와 저장소의 것이 같은지 본다.
+
+```bash
+.venv/bin/python scripts/gen_types.py
+```
+
+구조 검사: `.venv/bin/python -m pytest -q tests/test_structure.py` (헤드 도구는 `python3 head/scripts/structure-check.py synthetic-data`).
+
 ## 5. 시험 상태
 
-시험 상태(이 영역 시험 개수는 이 절에만 적는다). 2026-10-28, 워크스페이스 밖 새 폴더의 clone(이웃 폴더 없음, `bash scripts/setup-env.sh`로 설치한 `.venv`: boundary-contracts와 문진 스키마 모두 requirements.lock의 태그 설치, 이웃은 tests/doubles.py 대역·참조 서버): `python -m pytest -q -rs` -> 164 통과, 1 건너뜀, 0 실패(I2 HTTP 서버 시험, 계약 클라이언트 시험, 잡의 HTTP 게시 통합 시험, 스모크 비밀 검사 포함). 이미지 스모크 `scripts/smoke_service.sh`(wheel을 requirements.lock 태그에서 `pip wheel`로 만든다, 이웃 폴더 불필요): 2026-10-28 이 작업 환경(이웃 폴더가 있는 워크스페이스, `../survey-service/schema`를 빌드 컨텍스트로 사용)에서 `/healthz`·`/readyz` 응답과 게시·조회까지 SMOKE_OK. 이웃 폴더가 없는 두 번째 환경에서는 돌리지 않았다. 건너뜀 1건은 `SD_REFERENCE_DATA_DIR`(실제 학습 데이터 파일 경로)가 없어서다. v1 생성 경로 제거(ADR 0010)로 보류 시험 15건과 생성 전용 시험이 줄었다. 돌리지 않은 것: 서비스끼리 도는 시험, 운영 이웃 영역과의 연동. 서비스끼리 도는 시험의 결과는 deploy/docs/E2E_RESULTS.md를 본다.
+시험 상태(이 영역 시험 개수는 이 절에만 적는다). 2026-10-30 U400 구조 개편 후, 이 작업 환경(워크스페이스의 worktree, 계약 v3.1.1·openit-link v0.1.0을 태그에서 설치한 `.venv`)에서 `python -m pytest -q` -> 258 통과, 1 건너뜀, 0 실패(구조 시험 `tests/test_structure.py` 7건 포함). 건너뜀 1건은 `SD_REFERENCE_DATA_DIR`(실제 학습 데이터 파일 경로)가 없어서다. 구조 검사 `head/scripts/structure-check.py`: 통과. 이미지 스모크 `scripts/smoke_service.sh`와 빌드 진입점 `scripts/smoke_build_image.sh`: 같은 환경에서 SMOKE_OK와 BuildImageResult 확인(`/healthz`·`/readyz`·권한·게시·조회). 줄 검증 속도는 한 줄 약 0.5ms(LoRA-A 대표 행 2000줄 측정)이고 실제 C1 데이터 6개(64,459행) 전체로는 돌리지 않았다. 돌리지 않은 것: 서비스끼리 도는 시험, 운영 이웃 영역과의 연동. 서비스끼리 도는 시험의 결과는 deploy/docs/E2E_RESULTS.md를 본다.
 
 ## 6. 이 영역의 열린 항목 (head/docs/OPEN_GAPS.md)
 

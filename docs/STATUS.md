@@ -1,5 +1,10 @@
 # STATUS (synthetic-data)
 
+## U400 (2026-10-30, 영역 구조 개편)
+- 한 일: 컴포넌트 분해(`docs/components.md`), `schemas/` 58개, `types/` 생성, `components/`·`wiring/` 이동, `tests/test_structure.py`, 통신을 openit-link 위로(ADR 0021). 계약 핀 v3.1.1. 변경 요청 CR-S-001(adapters factory), CR-S-002(link 스트리밍·경로).
+- 남은 일: 없음(구조 개편 범위). 스키마 밖 조건 25건은 `schemas/README.md`에 이유와 함께 있다.
+- 열린 것: 파일 다운로드가 메모리 적재(CR-S-002), 실제 C1 데이터(64k행)로 개편 후 속도는 재지 않았다(줄마다 스키마 검증이 들어갔다).
+
 마지막 갱신: 2026-10-29. 의존 버전의 정본은 `requirements.lock`이다(이 문서에 복사하지 않는다).
 
 **버전 표기(사실)**: `pyproject.toml`의 version은 0.2.0이고, `docs/CHANGELOG.md`는 0.2.1과 0.2.2를 '제안 버전'으로 적었다. pyproject는 올리지 않았으므로 두 값이 어긋난다. 어느 쪽이 맞는지는 헤드 결정 사항이며 이 문서에서 정하지 않는다.

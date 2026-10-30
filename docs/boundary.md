@@ -15,10 +15,8 @@
 **I2 DatasetStore** (`boundary_contracts.sdk.DatasetStore` Protocol). 생성자 인자로만 설정을 받고 환경 변수를 읽지 않는다.
 
 ```python
-from synthetic_data.schemas import Validators
-from synthetic_data.store import FileDatasetStore, MemoryDatasetStore
-v = Validators(survey_schema_dir=<문진 스키마 디렉터리>)       # 게시(쓰기)에는 필요, 읽기만 하면 생략 가능
-store = FileDatasetStore(root, v)     # 또는 MemoryDatasetStore(v)
+from synthetic_data.components.dataset_store import FileDatasetStore, MemoryDatasetStore
+store = FileDatasetStore(root, survey_contract_version)     # 또는 MemoryDatasetStore(survey_contract_version). 문진 스키마 정수 버전(CONTRACT_VERSION)은 만드는 쪽이 읽어 넘긴다
 ```
 
 | 호출 | 동작 | 오류 |

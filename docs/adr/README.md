@@ -22,3 +22,4 @@ Nygard 형식. 영역 내부 구조 선택의 정본이다. 근거를 모르는 
 - [ADR 0018: 영역 빌드 진입점 build-image.sh](0018-영역-빌드-진입점-build-image-sh.md)
 - [ADR 0019: 잡을 dataset-store 이미지에서 선언으로 돌린다](0019-잡을-dataset-store-이미지에서-선언으로-돌린다.md)
 - [ADR 0020: 노출 선언은 전 경로 denied다](0020-노출-선언은-전부-denied다.md)
+- [ADR 0021: 영역 내부를 컴포넌트·스키마·wiring으로 나누고 통신은 openit-link 위에 둔다](0021-영역-구조-개편-컴포넌트-스키마-wiring.md)
