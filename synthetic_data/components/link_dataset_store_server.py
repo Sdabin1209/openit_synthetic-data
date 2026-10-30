@@ -16,7 +16,6 @@ import time
 from collections import defaultdict, deque
 from contextlib import contextmanager
 from pathlib import Path, PurePosixPath
-from urllib.parse import quote, unquote
 
 from boundary_contracts import PIPELINE_SCHEMA_VERSION, BoundaryError, canonical
 from openit_link import App, Request, Response, Route
@@ -248,39 +247,66 @@ def _limit(q) -> int:
     return min(v, 500)
 
 
-def make_routes(svc: Service) -> list[Route]:
-    """경로 표. 경로 조각은 퍼센트 인코딩된 채로 들어오고(make_app의 PATH_INFO 보존) 처리 함수가 푼다."""
+class _Stream:
+    """파일을 1MiB 청크로 흘리는 WSGI 응답 본문. 응답이 끝나거나 클라이언트가 끊으면 서버가 close()를 불러 정리한다(PEP 3333).
+    왜 청크: 데이터셋 파일이 클 수 있어 통째로 메모리에 올리지 않는다(ADR 0012의 스트리밍을 link 0.2.0의 반복자 본문으로 되살렸다)."""
 
-    @contextmanager
-    def download_slot():
+    def __init__(self, path: Path, cleanup):
+        self._f = open(path, "rb")
+        self._cleanup = cleanup
+
+    def __iter__(self):
+        while True:
+            chunk = self._f.read(1 << 20)
+            if not chunk:
+                return
+            yield chunk
+
+    def close(self):
+        try:
+            self._f.close()
+        finally:
+            self._cleanup()
+
+
+def make_routes(svc: Service) -> list[Route]:
+    """경로 표. 경로 조각의 퍼센트 인코딩(%2F 포함)은 openit_link(0.2.0)가 조각마다 풀어 params로 준다."""
+
+    def take_download_slot():
         if not svc.download_slots.acquire(blocking=False):      # 동시 다운로드 상한: 디스크 읽기와 임시 tar를 지킨다
             raise BoundaryError("UNAVAILABLE", "다운로드가 많다. 잠시 뒤 다시 시도한다")
-        try:
-            yield
-        finally:
-            svc.download_slots.release()
 
     def list_datasets(r: Request):
         return Response(200, _page(svc.list_ids(), r.query.get("cursor"), _limit(r.query)))
 
     def list_versions(r: Request):
-        return Response(200, _page(svc.store.list_versions(unquote(r.params["d"])), r.query.get("cursor"), _limit(r.query)))
+        return Response(200, _page(svc.store.list_versions(r.params["d"]), r.query.get("cursor"), _limit(r.query)))
 
     def get_manifest(r: Request):
-        return Response(200, svc.store.get_manifest(unquote(r.params["d"]), unquote(r.params["v"])))
+        return Response(200, svc.store.get_manifest(r.params["d"], r.params["v"]))
 
     def get_tar(r: Request):
-        with download_slot():
-            with tempfile.TemporaryDirectory(dir=svc.tmp) as td:
-                svc.dataset_tar(unquote(r.params["d"]), unquote(r.params["v"]), Path(td) / "d.tar")
-                return Response(200, (Path(td) / "d.tar").read_bytes(), content_type="application/x-tar")
+        take_download_slot()
+        td = Path(tempfile.mkdtemp(dir=svc.tmp))
+        try:
+            svc.dataset_tar(r.params["d"], r.params["v"], td / "d.tar")
+            return Response(200, _Stream(td / "d.tar", lambda: (shutil.rmtree(td, ignore_errors=True), svc.download_slots.release())),
+                            headers={"Content-Length": str((td / "d.tar").stat().st_size)}, content_type="application/x-tar")
+        except BaseException:
+            shutil.rmtree(td, ignore_errors=True)
+            svc.download_slots.release()
+            raise
 
     def get_file(r: Request):
-        did, ver, fp = unquote(r.params["d"]), unquote(r.params["v"]), unquote(r.params["p"])
+        did, ver, fp = r.params["d"], r.params["v"], r.params["p"]
         check("FileRequest", {"dataset_id": did, "version": ver, "path": fp})      # '..'·절대 경로·역슬래시는 400(HTTP.md). 그 밖에 manifest에 없는 경로는 404
-        with download_slot():
-            p, _ = svc.verified_file(did, ver, fp)
-            return Response(200, p.read_bytes(), content_type="application/octet-stream")
+        take_download_slot()
+        try:
+            p, size = svc.verified_file(did, ver, fp)
+            return Response(200, _Stream(p, svc.download_slots.release), headers={"Content-Length": str(size)}, content_type="application/octet-stream")
+        except BaseException:
+            svc.download_slots.release()
+            raise
 
     def publish(r: Request):
         if not svc.publish_slots.acquire(blocking=False):
@@ -340,9 +366,9 @@ def make_routes(svc: Service) -> list[Route]:
 
 
 def make_app(svc: Service):
-    """WSGI 앱. 규약은 openit_link.App이 맡고, 이 겉옷은 세 가지만 한다: (1) 퍼센트 인코딩 보존(HTTP.md I2 open_file의 파일 경로 %2F; WSGI의 PATH_INFO는
-    디코딩돼 있어 '/'가 되므로 REQUEST_URI에서 조각마다 다시 인코딩한다), (2) 인증 실패 횟수 제한(차단 중인 주소는 올바른 토큰도 거부해 추측이 맞는지 알 수 없게 한다, ADR 0012),
-    (3) 처리하지 못한 예외를 비밀 없는 503으로(내부 오류 형식 이름만 로그)."""
+    """WSGI 앱. 규약(인증, 413, 계약 검증, 오류 본문, 경로 인코딩, 405 Allow)은 openit_link.App(0.2.0)이 맡는다. 이 겉옷은 라이브러리에 없는 이 서버만의 방어 둘이다:
+    (1) 인증 실패 횟수 제한: 같은 주소에서 401이 limit번 쌓이면 올바른 토큰도 잠시 거부해 토큰 추측이 맞는지 알 수 없게 한다(ADR 0012, 규약이 아니라 서버 방어라 라이브러리 몫이 아니다),
+    (2) 처리하지 못한 예외를 비밀 없는 503으로(라이브러리는 예외를 잡지 않아 서버가 HTML 500을 낸다; 내부 오류 형식 이름만 로그)."""
     inner = App(make_routes(svc), svc.tokens(), ready=svc.ready)
 
     def respond_unavailable(start_response, message: str):
@@ -352,16 +378,13 @@ def make_app(svc: Service):
         return [body]
 
     def app(environ, start_response):
-        raw = (environ.get("REQUEST_URI") or environ.get("PATH_INFO", "/")).split("?", 1)[0]
-        shown = environ.get("PATH_INFO", raw)
+        path = environ.get("PATH_INFO", "/")
         addr = environ.get("REMOTE_ADDR", "-")
         status = []
-        if raw not in ("/healthz", "/readyz") and svc.auth_blocked(addr):
+        if path not in ("/healthz", "/readyz") and svc.auth_blocked(addr):
             out = respond_unavailable(start_response, "인증 시도가 너무 많다. 잠시 뒤 다시 시도한다")
             status.append("503")
         else:
-            environ["PATH_INFO"] = "/".join(quote(unquote(seg), safe="") for seg in raw.split("/"))
-
             def sr(st, headers, exc_info=None):
                 status.append(st.split(" ", 1)[0])
                 return start_response(st, headers, exc_info)
@@ -373,7 +396,7 @@ def make_app(svc: Service):
                 status.append("503")
             if status and status[0] == "401":
                 svc.note_auth_failure(addr)      # 유효한 토큰의 403(역할 부족)은 실패 횟수에 넣지 않는다
-        svc.log(f"{environ['REQUEST_METHOD']} {shown} {status[0] if status else '-'}")
+        svc.log(f"{environ['REQUEST_METHOD']} {path} {status[0] if status else '-'}")
         return out
 
     return app
