@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://openit.invalid/synthetic-data/schemas/PiiScanResult.schema.json",
+  "title": "PiiScanResult",
+  "description": "항목마다 걸린 패턴 이름(입력과 같은 순서)과 전체 패턴 이름 목록.",
+  "type": "object",
+  "properties": {
+    "kinds": {
+      "type": "array",
+      "items": {
+        "type": "array",
+        "items": {
+          "enum": [
+            "email",
+            "phone_landline",
+            "phone_mobile",
+            "rrn"
+          ]
+        },
+        "uniqueItems": true
+      }
+    },
+    "patterns": {
+      "type": "array",
+      "items": {
+        "enum": [
+          "email",
+          "phone_landline",
+          "phone_mobile",
+          "rrn"
+        ]
+      },
+      "uniqueItems": true
+    }
+  },
+  "required": [
+    "kinds",
+    "patterns"
+  ],
+  "additionalProperties": false
+}

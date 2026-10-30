@@ -1,0 +1,55 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://openit.invalid/synthetic-data/schemas/QuestionSetAdmitInput.schema.json",
+  "title": "QuestionSetAdmitInput",
+  "description": "읽어 온 문항 세트를 실행에 쓸지 판정하는 입력.",
+  "type": "object",
+  "properties": {
+    "fetch": {
+      "$ref": "QuestionSetFetch.schema.json"
+    },
+    "spec": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "version": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "usage": {
+          "enum": [
+            "TRAIN_POOL",
+            "HELD_OUT_EVAL"
+          ]
+        }
+      },
+      "required": [
+        "id",
+        "version",
+        "usage"
+      ],
+      "additionalProperties": false
+    },
+    "reviewed_only": {
+      "type": "boolean"
+    },
+    "regeneration_mode": {
+      "enum": [
+        "full",
+        "affected_only"
+      ]
+    }
+  },
+  "required": [
+    "fetch",
+    "spec",
+    "reviewed_only",
+    "regeneration_mode"
+  ],
+  "additionalProperties": false
+}

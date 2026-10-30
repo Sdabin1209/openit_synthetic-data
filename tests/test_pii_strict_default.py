@@ -9,9 +9,10 @@ import pytest
 import doubles
 from boundary_contracts.errors import BoundaryError
 from conftest import make_cfg_raw, run
-from synthetic_data.config import ConfigError, parse_config
-from synthetic_data.importer import run_import
-from synthetic_data.store import MemoryDatasetStore
+from synthetic_data.config import ConfigError
+from synthetic_data.wiring.plans import parse_config
+from synthetic_data.wiring.import_job import run_import
+from synthetic_data.components.dataset_store import MemoryDatasetStore
 from test_import import cfg_for, row, set_utt, write_input
 
 PHONE = "연락처는 010-1234-5678 입니다"
@@ -29,14 +30,14 @@ def tol(**kw):
 
 def test_import_rejects_pii_suspect_by_default(tmp_path, validators):
     write_input(tmp_path / "in", mutate=with_pii)
-    res = run_import(cfg_for(tmp_path, tolerance=tol()), store=MemoryDatasetStore(validators), validators=validators)
+    res = run_import(cfg_for(tmp_path, tolerance=tol()), store=MemoryDatasetStore(validators.contract_version), survey=validators)
     assert res.status == "REJECTED" and any("개인정보" in r for r in res.rejected_reasons)
     assert "1234-5678" not in json.dumps(res.rejected_reasons, ensure_ascii=False)
 
 
 def test_import_null_is_explicit_warn_only(tmp_path, validators):
     write_input(tmp_path / "in", mutate=with_pii)
-    res = run_import(cfg_for(tmp_path, tolerance=tol(max_pii_suspect_rows=None)), store=MemoryDatasetStore(validators), validators=validators)
+    res = run_import(cfg_for(tmp_path, tolerance=tol(max_pii_suspect_rows=None)), store=MemoryDatasetStore(validators.contract_version), survey=validators)
     assert res.status == "PUBLISHED"
 
 
@@ -48,15 +49,15 @@ def seed_store(utterance):
 
 def test_run_rejects_pii_suspect_seed_by_default(tmp_path, validators):
     with pytest.raises(BoundaryError) as e:
-        run(make_cfg_raw(tmp_path), MemoryDatasetStore(validators), validators, fstore=seed_store(PHONE))
+        run(make_cfg_raw(tmp_path), MemoryDatasetStore(validators.contract_version), validators, fstore=seed_store(PHONE))
     assert e.value.code == "INVALID_RECORD" and "1234-5678" not in e.value.message and "fc-a" in e.value.message
 
 
 def test_run_clean_seed_publishes_and_null_is_warn_only(tmp_path, validators):
-    _, ok = run(make_cfg_raw(tmp_path), MemoryDatasetStore(validators), validators, fstore=seed_store("한 다섯 시간 정도 자요"))
+    _, ok = run(make_cfg_raw(tmp_path), MemoryDatasetStore(validators.contract_version), validators, fstore=seed_store("한 다섯 시간 정도 자요"))
     assert ok.status == "PUBLISHED"
     raw = make_cfg_raw(tmp_path, seeds={"enabled": True, "question_set_id": "qs-main", "max_pii_suspect_rows": None})
-    _, warn = run(raw, MemoryDatasetStore(validators), validators, fstore=seed_store(PHONE))
+    _, warn = run(raw, MemoryDatasetStore(validators.contract_version), validators, fstore=seed_store(PHONE))
     assert warn.status == "PUBLISHED"
 
 

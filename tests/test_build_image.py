@@ -158,7 +158,7 @@ def test_repo_jobs_json_matches_contract_and_code():
         assert j["argv"][-1] == j["config"]["container_path"] and j["idempotent"] is True
         validator(schema)                                                   # 선언한 설정 스키마가 계약에 있다
     # 비밀 파일 이름은 설정의 token_env 기본·예시와 맞는다(NAME_FILE = NAME + _FILE, D84)
-    from synthetic_data.store.spec import DEFAULT_TOKEN_ENV
+    from synthetic_data.components.run_plan import DEFAULT_TOKEN_ENV
     assert DEFAULT_TOKEN_ENV + "_FILE" in jobs["synthetic-run"]["secret_files"]
     assert DEFAULT_TOKEN_ENV + "_FILE" in jobs["synthetic-import"]["secret_files"]
 
@@ -186,9 +186,10 @@ def test_exposure_table_matches_code_routes():
     exp = json.loads((ROOT / "deploy-exposure.json").read_text(encoding="utf-8"))
     assert all(r["auth"]["kind"] == "denied" for r in exp["routes"])
     table = {p for r in exp["routes"] for p in r["paths"]}
-    src = (ROOT / "synthetic_data" / "service" / "app.py").read_text(encoding="utf-8")
-    code = set(re.findall(r'path (?:==|!=) "(/[^"]*)"', src))                    # /healthz, /readyz, /v1/datasets
-    if re.search(r'compile\(r"\^/v1/datasets/', src):                          # 데이터셋 하위 경로 정규식들
+    src = (ROOT / "synthetic_data" / "components" / "link_dataset_store_server.py").read_text(encoding="utf-8")
+    code = {"/healthz", "/readyz"}                                             # openit_link.App이 낸다(D118)
+    code |= set(re.findall(r'base = "(/v1/datasets)"', src))                   # 경로 표의 뿌리
+    if re.search(r'base \+ "/\{d\}/versions', src):                           # 데이터셋 하위 경로들
         code.add("/v1/datasets/*")
     assert code == {"/healthz", "/readyz", "/v1/datasets", "/v1/datasets/*"} == table
 

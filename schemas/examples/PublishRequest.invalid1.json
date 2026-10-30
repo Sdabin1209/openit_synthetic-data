@@ -1,0 +1,14 @@
+{
+  "manifest": {
+    "dataset_id": "ds-1",
+    "version": "v1",
+    "files": [
+      {
+        "path": "../x"
+      }
+    ]
+  },
+  "files": {
+    "../x": "/tmp/x"
+  }
+}

@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://openit.invalid/synthetic-data/schemas/QuestionSetQuery.schema.json",
+  "title": "QuestionSetQuery",
+  "description": "문항 세트 하나를 읽는 요청(I1). version이 null이면 최신(reviewed_only면 검수 통과분).",
+  "type": "object",
+  "properties": {
+    "id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "version": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "reviewed_only": {
+      "type": "boolean"
+    },
+    "want_approvals": {
+      "type": "boolean"
+    },
+    "want_change": {
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "id",
+    "version",
+    "reviewed_only",
+    "want_approvals",
+    "want_change"
+  ],
+  "additionalProperties": false
+}

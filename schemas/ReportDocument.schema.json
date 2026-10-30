@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://openit.invalid/synthetic-data/schemas/ReportDocument.schema.json",
+  "title": "ReportDocument",
+  "description": "계약 보고서(SyntheticRunReport 또는 SyntheticImportReport) 한 부. 내용 검사는 계약 스키마가 맡는다.",
+  "type": "object",
+  "properties": {
+    "report": {
+      "type": "object"
+    }
+  },
+  "required": [
+    "report"
+  ],
+  "additionalProperties": false
+}

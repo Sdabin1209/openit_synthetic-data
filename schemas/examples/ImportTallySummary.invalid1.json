@@ -1,0 +1,23 @@
+{
+  "total_rows": 1,
+  "valid_rows": 1,
+  "invalid_rows": 0,
+  "invalid_reasons_by_file": {
+    "lora_a_train.jsonl": {}
+  },
+  "invalid_reasons_total": {},
+  "first_invalid_line": {},
+  "row_split_field": {
+    "lora_a_train.jsonl": {
+      "absent": 0,
+      "distinct_values": 1
+    }
+  },
+  "human_review_counts": {
+    "(없음)": 1
+  },
+  "pending_by_file": {},
+  "pii_rows_by_file": {},
+  "pii_rows_by_kind": {},
+  "pii_rows_total": 0
+}

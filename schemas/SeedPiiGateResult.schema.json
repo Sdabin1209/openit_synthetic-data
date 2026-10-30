@@ -1,0 +1,58 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://openit.invalid/synthetic-data/schemas/SeedPiiGateResult.schema.json",
+  "title": "SeedPiiGateResult",
+  "description": "관문 결과: 의심 사례 수, 패턴 이름, 거부 여부와 거부 메시지(사례 ID만, 값 없음).",
+  "type": "object",
+  "properties": {
+    "suspect_rows": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "patterns": {
+      "type": "array",
+      "items": {
+        "enum": [
+          "email",
+          "phone_landline",
+          "phone_mobile",
+          "rrn"
+        ]
+      }
+    },
+    "rejected": {
+      "type": "boolean"
+    },
+    "message": {
+      "type": [
+        "string",
+        "null"
+      ]
+    }
+  },
+  "required": [
+    "suspect_rows",
+    "patterns",
+    "rejected",
+    "message"
+  ],
+  "additionalProperties": false,
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "rejected": {
+            "const": true
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "message": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  ]
+}

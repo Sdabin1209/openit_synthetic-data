@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://openit.invalid/synthetic-data/schemas/ConfirmedCases.schema.json",
+  "title": "ConfirmedCases",
+  "description": "읽은 실패 사례(계약 FailureCase) 목록.",
+  "type": "object",
+  "properties": {
+    "cases": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    }
+  },
+  "required": [
+    "cases"
+  ],
+  "additionalProperties": false
+}

@@ -1,0 +1,21 @@
+{
+  "seeds": [
+    {
+      "case_id": "c1",
+      "version": 1,
+      "role": "LORA_B",
+      "input": {
+        "action": "ASK"
+      },
+      "expected": "네",
+      "question_set": null
+    }
+  ],
+  "skipped": [
+    {
+      "case_id": "c2",
+      "reason": "CONFIRMED 아님"
+    }
+  ],
+  "notes": []
+}

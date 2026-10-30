@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://openit.invalid/synthetic-data/schemas/VersionsRequest.schema.json",
+  "title": "VersionsRequest",
+  "description": "버전 목록 요청.",
+  "type": "object",
+  "properties": {
+    "dataset_id": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+      "maxLength": 128
+    }
+  },
+  "required": [
+    "dataset_id"
+  ],
+  "additionalProperties": false
+}

@@ -15,14 +15,18 @@ else
   .venv/bin/python -m pip wheel -q --no-deps --disable-pip-version-check -w "$BUILT" "$(grep ^boundary-contracts requirements.lock)"
   WHL=$(ls "$BUILT"/boundary_contracts-*.whl | head -1)
 fi
+# 통신 기반 openit-link(D118)도 잠금 파일의 태그에서 wheel로 만든다(--no-deps: 계약은 위 wheel을 쓴다)
+LBUILT=$(mktemp -d)
+.venv/bin/python -m pip wheel -q --no-deps --disable-pip-version-check -w "$LBUILT" "$(grep ^openit-link requirements.lock)"
+LWHL=$(ls "$LBUILT"/openit_link-*.whl | head -1)
 TAG="synthetic-data-dataset-store:smoke-$$"
 NAME="synthetic-data-dataset-store-smoke-$$"
 SECRETS=$(mktemp -d)
-trap 'rm -rf "${BUILT:-}" "$SECRETS"; docker rm -f "$NAME" >/dev/null 2>&1 || true; docker volume rm "$NAME-data" >/dev/null 2>&1 || true; docker rmi "$TAG" >/dev/null 2>&1 || true' EXIT
+trap 'rm -rf "${BUILT:-}" "${LBUILT:-}" "$SECRETS"; docker rm -f "$NAME" >/dev/null 2>&1 || true; docker volume rm "$NAME-data" >/dev/null 2>&1 || true; docker rmi "$TAG" >/dev/null 2>&1 || true' EXIT
 # wheel 폴더 전체가 아니라 고른 wheel 하나만 컨텍스트로 준다
-WCTX=$(mktemp -d); cp "$WHL" "$WCTX"/; trap 'rm -rf "${BUILT:-}" "$WCTX" "$SECRETS"; docker rm -f "$NAME" >/dev/null 2>&1 || true; docker volume rm "$NAME-data" >/dev/null 2>&1 || true; docker rmi "$TAG" >/dev/null 2>&1 || true' EXIT
+WCTX=$(mktemp -d); cp "$WHL" "$LWHL" "$WCTX"/; trap 'rm -rf "${BUILT:-}" "${LBUILT:-}" "$WCTX" "$SECRETS"; docker rm -f "$NAME" >/dev/null 2>&1 || true; docker volume rm "$NAME-data" >/dev/null 2>&1 || true; docker rmi "$TAG" >/dev/null 2>&1 || true' EXIT
 docker build -q --build-context wheels="$WCTX" --build-context survey_schema="$SCHEMA" \
-  --build-arg "BC_SPEC=/wheels/$(basename "$WHL")" --build-arg "BC_VERSION=v$BC_VER" --build-arg "SURVEY_SCHEMA_VERSION=$(sed -n 's/^openit-survey-schema @ .*@survey-schema-v\([0-9][0-9]*\)\..*/\1/p' requirements.lock)" \
+  --build-arg "BC_SPEC=/wheels/$(basename "$WHL")" --build-arg "LINK_SPEC=/wheels/$(basename "$LWHL")" --build-arg "BC_VERSION=v$BC_VER" --build-arg "SURVEY_SCHEMA_VERSION=$(sed -n 's/^openit-survey-schema @ .*@survey-schema-v\([0-9][0-9]*\)\..*/\1/p' requirements.lock)" \
   --build-arg "REVISION=$(git rev-parse --short HEAD)" -t "$TAG" .
 docker volume create "$NAME-data" >/dev/null
 # 토큰은 환경 변수가 아니라 파일로 준다(D84). 시험 전용 무작위 값이고 끝나면 버려진다.

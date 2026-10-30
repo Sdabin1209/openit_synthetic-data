@@ -6,13 +6,13 @@ import pytest
 
 from boundary_contracts.errors import BoundaryError
 from conftest import make_cfg_raw, run
-from synthetic_data.importer import run_import
-from synthetic_data.store import MemoryDatasetStore
+from synthetic_data.wiring.import_job import run_import
+from synthetic_data.components.dataset_store import MemoryDatasetStore
 from test_import import cfg_for, write_input
 
 
 def test_run_with_pinned_version_and_other_created_at_is_already_published(tmp_path, validators):
-    store = MemoryDatasetStore(validators)
+    store = MemoryDatasetStore(validators.contract_version)
     raw = make_cfg_raw(tmp_path, version="v-pinned")
     _, first = run(raw, store, validators)
     assert first.status == "PUBLISHED"
@@ -23,7 +23,7 @@ def test_run_with_pinned_version_and_other_created_at_is_already_published(tmp_p
 
 def test_import_and_run_agree_on_pinned_version_rerun(tmp_path, validators):
     write_input(tmp_path / "in")
-    store = MemoryDatasetStore(validators)
-    a = run_import(cfg_for(tmp_path, version="v-pin"), store=store, validators=validators)
-    b = run_import(cfg_for(tmp_path, version="v-pin", created_at="2026-10-28T00:00:00Z"), store=store, validators=validators)
+    store = MemoryDatasetStore(validators.contract_version)
+    a = run_import(cfg_for(tmp_path, version="v-pin"), store=store, survey=validators)
+    b = run_import(cfg_for(tmp_path, version="v-pin", created_at="2026-10-28T00:00:00Z"), store=store, survey=validators)
     assert (a.status, b.status) == ("PUBLISHED", "ALREADY_PUBLISHED")

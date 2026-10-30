@@ -1,0 +1,80 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://openit.invalid/synthetic-data/schemas/SplitInput.schema.json",
+  "title": "SplitInput",
+  "description": "분할 입력: 시나리오 단위. HELD_OUT_EVAL 문항 세트의 시나리오는 전부 EVAL이다(D32).",
+  "type": "object",
+  "properties": {
+    "samples": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "usage_by_question_set": {
+      "type": "object",
+      "additionalProperties": {
+        "enum": [
+          "TRAIN_POOL",
+          "HELD_OUT_EVAL"
+        ]
+      }
+    },
+    "ratios": {
+      "type": "object",
+      "properties": {
+        "TRAIN": {
+          "type": "number",
+          "minimum": 0
+        },
+        "VALIDATION": {
+          "type": "number",
+          "minimum": 0
+        },
+        "EVAL": {
+          "type": "number",
+          "minimum": 0
+        }
+      },
+      "required": [
+        "TRAIN",
+        "VALIDATION",
+        "EVAL"
+      ],
+      "additionalProperties": false,
+      "anyOf": [
+        {
+          "properties": {
+            "TRAIN": {
+              "exclusiveMinimum": 0
+            }
+          }
+        },
+        {
+          "properties": {
+            "VALIDATION": {
+              "exclusiveMinimum": 0
+            }
+          }
+        },
+        {
+          "properties": {
+            "EVAL": {
+              "exclusiveMinimum": 0
+            }
+          }
+        }
+      ]
+    },
+    "seed": {
+      "type": "integer"
+    }
+  },
+  "required": [
+    "samples",
+    "usage_by_question_set",
+    "ratios",
+    "seed"
+  ],
+  "additionalProperties": false
+}

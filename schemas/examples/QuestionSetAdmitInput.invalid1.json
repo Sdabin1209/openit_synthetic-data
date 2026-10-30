@@ -1,0 +1,9 @@
+{
+  "spec": {
+    "id": "qs-main",
+    "version": null,
+    "usage": "TRAIN_POOL"
+  },
+  "reviewed_only": true,
+  "regeneration_mode": "full"
+}

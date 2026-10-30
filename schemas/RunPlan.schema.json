@@ -1,0 +1,355 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://openit.invalid/synthetic-data/schemas/RunPlan.schema.json",
+  "title": "RunPlan",
+  "description": "시드 잡 실행 계획: 설정 파일을 정규화한 것(기본값을 채우고 경로를 절대 경로로).",
+  "type": "object",
+  "properties": {
+    "dataset_id": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+      "maxLength": 128
+    },
+    "seed": {
+      "type": "integer"
+    },
+    "created_at": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "version": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "action_rules_version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "survey_schema_dir": {
+      "type": "string",
+      "minLength": 1
+    },
+    "question_reader": {
+      "type": "object",
+      "properties": {
+        "factory": {
+          "type": "string",
+          "pattern": "^[^:]+:[^:]+$"
+        },
+        "kwargs": {
+          "type": "object"
+        }
+      },
+      "required": [
+        "factory",
+        "kwargs"
+      ],
+      "additionalProperties": false
+    },
+    "failure_store": {
+      "anyOf": [
+        {
+          "type": "object",
+          "properties": {
+            "factory": {
+              "type": "string",
+              "pattern": "^[^:]+:[^:]+$"
+            },
+            "kwargs": {
+              "type": "object"
+            }
+          },
+          "required": [
+            "factory",
+            "kwargs"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "question_sets": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "version": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "usage": {
+            "enum": [
+              "TRAIN_POOL",
+              "HELD_OUT_EVAL"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "version",
+          "usage"
+        ],
+        "additionalProperties": false
+      },
+      "minItems": 1
+    },
+    "reviewed_only": {
+      "type": "boolean"
+    },
+    "seeds_enabled": {
+      "type": "boolean"
+    },
+    "seeds_question_set_id": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "seeds_max_pii_suspect": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "minimum": 0
+    },
+    "ratios": {
+      "type": "object",
+      "properties": {
+        "TRAIN": {
+          "type": "number",
+          "minimum": 0
+        },
+        "VALIDATION": {
+          "type": "number",
+          "minimum": 0
+        },
+        "EVAL": {
+          "type": "number",
+          "minimum": 0
+        }
+      },
+      "required": [
+        "TRAIN",
+        "VALIDATION",
+        "EVAL"
+      ],
+      "additionalProperties": false,
+      "anyOf": [
+        {
+          "properties": {
+            "TRAIN": {
+              "exclusiveMinimum": 0
+            }
+          }
+        },
+        {
+          "properties": {
+            "VALIDATION": {
+              "exclusiveMinimum": 0
+            }
+          }
+        },
+        {
+          "properties": {
+            "EVAL": {
+              "exclusiveMinimum": 0
+            }
+          }
+        }
+      ]
+    },
+    "review_per_kind": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "regeneration_mode": {
+      "enum": [
+        "full",
+        "affected_only"
+      ]
+    },
+    "work_dir": {
+      "type": "string",
+      "minLength": 1
+    },
+    "store": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "enum": [
+            "file",
+            "memory",
+            "http"
+          ]
+        },
+        "root": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "http": {
+          "anyOf": [
+            {
+              "type": "object",
+              "properties": {
+                "base_url": {
+                  "type": "string",
+                  "pattern": "^https?://"
+                },
+                "token_env": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "timeout": {
+                  "type": "number",
+                  "exclusiveMinimum": 0
+                }
+              },
+              "required": [
+                "base_url",
+                "token_env",
+                "timeout"
+              ],
+              "additionalProperties": false
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "kind",
+        "root",
+        "http"
+      ],
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "file"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "root": {
+                "type": "string",
+                "minLength": 1
+              },
+              "http": {
+                "type": "null"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "memory"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "root": {
+                "type": "null"
+              },
+              "http": {
+                "type": "null"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "http"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "root": {
+                "type": "null"
+              },
+              "http": {
+                "type": "object"
+              }
+            }
+          }
+        }
+      ]
+    }
+  },
+  "required": [
+    "dataset_id",
+    "seed",
+    "created_at",
+    "version",
+    "action_rules_version",
+    "survey_schema_dir",
+    "question_reader",
+    "failure_store",
+    "question_sets",
+    "reviewed_only",
+    "seeds_enabled",
+    "seeds_question_set_id",
+    "seeds_max_pii_suspect",
+    "ratios",
+    "review_per_kind",
+    "regeneration_mode",
+    "work_dir",
+    "store"
+  ],
+  "additionalProperties": false,
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "seeds_enabled": {
+            "const": true
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "failure_store": {
+            "type": "object",
+            "properties": {
+              "factory": {
+                "type": "string",
+                "pattern": "^[^:]+:[^:]+$"
+              },
+              "kwargs": {
+                "type": "object"
+              }
+            },
+            "required": [
+              "factory",
+              "kwargs"
+            ],
+            "additionalProperties": false
+          }
+        }
+      }
+    }
+  ]
+}

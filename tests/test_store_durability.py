@@ -10,8 +10,8 @@ import pytest
 
 from boundary_contracts.errors import BoundaryError
 from conftest import write_files
-from synthetic_data.store import FileDatasetStore
-from synthetic_data.store import file_store as fs_mod
+from synthetic_data.components.dataset_store import FileDatasetStore
+from synthetic_data.components import dataset_store as fs_mod
 
 
 @pytest.fixture
@@ -35,7 +35,7 @@ def trace(monkeypatch):
 def test_publish_fsyncs_files_then_renames_then_fsyncs_directory(tmp_path, validators, captured, trace):
     m, blobs = captured
     root = tmp_path / "store"
-    FileDatasetStore(root, validators).publish(m, write_files(tmp_path / "src", blobs))
+    FileDatasetStore(root, validators.contract_version).publish(m, write_files(tmp_path / "src", blobs))
     i = next(k for k, e in enumerate(trace) if e[0] == "rename")
     before = {e[1] for e in trace[:i] if e[0] == "fsync"}
     tmp_dir = Path(trace[i][1])
@@ -56,7 +56,7 @@ def test_crash_before_rename_leaves_no_visible_version(tmp_path, validators, cap
 
     monkeypatch.setattr(fs_mod.os, "rename", boom)
     m, blobs = captured
-    st = FileDatasetStore(tmp_path / "store", validators)
+    st = FileDatasetStore(tmp_path / "store", validators.contract_version)
     with pytest.raises(Crash):
         st.publish(m, write_files(tmp_path / "src", blobs))
     assert st.list_versions(m["dataset_id"]) == []

@@ -9,10 +9,10 @@ import pytest
 import doubles
 import survey_schema
 from boundary_contracts import PIPELINE_SCHEMA_VERSION
-from synthetic_data.config import parse_config
-from synthetic_data.job import run_job
-from synthetic_data.schemas import Validators
-from synthetic_data.store import FileDatasetStore, MemoryDatasetStore
+from synthetic_data.wiring.plans import parse_config
+from synthetic_data.wiring.run_job import run_job
+from synthetic_data.wiring.survey import Survey
+from synthetic_data.components.dataset_store import FileDatasetStore, MemoryDatasetStore
 
 ROOT = Path(__file__).resolve().parent.parent
 # 왜: 문진 스키마는 형제 폴더가 아니라 설치된 패키지(requirements.lock의 태그)에서 읽는다. 새 머신에는 이웃 폴더가 없다.
@@ -39,7 +39,7 @@ def make_cfg_raw(tmp_path: Path, **over) -> dict:
 
 @pytest.fixture(scope="session")
 def validators():
-    return Validators(survey_schema_dir=SURVEY_DIR)
+    return Survey(SURVEY_DIR)
 
 
 @pytest.fixture
@@ -51,7 +51,7 @@ def run(cfg_raw: dict, store, validators, *, reader=None, fstore=None, **kw):
     cfg = parse_config(cfg_raw, Path("."))
     reader = reader or doubles.make_question_reader()
     fstore = fstore or doubles.make_failure_store(doubles.make_bank("main"))
-    return cfg, run_job(cfg, question_reader=reader, failure_store=fstore, store=store, validators=validators, **kw)
+    return cfg, run_job(cfg, question_reader=reader, failure_store=fstore, store=store, survey=validators, **kw)
 
 
 def v2_sample(role: str, n: int, split: str, ref: dict, *, scenario: str = None, origin: str = "SYNTHETIC") -> dict:
@@ -67,14 +67,13 @@ def v2_sample(role: str, n: int, split: str, ref: dict, *, scenario: str = None,
 
 def build_v2_dataset(tmp: Path):
     """v2 샘플을 package()로 묶은 (매니페스트, 파일 바이트). 생성기를 거치지 않는다."""
-    from synthetic_data.package import package
-    from synthetic_data.context import QuestionSetContext
+    from synthetic_data.components import run_package
     r = doubles.make_question_reader()
     ctxs = []
     for qid, use in (("qs-main", "TRAIN_POOL"), ("qs-unseen", "HELD_OUT_EVAL")):
         ref = r.latest(qid)
-        ctxs.append(QuestionSetContext(ref, r.get_question_bank(ref), use))
-    main, unseen = ctxs[0].ref, ctxs[1].ref
+        ctxs.append({"ref": ref, "usage": use})
+    main, unseen = ctxs[0]["ref"], ctxs[1]["ref"]
     samples, n = [], 0
     for role in ("LORA_A", "LORA_B"):
         for split, count, ref in (("TRAIN", 3, main), ("VALIDATION", 1, main), ("EVAL", 1, main), ("EVAL", 1, unseen)):
@@ -82,9 +81,10 @@ def build_v2_dataset(tmp: Path):
                 n += 1
                 samples.append(v2_sample(role, n, split, ref))
     cfg = parse_config(make_cfg_raw(tmp), Path("."))
-    manifest, files, _ = package(samples, ctxs, cfg, staging=tmp / "stage", contract=1, generator_version="test-hand@0",
-                                 action_rules_version=cfg.action_rules_version, created_at="2026-10-15T00:00:00Z")
-    return manifest, {k: Path(p).read_bytes() for k, p in files.items()}
+    packaged = run_package.run({"samples": samples, "contexts": ctxs, "dataset_id": cfg.dataset_id, "version": cfg.version, "contract_version": 1,
+                                "generator_version": "test-hand@0", "action_rules_version": cfg.action_rules_version,
+                                "created_at": "2026-10-15T00:00:00Z", "pipeline_schema_version": PIPELINE_SCHEMA_VERSION})
+    return packaged["manifest"], {f["path"]: f["text"].encode("utf-8") for f in packaged["files"]}
 
 
 @pytest.fixture(scope="session")
@@ -104,4 +104,4 @@ def write_files(tmp: Path, blobs: dict) -> dict:
 
 @pytest.fixture(params=["memory", "file"])
 def store(request, validators, tmp_path):
-    return MemoryDatasetStore(validators) if request.param == "memory" else FileDatasetStore(tmp_path / "store", validators)
+    return MemoryDatasetStore(validators.contract_version) if request.param == "memory" else FileDatasetStore(tmp_path / "store", validators.contract_version)

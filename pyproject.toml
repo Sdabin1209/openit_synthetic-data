@@ -9,6 +9,7 @@ requires-python = ">=3.10"
 description = "문진 시스템 합성 데이터 영역: LoRA-A/B 학습 데이터 게시기·시드 잡과 DatasetStore(I2) 서버"
 dependencies = [
   "boundary-contracts",
+  "openit-link",
   "jsonschema==4.10.3",
   "waitress==3.0.2",
 ]
@@ -17,7 +18,7 @@ dependencies = [
 dev = ["pytest"]
 
 [tool.setuptools]
-packages = ["synthetic_data", "synthetic_data.store", "synthetic_data.service"]
+packages = ["synthetic_data", "synthetic_data.adapters", "synthetic_data.components", "synthetic_data.service", "synthetic_data.types", "synthetic_data.wiring"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

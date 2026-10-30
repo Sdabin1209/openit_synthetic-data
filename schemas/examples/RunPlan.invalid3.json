@@ -1,0 +1,36 @@
+{
+  "dataset_id": "ds-1",
+  "created_at": null,
+  "version": null,
+  "action_rules_version": "r1",
+  "survey_schema_dir": "/s",
+  "question_reader": {
+    "factory": "m:f",
+    "kwargs": {}
+  },
+  "failure_store": null,
+  "question_sets": [
+    {
+      "id": "qs-main",
+      "version": null,
+      "usage": "TRAIN_POOL"
+    }
+  ],
+  "reviewed_only": true,
+  "seeds_enabled": false,
+  "seeds_question_set_id": null,
+  "seeds_max_pii_suspect": 0,
+  "ratios": {
+    "TRAIN": 1,
+    "VALIDATION": 0,
+    "EVAL": 0
+  },
+  "review_per_kind": 2,
+  "regeneration_mode": "full",
+  "work_dir": "/w",
+  "store": {
+    "kind": "memory",
+    "root": null,
+    "http": null
+  }
+}

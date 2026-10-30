@@ -1,0 +1,221 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://openit.invalid/synthetic-data/schemas/ImportPlan.schema.json",
+  "title": "ImportPlan",
+  "description": "게시기 실행 계획: 설정 파일을 정규화한 것.",
+  "type": "object",
+  "properties": {
+    "dataset_id": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+      "maxLength": 128
+    },
+    "input_dir": {
+      "type": "string",
+      "minLength": 1
+    },
+    "survey_schema_dir": {
+      "type": "string",
+      "minLength": 1
+    },
+    "question_sets": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      },
+      "minItems": 1
+    },
+    "source_label": {
+      "type": "string",
+      "minLength": 1
+    },
+    "action_rules_version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "tolerance": {
+      "type": "object",
+      "properties": {
+        "max_invalid_rows": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "max_invalid_rate": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "max_pii_suspect_rows": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        }
+      },
+      "required": [
+        "max_invalid_rows",
+        "max_invalid_rate",
+        "max_pii_suspect_rows"
+      ],
+      "additionalProperties": false
+    },
+    "max_cross_split_duplicates": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "version": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "created_at": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "work_dir": {
+      "type": "string",
+      "minLength": 1
+    },
+    "pending_policy": {
+      "enum": [
+        "report",
+        "exclude",
+        "reject"
+      ]
+    },
+    "store": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "enum": [
+            "file",
+            "memory",
+            "http"
+          ]
+        },
+        "root": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "http": {
+          "anyOf": [
+            {
+              "type": "object",
+              "properties": {
+                "base_url": {
+                  "type": "string",
+                  "pattern": "^https?://"
+                },
+                "token_env": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "timeout": {
+                  "type": "number",
+                  "exclusiveMinimum": 0
+                }
+              },
+              "required": [
+                "base_url",
+                "token_env",
+                "timeout"
+              ],
+              "additionalProperties": false
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "kind",
+        "root",
+        "http"
+      ],
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "file"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "root": {
+                "type": "string",
+                "minLength": 1
+              },
+              "http": {
+                "type": "null"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "memory"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "root": {
+                "type": "null"
+              },
+              "http": {
+                "type": "null"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "http"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "root": {
+                "type": "null"
+              },
+              "http": {
+                "type": "object"
+              }
+            }
+          }
+        }
+      ]
+    }
+  },
+  "required": [
+    "dataset_id",
+    "input_dir",
+    "survey_schema_dir",
+    "question_sets",
+    "source_label",
+    "action_rules_version",
+    "tolerance",
+    "max_cross_split_duplicates",
+    "version",
+    "created_at",
+    "work_dir",
+    "pending_policy",
+    "store"
+  ],
+  "additionalProperties": false
+}

@@ -1,0 +1,110 @@
+{
+  "dataset_id": "ds-1",
+  "version": null,
+  "created_at": "2026-10-30T00:00:00Z",
+  "contract_version": 1,
+  "question_sets": [
+    {
+      "id": "qs-main",
+      "version": "v1",
+      "content_hash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    }
+  ],
+  "source_label": "c1",
+  "action_rules_version": "r1",
+  "pending_policy": "report",
+  "pending_excluded": 0,
+  "tolerance": {
+    "max_invalid_rows": 0,
+    "max_invalid_rate": 0
+  },
+  "tool_version": "0.2.0",
+  "pipeline_schema_version": "3.1",
+  "files": [
+    {
+      "name": "lora_a_train.jsonl",
+      "role": "LORA_A",
+      "split": "TRAIN",
+      "sha256": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "samples": []
+    },
+    {
+      "name": "lora_a_val.jsonl",
+      "role": "LORA_A",
+      "split": "VALIDATION",
+      "sha256": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "samples": []
+    },
+    {
+      "name": "lora_a_test.jsonl",
+      "role": "LORA_A",
+      "split": "EVAL",
+      "sha256": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "samples": []
+    },
+    {
+      "name": "lora_b_train.jsonl",
+      "role": "LORA_B",
+      "split": "TRAIN",
+      "sha256": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "samples": []
+    },
+    {
+      "name": "lora_b_val.jsonl",
+      "role": "LORA_B",
+      "split": "VALIDATION",
+      "sha256": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "samples": []
+    },
+    {
+      "name": "lora_b_test.jsonl",
+      "role": "LORA_B",
+      "split": "EVAL",
+      "sha256": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "samples": []
+    }
+  ],
+  "summary": {
+    "inputs": {
+      "lora_a_train.jsonl": {
+        "sha256": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "rows": 1,
+        "valid": 1,
+        "invalid": 0
+      }
+    },
+    "total_rows": 1,
+    "valid_rows": 1,
+    "invalid_rows": 0,
+    "invalid_reasons_by_file": {
+      "lora_a_train.jsonl": {}
+    },
+    "invalid_reasons_total": {},
+    "first_invalid_line": {},
+    "row_split_field": {
+      "lora_a_train.jsonl": {
+        "absent": 0,
+        "distinct_values": 1
+      }
+    },
+    "human_review_counts": {
+      "(없음)": 1
+    },
+    "pending_by_file": {},
+    "pii_rows_by_file": {},
+    "pii_rows_by_kind": {},
+    "pii_rows_total": 0
+  },
+  "overlap": {
+    "duplicate_utterances": {
+      "EVAL~TRAIN": 0,
+      "EVAL~VALIDATION": 0,
+      "TRAIN~VALIDATION": 0
+    },
+    "duplicate_inputs": {
+      "EVAL~TRAIN": 0,
+      "EVAL~VALIDATION": 0,
+      "TRAIN~VALIDATION": 0
+    }
+  }
+}

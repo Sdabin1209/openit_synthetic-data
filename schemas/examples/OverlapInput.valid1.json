@@ -1,0 +1,13 @@
+{
+  "items": [
+    {
+      "role": "LORA_A",
+      "split": "TRAIN",
+      "scenario_id": "s1",
+      "input": {
+        "user_utterance": "안녕"
+      }
+    }
+  ],
+  "max_cross_split_duplicates": 0
+}

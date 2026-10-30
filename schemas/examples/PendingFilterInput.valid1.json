@@ -1,0 +1,12 @@
+{
+  "files": {
+    "lora_a_train.jsonl": [
+      {
+        "human_review": "pending"
+      },
+      {
+        "human_review": "human_ok"
+      }
+    ]
+  }
+}

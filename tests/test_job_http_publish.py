@@ -7,7 +7,8 @@ import pytest
 
 from conftest import RULES_VERSION, SURVEY_DIR, make_cfg_raw
 from synthetic_data.__main__ import main
-from synthetic_data.config import ConfigError, parse_config
+from synthetic_data.config import ConfigError
+from synthetic_data.wiring.plans import parse_config
 from test_import import QS, write_input
 from test_service import RT, WT, Srv
 

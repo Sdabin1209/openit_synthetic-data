@@ -1,0 +1,86 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://openit.invalid/synthetic-data/schemas/RunReportInput.schema.json",
+  "title": "RunReportInput",
+  "description": "시드 잡 보고서 재료. 단계에 도달하지 못했으면 해당 키가 없다. samples가 있으면 counts(역할·분할·출처·종류별 개수)를 센다.",
+  "type": "object",
+  "properties": {
+    "dataset_id": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+      "maxLength": 128
+    },
+    "tool_version": {
+      "type": "string"
+    },
+    "notes": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "dropped": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "integer",
+        "minimum": 0
+      }
+    },
+    "skipped_seeds": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "case_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "reason": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "case_id",
+          "reason"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "pii_suspect": {
+      "type": "object"
+    },
+    "generation": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "integer",
+        "minimum": 0
+      }
+    },
+    "samples": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "dataset_digest": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "result": {
+      "type": "object"
+    },
+    "error": {
+      "type": "object"
+    }
+  },
+  "required": [
+    "dataset_id",
+    "tool_version",
+    "notes",
+    "dropped",
+    "skipped_seeds"
+  ],
+  "additionalProperties": false
+}

@@ -1,0 +1,28 @@
+{
+  "input_dir": "/in",
+  "survey_schema_dir": "/s",
+  "question_sets": [
+    {
+      "id": "qs-main",
+      "version": "v1",
+      "content_hash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    }
+  ],
+  "source_label": "c1",
+  "action_rules_version": "r1",
+  "tolerance": {
+    "max_invalid_rows": 0,
+    "max_invalid_rate": 0,
+    "max_pii_suspect_rows": 0
+  },
+  "max_cross_split_duplicates": 0,
+  "version": null,
+  "created_at": null,
+  "work_dir": "/w",
+  "pending_policy": "report",
+  "store": {
+    "kind": "memory",
+    "root": null,
+    "http": null
+  }
+}

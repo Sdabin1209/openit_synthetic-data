@@ -1,0 +1,52 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://openit.invalid/synthetic-data/schemas/OverlapInput.schema.json",
+  "title": "OverlapInput",
+  "description": "분할 사이 겹침 판정 입력: 통과한 샘플의 역할·분할·시나리오·입력.",
+  "type": "object",
+  "properties": {
+    "items": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "role": {
+            "enum": [
+              "LORA_A",
+              "LORA_B"
+            ]
+          },
+          "split": {
+            "enum": [
+              "TRAIN",
+              "VALIDATION",
+              "EVAL"
+            ]
+          },
+          "scenario_id": {
+            "type": "string"
+          },
+          "input": {
+            "type": "object"
+          }
+        },
+        "required": [
+          "role",
+          "split",
+          "scenario_id",
+          "input"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "max_cross_split_duplicates": {
+      "type": "integer",
+      "minimum": 0
+    }
+  },
+  "required": [
+    "items",
+    "max_cross_split_duplicates"
+  ],
+  "additionalProperties": false
+}

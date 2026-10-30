@@ -1,0 +1,145 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://openit.invalid/synthetic-data/schemas/QuestionSetAdmission.schema.json",
+  "title": "QuestionSetAdmission",
+  "description": "판정: ADMITTED(쓴다), SKIPPED(REGENERATE_SAMPLES 없음), REJECTED(검수·무결성·형식 위반; error가 경계 오류 코드와 메시지).",
+  "type": "object",
+  "properties": {
+    "status": {
+      "enum": [
+        "ADMITTED",
+        "SKIPPED",
+        "REJECTED"
+      ]
+    },
+    "context": {
+      "anyOf": [
+        {
+          "type": "object",
+          "properties": {
+            "ref": {
+              "type": "object"
+            },
+            "bank": {
+              "type": "object"
+            },
+            "usage": {
+              "enum": [
+                "TRAIN_POOL",
+                "HELD_OUT_EVAL"
+              ]
+            }
+          },
+          "required": [
+            "ref",
+            "bank",
+            "usage"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "note": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "error": {
+      "anyOf": [
+        {
+          "type": "object",
+          "properties": {
+            "code": {
+              "enum": [
+                "FAILED_PRECONDITION",
+                "INTEGRITY_ERROR",
+                "INVALID_RECORD"
+              ]
+            },
+            "message": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "code",
+            "message"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "null"
+        }
+      ]
+    }
+  },
+  "required": [
+    "status",
+    "context",
+    "note",
+    "error"
+  ],
+  "additionalProperties": false,
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "status": {
+            "const": "ADMITTED"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "context": {
+            "type": "object"
+          },
+          "error": {
+            "type": "null"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "status": {
+            "const": "SKIPPED"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "context": {
+            "type": "null"
+          },
+          "note": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "status": {
+            "const": "REJECTED"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "context": {
+            "type": "null"
+          },
+          "error": {
+            "type": "object"
+          }
+        }
+      }
+    }
+  ]
+}

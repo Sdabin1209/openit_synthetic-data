@@ -1,0 +1,10 @@
+{
+  "samples": [],
+  "usage_by_question_set": {},
+  "ratios": {
+    "TRAIN": 0,
+    "VALIDATION": 0,
+    "EVAL": 0
+  },
+  "seed": 1
+}

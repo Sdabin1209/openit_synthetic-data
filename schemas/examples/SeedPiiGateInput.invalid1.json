@@ -1,0 +1,6 @@
+{
+  "patterns": [
+    "email"
+  ],
+  "max_suspect": 0
+}

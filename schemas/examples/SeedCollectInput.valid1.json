@@ -1,0 +1,9 @@
+{
+  "cases": [
+    {
+      "case_id": "c1",
+      "deidentified": true
+    }
+  ],
+  "survey_contract_version": 1
+}

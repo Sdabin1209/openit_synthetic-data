@@ -14,9 +14,10 @@ import pytest
 import conformance
 from boundary_contracts import validator
 from synthetic_data.__main__ import _result_line, main
-from synthetic_data.config import ConfigError, parse_config
-from synthetic_data.importer import parse_import_config
-from synthetic_data.store import MemoryDatasetStore
+from synthetic_data.config import ConfigError
+from synthetic_data.wiring.plans import parse_config
+from synthetic_data.wiring.plans import parse_import_config
+from synthetic_data.components.dataset_store import MemoryDatasetStore
 
 from conftest import SURVEY_DIR, make_cfg_raw, run as run_job_helper
 
@@ -100,16 +101,16 @@ def test_config_error_message_has_no_input_values(tmp_path):
 # --- 잡 출력: 계약 스키마로 자기 검사 ---
 
 def test_run_result_and_report_match_contract(tmp_path, validators):
-    cfg, res = run_job_helper(make_cfg_raw(tmp_path), MemoryDatasetStore(validators), validators)
+    cfg, res = run_job_helper(make_cfg_raw(tmp_path), MemoryDatasetStore(validators.contract_version), validators)
     validator("SyntheticJobResult").validate(asdict(res))
     validator("SyntheticRunReport").validate(json.loads((tmp_path / "work" / "report.json").read_text(encoding="utf-8")))
 
 
 def test_import_result_and_report_match_contract(tmp_path, validators):
     from test_import import cfg_for, write_input
-    from synthetic_data.importer import run_import
+    from synthetic_data.wiring.import_job import run_import
     write_input(tmp_path / "in")
-    res = run_import(cfg_for(tmp_path), store=MemoryDatasetStore(validators), validators=validators)
+    res = run_import(cfg_for(tmp_path), store=MemoryDatasetStore(validators.contract_version), survey=validators)
     validator("SyntheticJobResult").validate(asdict(res))
     validator("SyntheticImportReport").validate(json.loads((tmp_path / "work" / "import_report.json").read_text(encoding="utf-8")))
 
@@ -157,7 +158,7 @@ def test_smoke_script_does_not_fall_back_to_unknown_revision():
 
 
 def test_cli_result_line_drops_empty_rejected_reasons_unless_rejected():
-    from synthetic_data.importer import ImportResult
+    from synthetic_data.wiring.import_job import ImportResult
     ok = json.loads(_result_line(ImportResult("ALREADY_PUBLISHED", "ds", "v1", "sha256:" + "a" * 64, "sha256:" + "b" * 64)))
     assert "rejected_reasons" not in ok
 
@@ -165,7 +166,7 @@ def test_cli_result_line_drops_empty_rejected_reasons_unless_rejected():
 def test_manifest_action_rules_version_is_the_installed_contract_rules_version(tmp_path, validators):
     """계약 3.0.0: 매니페스트의 action_rules_version은 설치된 계약 규칙 데이터의 rules_version이다(설정에 없어도). 코드·시험에 리터럴을 두지 않는다."""
     from conftest import RULES_VERSION
-    st = MemoryDatasetStore(validators)
+    st = MemoryDatasetStore(validators.contract_version)
     _, res = run_job_helper(make_cfg_raw(tmp_path), st, validators)
     m = st.get_manifest(res.dataset_id, res.version)
     assert m["action_rules_version"] == RULES_VERSION and "turn_engine_version" not in m

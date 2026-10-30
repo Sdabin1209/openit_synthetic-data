@@ -1,0 +1,64 @@
+{
+  "files": [
+    {
+      "name": "lora_a_train.jsonl",
+      "role": "LORA_A",
+      "split": "TRAIN",
+      "sha256": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "rows": [
+        {
+          "lineno": 1,
+          "text": "{}"
+        }
+      ]
+    },
+    {
+      "name": "lora_a_val.jsonl",
+      "role": "LORA_A",
+      "split": "VALIDATION",
+      "sha256": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "rows": [
+        {
+          "lineno": 1,
+          "text": "{}"
+        }
+      ]
+    },
+    {
+      "name": "lora_a_test.jsonl",
+      "role": "LORA_A",
+      "split": "EVAL",
+      "sha256": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "rows": [
+        {
+          "lineno": 1,
+          "text": "{}"
+        }
+      ]
+    },
+    {
+      "name": "lora_b_train.jsonl",
+      "role": "LORA_B",
+      "split": "TRAIN",
+      "sha256": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "rows": [
+        {
+          "lineno": 1,
+          "text": "{}"
+        }
+      ]
+    },
+    {
+      "name": "lora_b_val.jsonl",
+      "role": "LORA_B",
+      "split": "VALIDATION",
+      "sha256": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "rows": [
+        {
+          "lineno": 1,
+          "text": "{}"
+        }
+      ]
+    }
+  ]
+}

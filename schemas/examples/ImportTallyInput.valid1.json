@@ -1,0 +1,23 @@
+{
+  "files": [
+    {
+      "name": "lora_a_train.jsonl",
+      "role": "LORA_A",
+      "split": "TRAIN",
+      "sha256": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "rows": [
+        {
+          "verdict": {
+            "sample": {
+              "sample_id": "as-train-000001",
+              "scenario_id": "s1"
+            },
+            "reasons": [],
+            "row_split": "train"
+          },
+          "pii_kinds": []
+        }
+      ]
+    }
+  ]
+}

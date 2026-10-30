@@ -11,7 +11,7 @@ from boundary_contracts.errors import BoundaryError
 from boundary_contracts.sdk import DatasetStore
 
 from conftest import write_files
-from synthetic_data.store.base import DatasetStoreBase
+from synthetic_data.components.dataset_store import DatasetStoreBase
 
 
 def code(excinfo):
@@ -280,17 +280,17 @@ def test_failed_publish_leaves_nothing(store, captured, tmp_path):
 
 
 def test_tamper_detected_on_open(captured, validators, tmp_path):
-    from synthetic_data.store import FileDatasetStore, MemoryDatasetStore
+    from synthetic_data.components.dataset_store import FileDatasetStore, MemoryDatasetStore
     m, b = captured
     path = m["files"][0]["path"]
-    fs = FileDatasetStore(tmp_path / "s", validators)
+    fs = FileDatasetStore(tmp_path / "s", validators.contract_version)
     fs.publish(m, write_files(tmp_path / "f", b))
     p = tmp_path / "s" / m["dataset_id"] / m["version"] / "files" / path
     p.write_bytes(p.read_bytes() + b"x")
     with pytest.raises(BoundaryError) as e:
         fs.open_file(m["dataset_id"], m["version"], path)
     assert code(e) == "INTEGRITY_ERROR"
-    ms = MemoryDatasetStore(validators)
+    ms = MemoryDatasetStore(validators.contract_version)
     ms.publish(m, write_files(tmp_path / "g", b))
     ms._corrupt_for_test(m["dataset_id"], m["version"], path)
     with pytest.raises(BoundaryError) as e:
@@ -299,21 +299,19 @@ def test_tamper_detected_on_open(captured, validators, tmp_path):
 
 
 def test_file_store_persists_across_instances(captured, validators, tmp_path):
-    from synthetic_data.store import FileDatasetStore
+    from synthetic_data.components.dataset_store import FileDatasetStore
     m, b = captured
-    FileDatasetStore(tmp_path / "s", validators).publish(m, write_files(tmp_path / "f", b))
-    again = FileDatasetStore(tmp_path / "s", validators)
+    FileDatasetStore(tmp_path / "s", validators.contract_version).publish(m, write_files(tmp_path / "f", b))
+    again = FileDatasetStore(tmp_path / "s", validators.contract_version)
     assert again.get_manifest(m["dataset_id"], m["version"]) == m
     assert again.list_versions(m["dataset_id"]) == [m["version"]]
 
 
-def test_reader_needs_no_survey_dir_but_publish_does(captured, tmp_path):
-    from synthetic_data.schemas import Validators
-    from synthetic_data.store import MemoryDatasetStore
-    m, b = captured
-    st = MemoryDatasetStore(Validators())
+def test_store_needs_the_survey_contract_version(captured, tmp_path):
+    """저장소는 문진 스키마 정수 버전 없이 만들 수 없다(wiring이 읽어 넘긴다). 디렉터리가 없으면 버전을 읽는 쪽이 FAILED_PRECONDITION을 낸다."""
+    from synthetic_data.wiring.survey import Survey
     with pytest.raises(BoundaryError) as e:
-        st.publish(m, write_files(tmp_path, b))
+        Survey().contract_version
     assert code(e) == "FAILED_PRECONDITION"
 
 

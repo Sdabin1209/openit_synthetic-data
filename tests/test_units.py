@@ -1,20 +1,20 @@
 from __future__ import annotations
 
 import copy
+import types
 
 import pytest
 
 import doubles
-from synthetic_data.context import QuestionSetContext
-from synthetic_data.quality import check_lora_a_sample, check_lora_b_sample
-from synthetic_data.split import assign_split
+from synthetic_data.components import sample_quality
+from synthetic_data.components.split_assign import assign_split
 
 
 @pytest.fixture(scope="module")
 def ctx():
     r = doubles.make_question_reader()
     ref = r.latest("qs-main")
-    return QuestionSetContext(ref, r.get_question_bank(ref), "TRAIN_POOL")
+    return types.SimpleNamespace(ref=ref, bank=r.get_question_bank(ref))
 
 
 def test_split_assign():
@@ -30,14 +30,13 @@ def test_quality_accepts_v2_samples_and_rejects_v1_shapes(ctx, validators):
     from conftest import v2_sample
     for role in ("LORA_A", "LORA_B"):
         s = v2_sample(role, 1, "TRAIN", ctx.ref)
-        check = check_lora_a_sample if role == "LORA_A" else check_lora_b_sample
-        assert check(s, ctx.bank, validators) == []
+        assert sample_quality.run({"role": role, "sample": s})["reasons"] == []
         bad = copy.deepcopy(s)
         bad["expected"] = {"items": []} if role == "LORA_A" else {"response_text": "x", "is_fallback": False}   # v1 형태
-        assert check(bad, ctx.bank, validators) == ["schema_sample"]
+        assert sample_quality.run({"role": role, "sample": bad})["reasons"] == ["schema_sample"]
         bad2 = copy.deepcopy(s)
         bad2["runtime_contract_version"] = 1                                                                    # v1 샘플 필드
-        assert check(bad2, ctx.bank, validators) == ["schema_sample"]
+        assert sample_quality.run({"role": role, "sample": bad2})["reasons"] == ["schema_sample"]
 
 
 def test_quality_rejects_a_output_that_breaks_the_save_rule(ctx, validators):
@@ -45,4 +44,4 @@ def test_quality_rejects_a_output_that_breaks_the_save_rule(ctx, validators):
     from conftest import v2_sample
     s = v2_sample("LORA_A", 1, "TRAIN", ctx.ref)
     s["expected"]["values"][0]["save"] = False
-    assert check_lora_a_sample(s, ctx.bank, validators) == ["schema_sample"]
+    assert sample_quality.run({"role": "LORA_A", "sample": s})["reasons"] == ["schema_sample"]

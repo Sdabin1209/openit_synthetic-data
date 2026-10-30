@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://openit.invalid/synthetic-data/schemas/ImportJudgement.schema.json",
+  "title": "ImportJudgement",
+  "description": "허용치 판정 결과: 거부 사유(비면 통과)와 pending 제외 여부.",
+  "type": "object",
+  "properties": {
+    "reasons": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "exclude_pending": {
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "reasons",
+    "exclude_pending"
+  ],
+  "additionalProperties": false
+}

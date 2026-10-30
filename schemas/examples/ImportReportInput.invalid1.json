@@ -1,0 +1,18 @@
+{
+  "tolerance": {
+    "max_invalid_rows": 0,
+    "max_invalid_rate": 0
+  },
+  "pending_policy": "report",
+  "tool_version": "0.2.0",
+  "summary": null,
+  "pii_patterns": [],
+  "pending_excluded": 0,
+  "overlap": null,
+  "rejected": [],
+  "published": null,
+  "error": {
+    "code": "UNAVAILABLE",
+    "message": "x"
+  }
+}

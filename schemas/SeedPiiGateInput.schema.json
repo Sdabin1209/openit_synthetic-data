@@ -1,0 +1,48 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://openit.invalid/synthetic-data/schemas/SeedPiiGateInput.schema.json",
+  "title": "SeedPiiGateInput",
+  "description": "시드의 개인정보 의심 패턴 관문 입력. max_suspect가 null이면 경고만.",
+  "type": "object",
+  "properties": {
+    "hits": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "array",
+        "items": {
+          "enum": [
+            "email",
+            "phone_landline",
+            "phone_mobile",
+            "rrn"
+          ]
+        },
+        "minItems": 1
+      }
+    },
+    "patterns": {
+      "type": "array",
+      "items": {
+        "enum": [
+          "email",
+          "phone_landline",
+          "phone_mobile",
+          "rrn"
+        ]
+      }
+    },
+    "max_suspect": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "minimum": 0
+    }
+  },
+  "required": [
+    "hits",
+    "patterns",
+    "max_suspect"
+  ],
+  "additionalProperties": false
+}

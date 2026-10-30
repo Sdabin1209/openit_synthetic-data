@@ -1,0 +1,62 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://openit.invalid/synthetic-data/schemas/PublishRequest.schema.json",
+  "title": "PublishRequest",
+  "description": "저장소 게시 요청: 매니페스트(계약 DatasetManifest)와 파일(경로 -> 디스크 경로).",
+  "type": "object",
+  "properties": {
+    "manifest": {
+      "type": "object",
+      "properties": {
+        "dataset_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+          "maxLength": 128
+        },
+        "version": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+          "maxLength": 128
+        },
+        "files": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "path": {
+                "type": "string",
+                "pattern": "^(?!\\.\\.?(?:/|$))[^/\\\\\\x00]+(?:/(?!\\.\\.?(?:/|$))[^/\\\\\\x00]+)*$",
+                "maxLength": 1024
+              }
+            },
+            "required": [
+              "path"
+            ],
+            "additionalProperties": true
+          }
+        }
+      },
+      "required": [
+        "dataset_id",
+        "version",
+        "files"
+      ],
+      "additionalProperties": true
+    },
+    "files": {
+      "type": "object",
+      "propertyNames": {
+        "pattern": "^(?!\\.\\.?(?:/|$))[^/\\\\\\x00]+(?:/(?!\\.\\.?(?:/|$))[^/\\\\\\x00]+)*$"
+      },
+      "additionalProperties": {
+        "type": "string",
+        "minLength": 1
+      }
+    }
+  },
+  "required": [
+    "manifest",
+    "files"
+  ],
+  "additionalProperties": false
+}

@@ -1,0 +1,10 @@
+{
+  "pending_policy": "report",
+  "total_rows": 10,
+  "invalid_rows": 0,
+  "valid_by_file": {
+    "lora_a_train.jsonl": 10
+  },
+  "pending_total": 0,
+  "pii_rows_total": 0
+}

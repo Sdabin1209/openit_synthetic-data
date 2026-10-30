@@ -1,0 +1,49 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://openit.invalid/synthetic-data/schemas/SeedCollection.schema.json",
+  "title": "SeedCollection",
+  "description": "수집 결과: 시드(case_id 순), 건너뛴 사례와 사유, 모르는 필드·열거값 메모.",
+  "type": "object",
+  "properties": {
+    "seeds": {
+      "type": "array",
+      "items": {
+        "$ref": "Seed.schema.json"
+      }
+    },
+    "skipped": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "case_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "reason": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "case_id",
+          "reason"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "notes": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  },
+  "required": [
+    "seeds",
+    "skipped",
+    "notes"
+  ],
+  "additionalProperties": false
+}

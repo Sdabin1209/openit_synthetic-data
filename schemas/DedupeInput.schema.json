@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://openit.invalid/synthetic-data/schemas/DedupeInput.schema.json",
+  "title": "DedupeInput",
+  "description": "중복 입력 제거 입력.",
+  "type": "object",
+  "properties": {
+    "samples": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    }
+  },
+  "required": [
+    "samples"
+  ],
+  "additionalProperties": false
+}

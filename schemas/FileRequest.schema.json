@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://openit.invalid/synthetic-data/schemas/FileRequest.schema.json",
+  "title": "FileRequest",
+  "description": "파일 읽기 요청. 경로는 '..'·절대 경로·역슬래시·빈 마디가 없는 정규형.",
+  "type": "object",
+  "properties": {
+    "dataset_id": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+      "maxLength": 128
+    },
+    "version": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+      "maxLength": 128
+    },
+    "path": {
+      "type": "string",
+      "pattern": "^(?!\\.\\.?(?:/|$))[^/\\\\\\x00]+(?:/(?!\\.\\.?(?:/|$))[^/\\\\\\x00]+)*$",
+      "maxLength": 1024
+    }
+  },
+  "required": [
+    "dataset_id",
+    "version",
+    "path"
+  ],
+  "additionalProperties": false
+}

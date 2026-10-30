@@ -1,0 +1,145 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://openit.invalid/synthetic-data/schemas/ImportTallySummary.schema.json",
+  "title": "ImportTallySummary",
+  "description": "6개 파일을 합친 집계(보고서와 매니페스트 ext에 들어가는 숫자). 값은 담지 않고 건수와 사유 코드만.",
+  "type": "object",
+  "properties": {
+    "inputs": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "properties": {
+          "sha256": {
+            "type": "string",
+            "pattern": "^sha256:[0-9a-f]{64}$"
+          },
+          "rows": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "valid": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "invalid": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "required": [
+          "sha256",
+          "rows",
+          "valid",
+          "invalid"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "total_rows": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "valid_rows": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "invalid_rows": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "invalid_reasons_by_file": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "invalid_reasons_total": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "integer",
+        "minimum": 0
+      }
+    },
+    "first_invalid_line": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "integer",
+        "minimum": 1
+      }
+    },
+    "row_split_field": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "properties": {
+          "absent": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "distinct_values": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "required": [
+          "absent",
+          "distinct_values"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "human_review_counts": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "integer",
+        "minimum": 0
+      }
+    },
+    "pending_by_file": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "integer",
+        "minimum": 0
+      }
+    },
+    "pii_rows_by_file": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "integer",
+        "minimum": 0
+      }
+    },
+    "pii_rows_by_kind": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "integer",
+        "minimum": 0
+      }
+    },
+    "pii_rows_total": {
+      "type": "integer",
+      "minimum": 0
+    }
+  },
+  "required": [
+    "inputs",
+    "total_rows",
+    "valid_rows",
+    "invalid_rows",
+    "invalid_reasons_by_file",
+    "invalid_reasons_total",
+    "first_invalid_line",
+    "row_split_field",
+    "human_review_counts",
+    "pending_by_file",
+    "pii_rows_by_file",
+    "pii_rows_by_kind",
+    "pii_rows_total"
+  ],
+  "additionalProperties": false
+}

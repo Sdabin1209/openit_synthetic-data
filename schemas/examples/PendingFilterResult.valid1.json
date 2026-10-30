@@ -1,0 +1,11 @@
+{
+  "files": {
+    "lora_a_train.jsonl": [
+      {
+        "human_review": "human_ok"
+      }
+    ]
+  },
+  "excluded": 1,
+  "reasons": []
+}

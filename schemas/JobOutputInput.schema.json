@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://openit.invalid/synthetic-data/schemas/JobOutputInput.schema.json",
+  "title": "JobOutputInput",
+  "description": "잡이 표준 출력·오류에 낼 한 줄의 재료.",
+  "type": "object",
+  "properties": {
+    "kind": {
+      "enum": [
+        "RESULT",
+        "ERROR"
+      ]
+    },
+    "record": {
+      "type": "object"
+    }
+  },
+  "required": [
+    "kind",
+    "record"
+  ],
+  "additionalProperties": false
+}

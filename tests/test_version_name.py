@@ -3,17 +3,17 @@
 from __future__ import annotations
 
 from conftest import make_cfg_raw, run
-from synthetic_data.importer import run_import
-from synthetic_data.store import MemoryDatasetStore
+from synthetic_data.wiring.import_job import run_import
+from synthetic_data.components.dataset_store import MemoryDatasetStore
 from test_import import cfg_for, write_input
 
 
 def test_import_version_is_128_bit_prefix(tmp_path, validators):
     write_input(tmp_path / "in")
-    r = run_import(cfg_for(tmp_path), store=MemoryDatasetStore(validators), validators=validators)
+    r = run_import(cfg_for(tmp_path), store=MemoryDatasetStore(validators.contract_version), survey=validators)
     assert r.version == "v" + r.dataset_digest[len("sha256:"):][:32]
 
 
 def test_run_version_is_128_bit_prefix(tmp_path, validators):
-    _, r = run(make_cfg_raw(tmp_path), MemoryDatasetStore(validators), validators)
+    _, r = run(make_cfg_raw(tmp_path), MemoryDatasetStore(validators.contract_version), validators)
     assert r.version == "v" + r.dataset_digest[len("sha256:"):][:32]

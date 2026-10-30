@@ -23,6 +23,11 @@ mkdir "$WORK/bc" "$WORK/wheels"; cp -a "$BC_SRC/." "$WORK/bc/"
 echo "build-image: 계약 wheel 만들기 ($BC)" >&2
 "$PY" -m pip wheel -q --no-deps --disable-pip-version-check -w "$WORK/wheels" "$WORK/bc" >&2
 WHL="$(basename "$(ls "$WORK"/wheels/boundary_contracts-*.whl | head -1)")"
+# 통신 기반(D118)도 잠금 파일의 태그에서 wheel로 만든다(호스트의 git SSH 접근 사용, 빌드 중에는 필요 없다). --no-deps: 계약은 위 wheel을 쓴다
+LINK_SPEC="$(grep '^openit-link' "$HERE/requirements.lock")"
+[ -n "$LINK_SPEC" ] || { echo "build-image: requirements.lock에 openit-link가 없다" >&2; exit 2; }
+"$PY" -m pip wheel -q --no-deps --disable-pip-version-check -w "$WORK/wheels" "$LINK_SPEC" >&2
+LINK_WHL="$(basename "$(ls "$WORK"/wheels/openit_link-*.whl | head -1)")"
 
 # 라벨 정직성(U50): 라벨은 요청 값을 적지 않고 실제로 설치·사용한 버전에서 찍는다. 요청 버전이 이 리포의 고정 버전(requirements.lock)이나
 # 실제 소스와 다르면 라벨을 찍지 않고 멈춘다(거짓 라벨이 게시 단계까지 가지 않게).
@@ -50,7 +55,7 @@ EXPOSURE="$("$PY" -I "$HERE/scripts/build_image_request.py" --exposure "$SRC/dep
 # 3. 빌드. Dockerfile 인자 이름은 이 영역의 것이고 deploy는 모른다
 echo "build-image: 이미지 빌드 $TAG" >&2
 "$DOCKER" build -q -t "$TAG" --build-context "wheels=$WORK/wheels" --build-context "survey_schema=$SS_SRC" \
-  --label "io.openit.jobs=$JOBS" --label "io.openit.exposure=$EXPOSURE" --build-arg "BC_SPEC=/wheels/$WHL" --build-arg "BC_VERSION=$BC_ACTUAL" --build-arg "REVISION=$REV" \
+  --label "io.openit.jobs=$JOBS" --label "io.openit.exposure=$EXPOSURE" --build-arg "BC_SPEC=/wheels/$WHL" --build-arg "LINK_SPEC=/wheels/$LINK_WHL" --build-arg "BC_VERSION=$BC_ACTUAL" --build-arg "REVISION=$REV" \
   --build-arg "SURVEY_SCHEMA_VERSION=$SS_ACTUAL" "$SRC" >&2
 
 # 4. 결과: docker가 준 ID와 이미지에 실제로 붙은 io.openit.* 라벨(요청 값을 되풀이하지 않고 inspect로 읽는다)

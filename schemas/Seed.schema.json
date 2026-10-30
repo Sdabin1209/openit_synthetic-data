@@ -1,0 +1,80 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://openit.invalid/synthetic-data/schemas/Seed.schema.json",
+  "title": "Seed",
+  "description": "시드 하나: 확정된 실패 사례를 샘플의 재료로 바꾼 것.",
+  "type": "object",
+  "properties": {
+    "case_id": {
+      "type": "string"
+    },
+    "version": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "role": {
+      "enum": [
+        "LORA_A",
+        "LORA_B"
+      ]
+    },
+    "input": {
+      "type": "object"
+    },
+    "expected": {
+      "type": [
+        "object",
+        "string"
+      ]
+    },
+    "question_set": {
+      "type": [
+        "object",
+        "null"
+      ]
+    }
+  },
+  "required": [
+    "case_id",
+    "version",
+    "role",
+    "input",
+    "expected",
+    "question_set"
+  ],
+  "additionalProperties": false,
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "role": {
+            "const": "LORA_A"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "expected": {
+            "type": "object"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "role": {
+            "const": "LORA_B"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "expected": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  ]
+}

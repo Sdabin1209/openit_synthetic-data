@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://openit.invalid/synthetic-data/schemas/ReviewSampleInput.schema.json",
+  "title": "ReviewSampleInput",
+  "description": "감수 샘플링 입력: 역할·종류마다 per_kind개를 해시 순으로.",
+  "type": "object",
+  "properties": {
+    "samples": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "seed": {
+      "type": "integer"
+    },
+    "per_kind": {
+      "type": "integer",
+      "minimum": 0
+    }
+  },
+  "required": [
+    "samples",
+    "seed",
+    "per_kind"
+  ],
+  "additionalProperties": false
+}

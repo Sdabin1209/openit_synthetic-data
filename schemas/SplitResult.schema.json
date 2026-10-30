@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://openit.invalid/synthetic-data/schemas/SplitResult.schema.json",
+  "title": "SplitResult",
+  "description": "split을 채운 샘플.",
+  "type": "object",
+  "properties": {
+    "samples": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    }
+  },
+  "required": [
+    "samples"
+  ],
+  "additionalProperties": false
+}

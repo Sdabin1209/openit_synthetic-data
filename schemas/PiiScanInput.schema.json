@@ -1,0 +1,35 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://openit.invalid/synthetic-data/schemas/PiiScanInput.schema.json",
+  "title": "PiiScanInput",
+  "description": "개인정보 의심 패턴 검사 입력: 샘플(또는 시드)의 input·expected 묶음. 비식별 확인이 아니다(ADR 0007).",
+  "type": "object",
+  "properties": {
+    "items": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "input": {
+            "type": "object"
+          },
+          "expected": {
+            "type": [
+              "object",
+              "string"
+            ]
+          }
+        },
+        "required": [
+          "input",
+          "expected"
+        ],
+        "additionalProperties": false
+      }
+    }
+  },
+  "required": [
+    "items"
+  ],
+  "additionalProperties": false
+}

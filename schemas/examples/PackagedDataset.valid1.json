@@ -1,0 +1,12 @@
+{
+  "manifest": {
+    "dataset_id": "ds-1"
+  },
+  "digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "files": [
+    {
+      "path": "lora_a/train.jsonl",
+      "text": "{}\n"
+    }
+  ]
+}

@@ -11,8 +11,9 @@ import doubles
 from boundary_contracts import PIPELINE_SCHEMA_VERSION
 from conftest import SURVEY_DIR, make_cfg_raw, run
 from synthetic_data.__main__ import main
-from synthetic_data.config import ConfigError, parse_config
-from synthetic_data.store import FileDatasetStore, MemoryDatasetStore
+from synthetic_data.config import ConfigError
+from synthetic_data.wiring.plans import parse_config
+from synthetic_data.components.dataset_store import FileDatasetStore, MemoryDatasetStore
 
 
 def read_all(store, m):
@@ -24,19 +25,19 @@ def read_all(store, m):
 
 @pytest.fixture
 def published(tmp_path, validators):
-    st = MemoryDatasetStore(validators)
+    st = MemoryDatasetStore(validators.contract_version)
     cfg, res = run(make_cfg_raw(tmp_path), st, validators)
     return st, res, st.get_manifest(res.dataset_id, res.version)
 
 
 def test_reproducible_same_content_hash(tmp_path, validators):
-    r1 = run(make_cfg_raw(tmp_path / "a"), MemoryDatasetStore(validators), validators)[1]
-    r2 = run(make_cfg_raw(tmp_path / "b"), FileDatasetStore(tmp_path / "s", validators), validators)[1]
+    r1 = run(make_cfg_raw(tmp_path / "a"), MemoryDatasetStore(validators.contract_version), validators)[1]
+    r2 = run(make_cfg_raw(tmp_path / "b"), FileDatasetStore(tmp_path / "s", validators.contract_version), validators)[1]
     assert r1.content_hash == r2.content_hash and r1.dataset_digest == r2.dataset_digest and r1.version == r2.version
 
 
 def test_reproducible_file_bytes(tmp_path, validators):
-    s1, s2 = MemoryDatasetStore(validators), MemoryDatasetStore(validators)
+    s1, s2 = MemoryDatasetStore(validators.contract_version), MemoryDatasetStore(validators.contract_version)
     _, a = run(make_cfg_raw(tmp_path / "a"), s1, validators)
     _, b = run(make_cfg_raw(tmp_path / "b"), s2, validators)
     m = s1.get_manifest(a.dataset_id, a.version)
@@ -45,13 +46,13 @@ def test_reproducible_file_bytes(tmp_path, validators):
 
 
 def test_different_seed_changes_digest(tmp_path, validators):
-    a = run(make_cfg_raw(tmp_path / "a"), MemoryDatasetStore(validators), validators)[1]
-    b = run(make_cfg_raw(tmp_path / "b", seed=8), MemoryDatasetStore(validators), validators)[1]
+    a = run(make_cfg_raw(tmp_path / "a"), MemoryDatasetStore(validators.contract_version), validators)[1]
+    b = run(make_cfg_raw(tmp_path / "b", seed=8), MemoryDatasetStore(validators.contract_version), validators)[1]
     assert a.dataset_digest != b.dataset_digest
 
 
 def test_rerun_is_already_published_even_with_new_created_at(tmp_path, validators):
-    st = MemoryDatasetStore(validators)
+    st = MemoryDatasetStore(validators.contract_version)
     a = run(make_cfg_raw(tmp_path / "a"), st, validators)[1]
     raw = make_cfg_raw(tmp_path / "b", created_at="2027-01-01T00:00:00Z")
     b = run(raw, st, validators)[1]
@@ -75,7 +76,7 @@ def test_not_deidentified_case_rejected(tmp_path, validators):
     fs = doubles.make_failure_store(doubles.make_bank("main"))
     fs.add(doubles.failure_case("fc-raw", "tr-p", {"items": []}, deidentified=False))
     with pytest.raises(BoundaryError) as e:
-        run(make_cfg_raw(tmp_path), MemoryDatasetStore(validators), validators, fstore=fs)
+        run(make_cfg_raw(tmp_path), MemoryDatasetStore(validators.contract_version), validators, fstore=fs)
     assert e.value.code == "INVALID_RECORD"
 
 
@@ -86,7 +87,7 @@ def test_seed_without_matching_question_is_skipped(tmp_path, validators):
     fs = doubles.make_failure_store(doubles.make_bank("main"))
     inp = dict(doubles.a_input(), question_id="Q11")
     fs.add(doubles.failure_case("fc-x", "tr-x2", doubles.a_expected(), question_set=ref, expected_kind="LORA_A", reviewed_input=inp))
-    cfg, res = run(make_cfg_raw(tmp_path), MemoryDatasetStore(validators), validators, reader=reader, fstore=fs)
+    cfg, res = run(make_cfg_raw(tmp_path), MemoryDatasetStore(validators.contract_version), validators, reader=reader, fstore=fs)
     rep = json.loads((cfg.work_dir / "report.json").read_text())
     assert any(s["case_id"] == "fc-x" and "문항 세트에 없음" in s["reason"] for s in rep["skipped_seeds"])
 
@@ -94,15 +95,15 @@ def test_seed_without_matching_question_is_skipped(tmp_path, validators):
 def test_reviewed_only(tmp_path, validators):
     reader = doubles.make_question_reader()
     reader.add("qs-main", "2", doubles.make_bank("main", wording=" (개정)"), approved=False)
-    st0 = MemoryDatasetStore(validators)
+    st0 = MemoryDatasetStore(validators.contract_version)
     _, res0 = run(make_cfg_raw(tmp_path / "a"), st0, validators, reader=reader)     # 버전 미지정: 검수된 최신(1)
     assert {q["version"] for q in st0.get_manifest(res0.dataset_id, res0.version)["question_sets"]} == {"1"}
     raw = make_cfg_raw(tmp_path / "b", question_sets=[{"id": "qs-main", "version": "2"}, {"id": "qs-unseen", "usage": "HELD_OUT_EVAL"}])
     with pytest.raises(BoundaryError) as e:
-        run(raw, MemoryDatasetStore(validators), validators, reader=reader)
+        run(raw, MemoryDatasetStore(validators.contract_version), validators, reader=reader)
     assert e.value.code == "FAILED_PRECONDITION"
     raw["reviewed_only"] = False
-    st = MemoryDatasetStore(validators)
+    st = MemoryDatasetStore(validators.contract_version)
     _, r = run(raw, st, validators, reader=reader)
     assert {q["version"] for q in st.get_manifest(r.dataset_id, r.version)["question_sets"]} == {"2", "1"}
 
@@ -117,7 +118,7 @@ def test_bank_hash_mismatch_is_integrity_error(tmp_path, validators):
     reader.add("qs-main", "1", doubles.make_bank("main"))
     reader.add("qs-unseen", "1", doubles.make_bank("unseen"))
     with pytest.raises(BoundaryError) as e:
-        run(make_cfg_raw(tmp_path), MemoryDatasetStore(validators), validators, reader=reader)
+        run(make_cfg_raw(tmp_path), MemoryDatasetStore(validators.contract_version), validators, reader=reader)
     assert e.value.code == "INTEGRITY_ERROR"
 
 
@@ -126,7 +127,7 @@ def test_boundary_error_from_neighbor_propagates(tmp_path, validators):
         def latest(self, *a, **k):
             raise BoundaryError("UNAVAILABLE", "점검 중")
     with pytest.raises(BoundaryError) as e:
-        run(make_cfg_raw(tmp_path), MemoryDatasetStore(validators), validators, reader=Down())
+        run(make_cfg_raw(tmp_path), MemoryDatasetStore(validators.contract_version), validators, reader=Down())
     assert e.value.retryable
 
 
@@ -149,7 +150,7 @@ def test_cli(tmp_path, capsys):
     assert out["status"] == "PUBLISHED"
     assert main(["run", "--config", str(cfgp), "--created-at", "2030-01-01T00:00:00Z"]) == 0
     assert json.loads(capsys.readouterr().out)["status"] == "ALREADY_PUBLISHED"
-    assert FileDatasetStore(tmp_path / "st", __import__("synthetic_data.schemas", fromlist=["Validators"]).Validators(survey_schema_dir=SURVEY_DIR)).list_versions("ds-test") == [out["version"]]
+    assert FileDatasetStore(tmp_path / "st", __import__("synthetic_data.wiring.survey", fromlist=["Survey"]).Survey(SURVEY_DIR).contract_version).list_versions("ds-test") == [out["version"]]
     bad = tmp_path / "bad.json"
     bad.write_text("{}")
     assert main(["run", "--config", str(bad)]) == 2
@@ -179,7 +180,7 @@ def test_seed_uses_failurecase_question_set_without_config_fallback(tmp_path, va
     ref = reader.latest("qs-main")
     fs = _seed_store_v2(ref)
     raw = make_cfg_raw(tmp_path, seeds={"enabled": True})          # question_set_id 없음
-    st = MemoryDatasetStore(validators)
+    st = MemoryDatasetStore(validators.contract_version)
     cfg, res = run(raw, st, validators, reader=reader, fstore=fs)
     m = st.get_manifest(res.dataset_id, res.version)
     assert m["seed_case_ids"] == ["fc-new"]                         # 문항 세트 참조 없는 사례(fc-a, fc-b)는 건너뜀
@@ -191,14 +192,13 @@ def test_seed_question_set_not_in_run_is_skipped(tmp_path, validators):
     reader = doubles.make_question_reader()
     other = dict(reader.latest("qs-main"), content_hash="sha256:" + "3" * 64)
     fs = _seed_store_v2(other)
-    cfg, res = run(make_cfg_raw(tmp_path), MemoryDatasetStore(validators), validators, reader=reader, fstore=fs)
+    cfg, res = run(make_cfg_raw(tmp_path), MemoryDatasetStore(validators.contract_version), validators, reader=reader, fstore=fs)
     rep = json.loads((cfg.work_dir / "report.json").read_text())
     assert any(s["case_id"] == "fc-new" and "학습 풀" in s["reason"] for s in rep["skipped_seeds"])
 
 
 def test_labels_never_copied_from_contract_examples():
     """boundary-contracts의 examples/ 정답 예시는 읽지도 복사하지도 않는다. 합성 정답은 라벨 기준 구현에서만 나온다."""
-    from synthetic_data.job import __file__ as _  # noqa
     src = Path(__file__).resolve().parent.parent / "synthetic_data"
     for p in src.rglob("*.py"):
         assert "examples" not in p.read_text(encoding="utf-8"), p
@@ -216,7 +216,7 @@ def test_seed_needs_reviewed_input_and_v2_schema(tmp_path, validators):
     fs.add(doubles.failure_case("fc-v1exp", "tr-v1", v1_exp, question_set=ref, expected_kind="LORA_A", reviewed_input=base["reviewed_input"]))
     fs.add(doubles.failure_case("fc-oldkind", "tr-old", base["expected"], question_set=ref, expected_kind="PARSER",
                                 reviewed_input=base["reviewed_input"]))
-    cfg, res = run(make_cfg_raw(tmp_path), MemoryDatasetStore(validators), validators, reader=reader, fstore=fs)
+    cfg, res = run(make_cfg_raw(tmp_path), MemoryDatasetStore(validators.contract_version), validators, reader=reader, fstore=fs)
     rep = json.loads((cfg.work_dir / "report.json").read_text())
     skipped = {s["case_id"]: s["reason"] for s in rep["skipped_seeds"]}
     assert "reviewed_input 없음" in skipped["fc-noinput"]
@@ -232,7 +232,7 @@ def test_regeneration_affected_only_excludes_sets_without_follow_up(tmp_path, va
     reader = doubles.make_question_reader()
     reader.add("qs-main", "2", doubles.make_bank("main", wording=" (개정)"), change=change)
     raw = make_cfg_raw(tmp_path, regeneration={"mode": "affected_only"}, question_sets=[{"id": "qs-main", "version": "2"}])
-    _, res = run(raw, MemoryDatasetStore(validators), validators, reader=reader)
+    _, res = run(raw, MemoryDatasetStore(validators.contract_version), validators, reader=reader)
     assert res.status == "NOTHING_TO_DO"
 
 

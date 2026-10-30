@@ -1,0 +1,25 @@
+{
+  "seeds": [
+    {
+      "case_id": "c1",
+      "version": 1,
+      "role": "LORA_B",
+      "input": {
+        "action": "ASK"
+      },
+      "expected": "네",
+      "question_set": null
+    }
+  ],
+  "contexts": [
+    {
+      "ref": {
+        "id": "qs-main",
+        "version": "v1",
+        "content_hash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      },
+      "usage": "TRAIN_POOL"
+    }
+  ],
+  "fallback_question_set_id": null
+}

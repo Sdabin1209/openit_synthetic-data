@@ -1,0 +1,34 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://openit.invalid/synthetic-data/schemas/PendingFilterResult.schema.json",
+  "title": "PendingFilterResult",
+  "description": "걷어낸 뒤의 파일별 샘플, 걷어낸 수, 비게 된 파일의 사유.",
+  "type": "object",
+  "properties": {
+    "files": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "array",
+        "items": {
+          "type": "object"
+        }
+      }
+    },
+    "excluded": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "reasons": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  },
+  "required": [
+    "files",
+    "excluded",
+    "reasons"
+  ],
+  "additionalProperties": false
+}

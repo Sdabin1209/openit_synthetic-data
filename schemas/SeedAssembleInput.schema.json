@@ -1,0 +1,39 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://openit.invalid/synthetic-data/schemas/SeedAssembleInput.schema.json",
+  "title": "SeedAssembleInput",
+  "description": "시드 샘플 조립 입력: 짝과 그 문항 세트의 문항 ID들.",
+  "type": "object",
+  "properties": {
+    "pairs": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "seed": {
+            "$ref": "Seed.schema.json"
+          },
+          "ref": {
+            "type": "object"
+          },
+          "question_ids": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "seed",
+          "ref",
+          "question_ids"
+        ],
+        "additionalProperties": false
+      }
+    }
+  },
+  "required": [
+    "pairs"
+  ],
+  "additionalProperties": false
+}

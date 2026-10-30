@@ -1,0 +1,160 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://openit.invalid/synthetic-data/schemas/ImportTallyInput.schema.json",
+  "title": "ImportTallyInput",
+  "description": "파일 6개의 줄별 판정과 개인정보 의심 패턴(통과한 줄만).",
+  "type": "object",
+  "properties": {
+    "files": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "pattern": "^lora_[ab]_(train|val|test)\\.jsonl$"
+          },
+          "role": {
+            "enum": [
+              "LORA_A",
+              "LORA_B"
+            ]
+          },
+          "split": {
+            "enum": [
+              "TRAIN",
+              "VALIDATION",
+              "EVAL"
+            ]
+          },
+          "sha256": {
+            "type": "string",
+            "pattern": "^sha256:[0-9a-f]{64}$"
+          },
+          "rows": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "verdict": {
+                  "$ref": "RowVerdict.schema.json"
+                },
+                "pii_kinds": {
+                  "type": "array",
+                  "items": {
+                    "enum": [
+                      "email",
+                      "phone_landline",
+                      "phone_mobile",
+                      "rrn"
+                    ]
+                  }
+                }
+              },
+              "required": [
+                "verdict",
+                "pii_kinds"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "name",
+          "role",
+          "split",
+          "sha256",
+          "rows"
+        ],
+        "additionalProperties": false,
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "name": {
+                  "pattern": "^lora_a_"
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "role": {
+                  "const": "LORA_A"
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "name": {
+                  "pattern": "^lora_b_"
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "role": {
+                  "const": "LORA_B"
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "name": {
+                  "pattern": "_train\\.jsonl$"
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "split": {
+                  "const": "TRAIN"
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "name": {
+                  "pattern": "_val\\.jsonl$"
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "split": {
+                  "const": "VALIDATION"
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "name": {
+                  "pattern": "_test\\.jsonl$"
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "split": {
+                  "const": "EVAL"
+                }
+              }
+            }
+          }
+        ]
+      },
+      "minItems": 1
+    }
+  },
+  "required": [
+    "files"
+  ],
+  "additionalProperties": false
+}

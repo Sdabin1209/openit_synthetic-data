@@ -1,0 +1,76 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://openit.invalid/synthetic-data/schemas/ServiceSettings.schema.json",
+  "title": "ServiceSettings",
+  "description": "dataset-store 서비스 기동 설정(환경 변수에서 읽은 값). 토큰 문자열은 역할=토큰,역할=토큰 형식이다(비밀이라 파일로 받는다, D84).",
+  "type": "object",
+  "properties": {
+    "read_tokens": {
+      "type": "string"
+    },
+    "write_tokens": {
+      "type": "string"
+    },
+    "min_token_len": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "root": {
+      "type": "string",
+      "minLength": 1
+    },
+    "max_body": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "max_publishes": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "max_downloads": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "max_entries": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "auth_fail_limit": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "min_free_gb": {
+      "type": "number",
+      "minimum": 0
+    }
+  },
+  "required": [
+    "read_tokens",
+    "write_tokens",
+    "min_token_len",
+    "root",
+    "max_body",
+    "max_publishes",
+    "max_downloads",
+    "max_entries",
+    "auth_fail_limit",
+    "min_free_gb"
+  ],
+  "additionalProperties": false,
+  "anyOf": [
+    {
+      "properties": {
+        "read_tokens": {
+          "minLength": 1
+        }
+      }
+    },
+    {
+      "properties": {
+        "write_tokens": {
+          "minLength": 1
+        }
+      }
+    }
+  ]
+}

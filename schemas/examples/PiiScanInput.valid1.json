@@ -1,0 +1,10 @@
+{
+  "items": [
+    {
+      "input": {
+        "user_utterance": "안녕"
+      },
+      "expected": "네"
+    }
+  ]
+}

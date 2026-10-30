@@ -1,0 +1,49 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://openit.invalid/synthetic-data/schemas/PublishDecisionInput.schema.json",
+  "title": "PublishDecisionInput",
+  "description": "멱등 게시 판정 입력: 매니페스트, 데이터셋 digest, 게시할 파일(경로 -> 디스크 경로).",
+  "type": "object",
+  "properties": {
+    "manifest": {
+      "type": "object",
+      "properties": {
+        "dataset_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+          "maxLength": 128
+        },
+        "version": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+          "maxLength": 128
+        }
+      },
+      "required": [
+        "dataset_id",
+        "version"
+      ],
+      "additionalProperties": true
+    },
+    "digest": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "files": {
+      "type": "object",
+      "propertyNames": {
+        "pattern": "^(?!\\.\\.?(?:/|$))[^/\\\\\\x00]+(?:/(?!\\.\\.?(?:/|$))[^/\\\\\\x00]+)*$"
+      },
+      "additionalProperties": {
+        "type": "string",
+        "minLength": 1
+      }
+    }
+  },
+  "required": [
+    "manifest",
+    "digest",
+    "files"
+  ],
+  "additionalProperties": false
+}

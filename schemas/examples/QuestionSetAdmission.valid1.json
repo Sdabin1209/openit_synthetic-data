@@ -1,0 +1,16 @@
+{
+  "status": "ADMITTED",
+  "context": {
+    "ref": {
+      "id": "qs-main",
+      "version": "v1",
+      "content_hash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    },
+    "bank": {
+      "questions": []
+    },
+    "usage": "TRAIN_POOL"
+  },
+  "note": null,
+  "error": null
+}

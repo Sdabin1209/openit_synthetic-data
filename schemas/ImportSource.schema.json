@@ -1,0 +1,157 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://openit.invalid/synthetic-data/schemas/ImportSource.schema.json",
+  "title": "ImportSource",
+  "description": "읽은 입력 파일 6개(파일 이름이 역할과 분할을 정한다, ADR 0002). 줄 텍스트는 UTF-8이 아니면 null.",
+  "type": "object",
+  "properties": {
+    "files": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "pattern": "^lora_[ab]_(train|val|test)\\.jsonl$"
+          },
+          "role": {
+            "enum": [
+              "LORA_A",
+              "LORA_B"
+            ]
+          },
+          "split": {
+            "enum": [
+              "TRAIN",
+              "VALIDATION",
+              "EVAL"
+            ]
+          },
+          "sha256": {
+            "type": "string",
+            "pattern": "^sha256:[0-9a-f]{64}$"
+          },
+          "rows": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "lineno": {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                "text": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                }
+              },
+              "required": [
+                "lineno",
+                "text"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "name",
+          "role",
+          "split",
+          "sha256",
+          "rows"
+        ],
+        "additionalProperties": false,
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "name": {
+                  "pattern": "^lora_a_"
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "role": {
+                  "const": "LORA_A"
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "name": {
+                  "pattern": "^lora_b_"
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "role": {
+                  "const": "LORA_B"
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "name": {
+                  "pattern": "_train\\.jsonl$"
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "split": {
+                  "const": "TRAIN"
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "name": {
+                  "pattern": "_val\\.jsonl$"
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "split": {
+                  "const": "VALIDATION"
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "name": {
+                  "pattern": "_test\\.jsonl$"
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "split": {
+                  "const": "EVAL"
+                }
+              }
+            }
+          }
+        ]
+      },
+      "minItems": 6,
+      "maxItems": 6
+    }
+  },
+  "required": [
+    "files"
+  ],
+  "additionalProperties": false
+}

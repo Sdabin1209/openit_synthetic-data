@@ -1,0 +1,13 @@
+{
+  "contexts": [
+    {
+      "ref": {
+        "id": "qs-main",
+        "version": "v1",
+        "content_hash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      },
+      "usage": "TRAIN_POOL"
+    }
+  ],
+  "fallback_question_set_id": null
+}

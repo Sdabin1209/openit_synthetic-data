@@ -1,0 +1,12 @@
+{
+  "read_tokens": "model-lab=a1b2c3d4a1b2c3d4a1b2c3d4a1b2c3d4",
+  "write_tokens": "",
+  "min_token_len": 32,
+  "root": "/data",
+  "max_body": 1073741824,
+  "max_publishes": 8,
+  "max_downloads": 8,
+  "max_entries": 1000,
+  "auth_fail_limit": 10,
+  "min_free_gb": 1
+}

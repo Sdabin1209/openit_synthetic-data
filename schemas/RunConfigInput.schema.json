@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://openit.invalid/synthetic-data/schemas/RunConfigInput.schema.json",
+  "title": "RunConfigInput",
+  "description": "시드 잡 설정 정규화 입력. raw는 계약 SyntheticJobConfigRun을 따라야 한다(계약 스키마로 검사).",
+  "type": "object",
+  "properties": {
+    "raw": {
+      "type": "object"
+    },
+    "base_dir": {
+      "type": "string",
+      "minLength": 1
+    },
+    "survey_dir_override": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "installed_action_rules_version": {
+      "type": "string",
+      "minLength": 1
+    }
+  },
+  "required": [
+    "raw",
+    "base_dir",
+    "survey_dir_override",
+    "installed_action_rules_version"
+  ],
+  "additionalProperties": false
+}

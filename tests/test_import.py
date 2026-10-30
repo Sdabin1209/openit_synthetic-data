@@ -10,9 +10,11 @@ import pytest
 
 import doubles
 from conftest import RULES_VERSION, SURVEY_DIR, ROOT
-from synthetic_data.importer import INPUT_FILES, InputError, load_import_config, parse_import_config, run_import
+from synthetic_data.components.import_source import INPUT_FILES
+from synthetic_data.wiring.import_job import InputError, run_import
+from synthetic_data.wiring.plans import load_import_config, parse_import_config
 from synthetic_data.config import ConfigError
-from synthetic_data.store import MemoryDatasetStore
+from synthetic_data.components.dataset_store import MemoryDatasetStore
 
 QS = [{"id": "qs-external", "version": "1", "content_hash": "sha256:" + "0" * 64}]
 
@@ -56,8 +58,8 @@ def report(tmp):
 
 def test_publishes_valid_input(tmp_path, validators):
     write_input(tmp_path / "in")
-    store = MemoryDatasetStore(validators)
-    res = run_import(cfg_for(tmp_path), store=store, validators=validators)
+    store = MemoryDatasetStore(validators.contract_version)
+    res = run_import(cfg_for(tmp_path), store=store, survey=validators)
     assert res.status == "PUBLISHED" and res.counts["rows_total"] == 18 and res.counts["rows_invalid"] == 0
     m = store.get_manifest("ds-imp", res.version)
     assert sorted(f["sample_count"] for f in m["files"]) == [3] * 6
@@ -72,18 +74,18 @@ def test_publishes_valid_input(tmp_path, validators):
 
 def test_idempotent(tmp_path, validators):
     write_input(tmp_path / "in")
-    store = MemoryDatasetStore(validators)
-    a = run_import(cfg_for(tmp_path), store=store, validators=validators)
-    b = run_import(cfg_for(tmp_path), store=store, validators=validators)
+    store = MemoryDatasetStore(validators.contract_version)
+    a = run_import(cfg_for(tmp_path), store=store, survey=validators)
+    b = run_import(cfg_for(tmp_path), store=store, survey=validators)
     assert b.status == "ALREADY_PUBLISHED" and a.version == b.version and a.dataset_digest == b.dataset_digest
     assert a.content_hash == b.content_hash and len(store.list_versions("ds-imp")) == 1
 
 
 def test_changed_input_changes_digest(tmp_path, validators):
     write_input(tmp_path / "in")
-    a = run_import(cfg_for(tmp_path), store=MemoryDatasetStore(validators), validators=validators)
+    a = run_import(cfg_for(tmp_path), store=MemoryDatasetStore(validators.contract_version), survey=validators)
     write_input(tmp_path / "in", per_file=4)
-    b = run_import(cfg_for(tmp_path), store=MemoryDatasetStore(validators), validators=validators)
+    b = run_import(cfg_for(tmp_path), store=MemoryDatasetStore(validators.contract_version), survey=validators)
     assert a.dataset_digest != b.dataset_digest
 
 
@@ -98,8 +100,8 @@ def bad_mutator(name, lines):
 
 def test_invalid_rows_rejected_with_counts_by_reason(tmp_path, validators):
     write_input(tmp_path / "in", mutate=bad_mutator)
-    store = MemoryDatasetStore(validators)
-    res = run_import(cfg_for(tmp_path), store=store, validators=validators)
+    store = MemoryDatasetStore(validators.contract_version)
+    res = run_import(cfg_for(tmp_path), store=store, survey=validators)
     assert res.status == "REJECTED" and store.list_versions("ds-imp") == []
     r = report(tmp_path)
     assert r["total_rows"] == 22 and r["invalid_rows"] == 4 and r["valid_rows"] == 18
@@ -113,8 +115,8 @@ def test_invalid_rows_rejected_with_counts_by_reason(tmp_path, validators):
 def test_within_tolerance_publishes_only_valid_rows(tmp_path, validators):
     write_input(tmp_path / "in", mutate=bad_mutator)
     cfg = cfg_for(tmp_path, tolerance={"max_invalid_rows": 4, "max_invalid_rate": 0.2})
-    store = MemoryDatasetStore(validators)
-    res = run_import(cfg, store=store, validators=validators)
+    store = MemoryDatasetStore(validators.contract_version)
+    res = run_import(cfg, store=store, survey=validators)
     assert res.status == "PUBLISHED"
     m = store.get_manifest("ds-imp", res.version)
     assert sum(f["sample_count"] for f in m["files"]) == 18
@@ -124,7 +126,7 @@ def test_within_tolerance_publishes_only_valid_rows(tmp_path, validators):
 def test_rate_over_tolerance_rejects_even_if_count_ok(tmp_path, validators):
     write_input(tmp_path / "in", mutate=bad_mutator)
     res = run_import(cfg_for(tmp_path, tolerance={"max_invalid_rows": 100, "max_invalid_rate": 0.01}),
-                     store=MemoryDatasetStore(validators), validators=validators)
+                     store=MemoryDatasetStore(validators.contract_version), survey=validators)
     assert res.status == "REJECTED"
 
 
@@ -133,7 +135,7 @@ def test_v1_shaped_rows_all_rejected(tmp_path, validators):
     def v1(name, lines):
         return [{"input": {"utterance": "x"}, "expected": {"items": []}} for _ in lines]
     write_input(tmp_path / "in", mutate=v1)
-    res = run_import(cfg_for(tmp_path), store=MemoryDatasetStore(validators), validators=validators)
+    res = run_import(cfg_for(tmp_path), store=MemoryDatasetStore(validators.contract_version), survey=validators)
     assert res.status == "REJECTED"
     assert set(report(tmp_path)["invalid_reasons_total"]) == {"record_shape: messages가 [system,user,assistant] 각각 문자열 content를 가진 3개가 아니다"}
 
@@ -142,7 +144,7 @@ def test_missing_file_is_input_error(tmp_path, validators):
     write_input(tmp_path / "in")
     (tmp_path / "in" / "lora_b_test.jsonl").unlink()
     with pytest.raises(InputError, match="lora_b_test.jsonl"):
-        run_import(cfg_for(tmp_path), store=MemoryDatasetStore(validators), validators=validators)
+        run_import(cfg_for(tmp_path), store=MemoryDatasetStore(validators.contract_version), survey=validators)
 
 
 def test_scenario_overlap_rejected(tmp_path, validators):
@@ -151,14 +153,14 @@ def test_scenario_overlap_rejected(tmp_path, validators):
             lines[0] = row("LORA_A", 77, "sc-TRAIN-0")
         return lines
     write_input(tmp_path / "in", mutate=overlap)
-    res = run_import(cfg_for(tmp_path), store=MemoryDatasetStore(validators), validators=validators)
+    res = run_import(cfg_for(tmp_path), store=MemoryDatasetStore(validators.contract_version), survey=validators)
     assert res.status == "REJECTED" and "scenario_id" in res.rejected_reasons[0]
 
 
 def test_empty_file_rejected(tmp_path, validators):
     write_input(tmp_path / "in")
     (tmp_path / "in" / "lora_a_val.jsonl").write_bytes(b"")
-    res = run_import(cfg_for(tmp_path), store=MemoryDatasetStore(validators), validators=validators)
+    res = run_import(cfg_for(tmp_path), store=MemoryDatasetStore(validators.contract_version), survey=validators)
     assert res.status == "REJECTED"
 
 
@@ -209,15 +211,15 @@ def test_cross_split_duplicate_utterance_rejected(tmp_path, validators):
             lines[0] = set_utt(row("LORA_A", 2, "sc-e-x"), "저는  하루에 담배를 한 갑 피워요")
         return lines
     write_input(tmp_path / "in", mutate=leak)
-    store = MemoryDatasetStore(validators)
-    res = run_import(cfg_for(tmp_path), store=store, validators=validators)
+    store = MemoryDatasetStore(validators.contract_version)
+    res = run_import(cfg_for(tmp_path), store=store, survey=validators)
     assert res.status == "REJECTED" and "같은 입력" in res.rejected_reasons[0]
     r = report(tmp_path)
     assert r["cross_split_duplicate_inputs"]["EVAL~TRAIN"] == 1 and store.list_versions("ds-imp") == []
     assert "담배" not in json.dumps(r, ensure_ascii=False)                    # 발화 본문은 보고서에 없다
     ok = run_import(cfg_for(tmp_path, tolerance={"max_invalid_rows": 0, "max_invalid_rate": 0,
                                                   "max_cross_split_duplicate_inputs": 1}),
-                    store=store, validators=validators)
+                    store=store, survey=validators)
     assert ok.status == "PUBLISHED"
 
 
@@ -232,7 +234,7 @@ def test_other_question_same_utterance_is_not_a_leak(tmp_path, validators):
             lines[0] = r
         return lines
     write_input(tmp_path / "in", mutate=same)
-    assert run_import(cfg_for(tmp_path), store=MemoryDatasetStore(validators), validators=validators).status == "PUBLISHED"
+    assert run_import(cfg_for(tmp_path), store=MemoryDatasetStore(validators.contract_version), survey=validators).status == "PUBLISHED"
 
 
 SECRET = "홍길동SECRET010-9999-8888"
@@ -249,8 +251,8 @@ def test_no_input_values_in_reasons_report_or_manifest(tmp_path, validators):
             lines = lines + [bad, "{" + SECRET]
         return lines
     write_input(tmp_path / "in", mutate=leak)
-    store = MemoryDatasetStore(validators)
-    res = run_import(cfg_for(tmp_path, tolerance={"max_invalid_rows": 5, "max_invalid_rate": 0.5}), store=store, validators=validators)
+    store = MemoryDatasetStore(validators.contract_version)
+    res = run_import(cfg_for(tmp_path, tolerance={"max_invalid_rows": 5, "max_invalid_rate": 0.5}), store=store, survey=validators)
     assert res.status == "PUBLISHED"
     blob = (tmp_path / "work" / "import_report.json").read_text(encoding="utf-8")
     blob += json.dumps(store.get_manifest("ds-imp", res.version), ensure_ascii=False) + json.dumps(res.__dict__, ensure_ascii=False)
@@ -261,14 +263,14 @@ def test_no_input_values_in_reasons_report_or_manifest(tmp_path, validators):
 def test_version_pinned_rerun_with_other_created_at_is_idempotent(tmp_path, validators):
     """SD-4"""
     write_input(tmp_path / "in")
-    store = MemoryDatasetStore(validators)
-    a = run_import(cfg_for(tmp_path, version="v-pin"), store=store, validators=validators)
-    b = run_import(cfg_for(tmp_path, version="v-pin", created_at="2026-12-01T00:00:00Z"), store=store, validators=validators)
+    store = MemoryDatasetStore(validators.contract_version)
+    a = run_import(cfg_for(tmp_path, version="v-pin"), store=store, survey=validators)
+    b = run_import(cfg_for(tmp_path, version="v-pin", created_at="2026-12-01T00:00:00Z"), store=store, survey=validators)
     assert a.status == "PUBLISHED" and b.status == "ALREADY_PUBLISHED" and a.content_hash == b.content_hash
     write_input(tmp_path / "in", per_file=4)
     from boundary_contracts.errors import BoundaryError
     with pytest.raises(BoundaryError) as e:
-        run_import(cfg_for(tmp_path, version="v-pin"), store=store, validators=validators)
+        run_import(cfg_for(tmp_path, version="v-pin"), store=store, survey=validators)
     assert e.value.code == "CONFLICT"
 
 
@@ -281,13 +283,13 @@ def _with_pending(name, lines):
 def test_pending_policies(tmp_path, validators):
     """SD-2: 기본은 보고만(싣는다), exclude는 뺀다, reject는 거부한다."""
     write_input(tmp_path / "in", mutate=_with_pending)
-    st = MemoryDatasetStore(validators)
-    d = run_import(cfg_for(tmp_path), store=st, validators=validators)
+    st = MemoryDatasetStore(validators.contract_version)
+    d = run_import(cfg_for(tmp_path), store=st, survey=validators)
     assert d.status == "PUBLISHED" and report(tmp_path)["pending_rows"] == 2 and report(tmp_path)["pending_excluded"] == 0
     assert report(tmp_path)["human_review_counts"] == {"auto_only": 16, "pending": 2}
-    ex = run_import(cfg_for(tmp_path, pending_policy="exclude"), store=MemoryDatasetStore(validators), validators=validators)
+    ex = run_import(cfg_for(tmp_path, pending_policy="exclude"), store=MemoryDatasetStore(validators.contract_version), survey=validators)
     assert ex.status == "PUBLISHED" and report(tmp_path)["pending_excluded"] == 2 and ex.dataset_digest != d.dataset_digest
-    assert run_import(cfg_for(tmp_path, pending_policy="reject"), store=MemoryDatasetStore(validators), validators=validators).status == "REJECTED"
+    assert run_import(cfg_for(tmp_path, pending_policy="reject"), store=MemoryDatasetStore(validators.contract_version), survey=validators).status == "REJECTED"
     with pytest.raises(ConfigError):
         cfg_for(tmp_path, pending_policy="drop")
     with pytest.raises(ConfigError):
@@ -305,23 +307,23 @@ def test_pii_suspect_counts_without_values(tmp_path, validators):
         return lines
     write_input(tmp_path / "in", mutate=pii)
     warn = {"max_invalid_rows": 0, "max_invalid_rate": 0, "max_pii_suspect_rows": None}
-    res = run_import(cfg_for(tmp_path, tolerance=warn), store=MemoryDatasetStore(validators), validators=validators)
+    res = run_import(cfg_for(tmp_path, tolerance=warn), store=MemoryDatasetStore(validators.contract_version), survey=validators)
     assert res.status == "PUBLISHED"
     r = report(tmp_path)
     assert r["pii_suspect"]["rows_total"] == 3 and r["pii_suspect"]["rows_by_kind"] == {"email": 1, "phone_mobile": 1, "rrn": 1}
     assert "1234-5678" not in json.dumps(r) and r["deid_attested"] is False
     rej = run_import(cfg_for(tmp_path, tolerance={"max_invalid_rows": 0, "max_invalid_rate": 0, "max_pii_suspect_rows": 2}),
-                     store=MemoryDatasetStore(validators), validators=validators)
+                     store=MemoryDatasetStore(validators.contract_version), survey=validators)
     assert rej.status == "REJECTED"
 
 
 def test_pii_patterns_are_fast_on_adversarial_text():
     import time
-    from synthetic_data.importer import pii_kinds
+    from synthetic_data.components import pii_scan
     evil = "a" * 19000 + "@" + "1" * 900 + "0" + "-" * 90
     rec = {"input": {"user_utterance": evil}, "expected": evil}
     t = time.time()
-    pii_kinds(rec)
+    pii_scan.run({"items": [rec]})
     assert time.time() - t < 1.0
 
 
@@ -337,7 +339,7 @@ def test_same_utterance_same_question_different_state_is_reported_not_rejected(t
             lines[0] = r
         return lines
     write_input(tmp_path / "in", mutate=diff_state)
-    res = run_import(cfg_for(tmp_path), store=MemoryDatasetStore(validators), validators=validators)
+    res = run_import(cfg_for(tmp_path), store=MemoryDatasetStore(validators.contract_version), survey=validators)
     r = report(tmp_path)
     assert res.status == "PUBLISHED" and r["cross_split_duplicate_utterances"]["EVAL~TRAIN"] == 1
     assert r["cross_split_duplicate_inputs"]["EVAL~TRAIN"] == 0
@@ -348,7 +350,7 @@ def test_real_reference_data_if_provided(tmp_path, validators):
     """선택 시험: 실제 파일 6개를 읽기 전용으로 검증한다. 데이터는 리포에 없고 건수 기대값은 C1 빌드의 것이다."""
     import os
     cfg = cfg_for(tmp_path, input_dir=os.environ["SD_REFERENCE_DATA_DIR"])
-    res = run_import(cfg, store=MemoryDatasetStore(validators), validators=validators)
+    res = run_import(cfg, store=MemoryDatasetStore(validators.contract_version), survey=validators)
     r = report(tmp_path)
     assert r["invalid_rows"] == 0 and r["total_rows"] == res.counts["rows_total"]
 

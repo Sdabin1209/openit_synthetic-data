@@ -5,7 +5,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path[:0] = [str(ROOT), str(ROOT / "tests")]
-from boundary_contracts.clients import HttpDatasetStore    # noqa: E402
+from openit_link.clients import HttpDatasetStore    # noqa: E402
 from conftest import build_v2_dataset, write_files        # noqa: E402
 
 url, wt, rt = sys.argv[1:4]

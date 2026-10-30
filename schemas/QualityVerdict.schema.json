@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://openit.invalid/synthetic-data/schemas/QualityVerdict.schema.json",
+  "title": "QualityVerdict",
+  "description": "품질 검사 결과: 사유 코드(비면 통과).",
+  "type": "object",
+  "properties": {
+    "reasons": {
+      "type": "array",
+      "items": {
+        "enum": [
+          "schema_sample"
+        ]
+      }
+    }
+  },
+  "required": [
+    "reasons"
+  ],
+  "additionalProperties": false
+}

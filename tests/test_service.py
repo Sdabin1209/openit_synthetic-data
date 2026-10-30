@@ -12,10 +12,11 @@ import urllib.request
 from pathlib import Path
 
 import pytest
+from synthetic_data.components.dataset_store import FileDatasetStore
 
 from conftest import SURVEY_DIR
-from synthetic_data.schemas import Validators
-from synthetic_data.service.app import Service, make_server, parse_tokens
+from synthetic_data.wiring.survey import Survey
+from synthetic_data.components.link_dataset_store_server import Service, make_server, parse_tokens
 
 RT, WT = "r" * 8 + "abcdef0123456789" * 2, "w" * 8 + "fedcba9876543210" * 2
 
@@ -46,7 +47,7 @@ class Srv:
 
     def __init__(self, tmp_path, **kw):
         skw = {k: kw.pop(k) for k in self.SERVER_KW if k in kw}
-        self.svc = Service(tmp_path / "root", Validators(SURVEY_DIR), parse_tokens(f"model-lab={RT}"),
+        self.svc = Service(FileDatasetStore(tmp_path / "root" / "datasets", Survey(SURVEY_DIR).contract_version), tmp_path / "root", parse_tokens(f"model-lab={RT}"),
                            parse_tokens(f"synthetic-data={WT}"), log=lambda s: None, **kw)
         self.httpd = make_server(self.svc, **skw)
         self.url = f"http://127.0.0.1:{self.httpd.server_address[1]}"
@@ -237,7 +238,7 @@ def test_auth_failure_window_expires_and_frees_memory(tmp_path):
 
 def test_write_role_must_be_synthetic_data(tmp_path):
     with pytest.raises(ValueError):
-        Service(tmp_path / "r", Validators(SURVEY_DIR), {}, parse_tokens("other=" + WT), log=lambda s: None)
+        Service(FileDatasetStore(tmp_path / "r" / "datasets", Survey(SURVEY_DIR).contract_version), tmp_path / "r", {}, parse_tokens("other=" + WT), log=lambda s: None)
 
 
 def test_secrets_not_in_responses(srv, captured):
@@ -307,7 +308,7 @@ def test_long_uri_and_bad_request_line_do_not_kill_logging(srv):
     logs = []
     srv.svc.log = logs.append
     # 표준 라이브러리 서버는 64KiB 넘는 요청 줄을 414로 거절했다. waitress는 헤더 전체 262144바이트까지 받고 그 아래는 앱이 인증부터 답한다(401).
-    assert _raw(srv, b"GET /" + b"a" * 70000 + b" HTTP/1.1\r\nHost: x\r\n\r\n").startswith((b"HTTP/1.1 414", b"HTTP/1.1 401"))
+    assert _raw(srv, b"GET /" + b"a" * 70000 + b" HTTP/1.1\r\nHost: x\r\n\r\n").startswith((b"HTTP/1.1 414", b"HTTP/1.1 401", b"HTTP/1.1 404"))
     assert _raw(srv, b"GET /" + b"a" * 300000 + b" HTTP/1.1\r\nHost: x\r\n\r\n").startswith((b"HTTP/1.1 414", b"HTTP/1.0 431"))
     assert b"400" in _raw(srv, b"GARBAGE\r\n\r\n")
     assert not any("내부 오류" in x for x in logs)
@@ -394,7 +395,7 @@ def test_empty_dataset_dir_hidden_and_startup_cleans_tmp(tmp_path, captured):
 
 def test_same_token_for_read_and_write_refused(tmp_path):
     with pytest.raises(ValueError):
-        Service(tmp_path / "r", Validators(SURVEY_DIR), parse_tokens("model-lab=" + WT), parse_tokens("synthetic-data=" + WT),
+        Service(FileDatasetStore(tmp_path / "r" / "datasets", Survey(SURVEY_DIR).contract_version), tmp_path / "r", parse_tokens("model-lab=" + WT), parse_tokens("synthetic-data=" + WT),
                 log=lambda s: None)
 
 

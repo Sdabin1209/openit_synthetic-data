@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://openit.invalid/synthetic-data/schemas/QualityInput.schema.json",
+  "title": "QualityInput",
+  "description": "샘플 품질 검사 입력(지금은 계약 스키마 통과만, 의미 검사는 미수행).",
+  "type": "object",
+  "properties": {
+    "role": {
+      "enum": [
+        "LORA_A",
+        "LORA_B"
+      ]
+    },
+    "sample": {
+      "type": "object"
+    }
+  },
+  "required": [
+    "role",
+    "sample"
+  ],
+  "additionalProperties": false
+}

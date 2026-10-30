@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://openit.invalid/synthetic-data/schemas/HttpStoreSpec.schema.json",
+  "title": "HttpStoreSpec",
+  "description": "dataset-store(I2 서버)로 게시하는 클라이언트 설정. 토큰은 값이 아니라 비밀 이름이다(D84).",
+  "type": "object",
+  "properties": {
+    "base_url": {
+      "type": "string",
+      "pattern": "^https?://"
+    },
+    "token_env": {
+      "type": "string",
+      "minLength": 1
+    },
+    "timeout": {
+      "type": "number",
+      "exclusiveMinimum": 0
+    }
+  },
+  "required": [
+    "base_url",
+    "token_env",
+    "timeout"
+  ],
+  "additionalProperties": false
+}

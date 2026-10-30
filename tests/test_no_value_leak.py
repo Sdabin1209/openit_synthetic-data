@@ -12,8 +12,8 @@ import pytest
 from boundary_contracts import canonical
 from boundary_contracts.errors import BoundaryError
 from conftest import SURVEY_DIR
-from synthetic_data.importer import run_import
-from synthetic_data.store import FileDatasetStore, MemoryDatasetStore
+from synthetic_data.wiring.import_job import run_import
+from synthetic_data.components.dataset_store import FileDatasetStore, MemoryDatasetStore
 from test_import import cfg_for, write_input
 from test_service import Srv, WT, body_of
 
@@ -42,17 +42,18 @@ def tamper_sample(manifest: dict, blobs: dict) -> tuple[dict, dict]:
 
 
 def test_validators_messages_carry_no_value(validators):
-    for fn, name, rec in ((validators.boundary, "ActionExtractionSample", {"origin": MARK}),
-                          (validators.survey, "QuestionBank", {"questions": MARK})):
-        with pytest.raises(BoundaryError) as e:
-            fn(name, rec)
-        assert e.value.code == "INVALID_RECORD" and MARK not in dump(e.value)
+    from synthetic_data.types.schema_registry import check_contract
+    with pytest.raises(BoundaryError) as e:
+        check_contract("ActionExtractionSample", {"origin": MARK})
+    assert e.value.code == "INVALID_RECORD" and MARK not in dump(e.value)
+    codes = validators.check("QuestionBank", {"questions": MARK})          # 문진 스키마 검사는 위치와 규칙 이름만 돌려준다
+    assert codes and MARK not in " ".join(codes)
 
 
 def test_store_publish_sample_violation_carries_no_value(captured, validators, tmp_path):
     from conftest import write_files
     m, b = tamper_sample(*captured)
-    for st in (MemoryDatasetStore(validators), FileDatasetStore(tmp_path / "s", validators)):
+    for st in (MemoryDatasetStore(validators.contract_version), FileDatasetStore(tmp_path / "s", validators.contract_version)):
         with pytest.raises(BoundaryError) as e:
             st.publish(m, write_files(tmp_path / "src", b))
         assert e.value.code == "INVALID_RECORD" and "ActionExtractionSample" in e.value.message
@@ -64,7 +65,7 @@ def test_store_publish_manifest_violation_carries_no_value(captured, validators)
     m["dataset_id"] = m["dataset_id"]
     m["generator_version"] = {"x": MARK}          # 문자열이어야 하는 필드
     with pytest.raises(BoundaryError) as e:
-        MemoryDatasetStore(validators).publish(m, {})
+        MemoryDatasetStore(validators.contract_version).publish(m, {})
     assert e.value.code == "INVALID_RECORD" and MARK not in dump(e.value)
 
 
@@ -100,6 +101,6 @@ def test_import_report_and_error_record_carry_no_value(tmp_path, validators):
 
     cfg = cfg_for(tmp_path)
     with pytest.raises(BoundaryError) as e:
-        run_import(cfg, store=Tampering(validators), validators=validators)
+        run_import(cfg, store=Tampering(validators), survey=validators)
     assert MARK not in dump(e.value)
     assert MARK not in (tmp_path / "work" / "import_report.json").read_text(encoding="utf-8")

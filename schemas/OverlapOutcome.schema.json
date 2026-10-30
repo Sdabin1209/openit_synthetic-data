@@ -1,0 +1,67 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://openit.invalid/synthetic-data/schemas/OverlapOutcome.schema.json",
+  "title": "OverlapOutcome",
+  "description": "분할 쌍마다 같은 발화+맥락 수(참고), 같은 입력 수(판정)와 거부 사유.",
+  "type": "object",
+  "properties": {
+    "duplicate_utterances": {
+      "type": "object",
+      "properties": {
+        "EVAL~TRAIN": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "EVAL~VALIDATION": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "TRAIN~VALIDATION": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "required": [
+        "EVAL~TRAIN",
+        "EVAL~VALIDATION",
+        "TRAIN~VALIDATION"
+      ],
+      "additionalProperties": false
+    },
+    "duplicate_inputs": {
+      "type": "object",
+      "properties": {
+        "EVAL~TRAIN": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "EVAL~VALIDATION": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "TRAIN~VALIDATION": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "required": [
+        "EVAL~TRAIN",
+        "EVAL~VALIDATION",
+        "TRAIN~VALIDATION"
+      ],
+      "additionalProperties": false
+    },
+    "reasons": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  },
+  "required": [
+    "duplicate_utterances",
+    "duplicate_inputs",
+    "reasons"
+  ],
+  "additionalProperties": false
+}

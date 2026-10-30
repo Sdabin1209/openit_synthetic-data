@@ -1,0 +1,13 @@
+{
+  "ref": {
+    "id": "qs-main",
+    "version": "v1",
+    "content_hash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+  },
+  "bank": {
+    "questions": []
+  },
+  "approvals": null,
+  "change_checked": false,
+  "follow_ups": null
+}

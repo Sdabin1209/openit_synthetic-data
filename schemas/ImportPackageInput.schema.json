@@ -1,0 +1,207 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://openit.invalid/synthetic-data/schemas/ImportPackageInput.schema.json",
+  "title": "ImportPackageInput",
+  "description": "게시기 패키징 입력. 설정에서 온 값, 집계, 통과한 샘플, 겹침 판정.",
+  "type": "object",
+  "properties": {
+    "dataset_id": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+      "maxLength": 128
+    },
+    "version": {
+      "anyOf": [
+        {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+          "maxLength": 128
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "created_at": {
+      "type": "string",
+      "minLength": 1
+    },
+    "contract_version": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "question_sets": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "source_label": {
+      "type": "string",
+      "minLength": 1
+    },
+    "action_rules_version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "pending_policy": {
+      "enum": [
+        "report",
+        "exclude",
+        "reject"
+      ]
+    },
+    "pending_excluded": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "tolerance": {
+      "type": "object",
+      "properties": {
+        "max_invalid_rows": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "max_invalid_rate": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        }
+      },
+      "required": [
+        "max_invalid_rows",
+        "max_invalid_rate"
+      ],
+      "additionalProperties": false
+    },
+    "tool_version": {
+      "type": "string"
+    },
+    "pipeline_schema_version": {
+      "type": "string",
+      "pattern": "^[0-9]+\\.[0-9]+$"
+    },
+    "files": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "pattern": "^lora_[ab]_(train|val|test)\\.jsonl$"
+          },
+          "role": {
+            "enum": [
+              "LORA_A",
+              "LORA_B"
+            ]
+          },
+          "split": {
+            "enum": [
+              "TRAIN",
+              "VALIDATION",
+              "EVAL"
+            ]
+          },
+          "sha256": {
+            "type": "string",
+            "pattern": "^sha256:[0-9a-f]{64}$"
+          },
+          "samples": {
+            "type": "array",
+            "items": {
+              "type": "object"
+            }
+          }
+        },
+        "required": [
+          "name",
+          "role",
+          "split",
+          "sha256",
+          "samples"
+        ],
+        "additionalProperties": false
+      },
+      "minItems": 6,
+      "maxItems": 6
+    },
+    "summary": {
+      "$ref": "ImportTallySummary.schema.json"
+    },
+    "overlap": {
+      "type": "object",
+      "properties": {
+        "duplicate_utterances": {
+          "type": "object",
+          "properties": {
+            "EVAL~TRAIN": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "EVAL~VALIDATION": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "TRAIN~VALIDATION": {
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          "required": [
+            "EVAL~TRAIN",
+            "EVAL~VALIDATION",
+            "TRAIN~VALIDATION"
+          ],
+          "additionalProperties": false
+        },
+        "duplicate_inputs": {
+          "type": "object",
+          "properties": {
+            "EVAL~TRAIN": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "EVAL~VALIDATION": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "TRAIN~VALIDATION": {
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          "required": [
+            "EVAL~TRAIN",
+            "EVAL~VALIDATION",
+            "TRAIN~VALIDATION"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "duplicate_utterances",
+        "duplicate_inputs"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "required": [
+    "dataset_id",
+    "version",
+    "created_at",
+    "contract_version",
+    "question_sets",
+    "source_label",
+    "action_rules_version",
+    "pending_policy",
+    "pending_excluded",
+    "tolerance",
+    "tool_version",
+    "pipeline_schema_version",
+    "files",
+    "summary",
+    "overlap"
+  ],
+  "additionalProperties": false
+}

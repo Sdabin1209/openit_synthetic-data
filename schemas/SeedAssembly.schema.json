@@ -1,0 +1,50 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://openit.invalid/synthetic-data/schemas/SeedAssembly.schema.json",
+  "title": "SeedAssembly",
+  "description": "조립 결과: FAILURE_CASE_SEED 샘플(계약 형식), 건너뛴 시드, 종류별 개수.",
+  "type": "object",
+  "properties": {
+    "samples": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "skipped": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "case_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "reason": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "case_id",
+          "reason"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "stats": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "integer",
+        "minimum": 0
+      }
+    }
+  },
+  "required": [
+    "samples",
+    "skipped",
+    "stats"
+  ],
+  "additionalProperties": false
+}

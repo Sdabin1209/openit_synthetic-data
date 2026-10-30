@@ -1,0 +1,8 @@
+{
+  "patterns": [
+    "email",
+    "phone_landline",
+    "phone_mobile",
+    "rrn"
+  ]
+}

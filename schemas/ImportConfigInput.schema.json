@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://openit.invalid/synthetic-data/schemas/ImportConfigInput.schema.json",
+  "title": "ImportConfigInput",
+  "description": "게시기 설정 정규화 입력. raw는 계약 SyntheticJobConfigImport를 따라야 한다.",
+  "type": "object",
+  "properties": {
+    "raw": {
+      "type": "object"
+    },
+    "base_dir": {
+      "type": "string",
+      "minLength": 1
+    },
+    "survey_dir_override": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "installed_action_rules_version": {
+      "type": "string",
+      "minLength": 1
+    }
+  },
+  "required": [
+    "raw",
+    "base_dir",
+    "survey_dir_override",
+    "installed_action_rules_version"
+  ],
+  "additionalProperties": false
+}

@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://openit.invalid/synthetic-data/schemas/PendingFilterInput.schema.json",
+  "title": "PendingFilterInput",
+  "description": "human_review가 pending인 행을 파일마다 걷어낸다.",
+  "type": "object",
+  "properties": {
+    "files": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "array",
+        "items": {
+          "type": "object"
+        }
+      }
+    }
+  },
+  "required": [
+    "files"
+  ],
+  "additionalProperties": false
+}

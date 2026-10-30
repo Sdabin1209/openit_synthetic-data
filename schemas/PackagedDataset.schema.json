@@ -1,0 +1,43 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://openit.invalid/synthetic-data/schemas/PackagedDataset.schema.json",
+  "title": "PackagedDataset",
+  "description": "패키징 결과: 매니페스트(계약 DatasetManifest), dataset_digest, 파일 본문(경로 -> JSONL 텍스트).",
+  "type": "object",
+  "properties": {
+    "manifest": {
+      "type": "object"
+    },
+    "digest": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "files": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string",
+            "pattern": "^(?!\\.\\.?(?:/|$))[^/\\\\\\x00]+(?:/(?!\\.\\.?(?:/|$))[^/\\\\\\x00]+)*$",
+            "maxLength": 1024
+          },
+          "text": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "path",
+          "text"
+        ],
+        "additionalProperties": false
+      }
+    }
+  },
+  "required": [
+    "manifest",
+    "digest",
+    "files"
+  ],
+  "additionalProperties": false
+}

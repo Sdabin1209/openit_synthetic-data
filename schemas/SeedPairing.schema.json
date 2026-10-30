@@ -1,0 +1,55 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://openit.invalid/synthetic-data/schemas/SeedPairing.schema.json",
+  "title": "SeedPairing",
+  "description": "짝: 시드와 문항 세트 참조. 짝이 없는 시드는 사유와 함께 건너뛴다.",
+  "type": "object",
+  "properties": {
+    "pairs": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "seed": {
+            "$ref": "Seed.schema.json"
+          },
+          "ref": {
+            "type": "object"
+          }
+        },
+        "required": [
+          "seed",
+          "ref"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "skipped": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "case_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "reason": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "case_id",
+          "reason"
+        ],
+        "additionalProperties": false
+      }
+    }
+  },
+  "required": [
+    "pairs",
+    "skipped"
+  ],
+  "additionalProperties": false
+}

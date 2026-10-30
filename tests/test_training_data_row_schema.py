@@ -11,13 +11,13 @@ S = Path(__file__).resolve().parent.parent / "schemas"
 
 
 def v():
-    schema = json.loads((S / "training-data-row.schema.json").read_text(encoding="utf-8"))
+    schema = json.loads((S / "TrainingDataRow.schema.json").read_text(encoding="utf-8"))
     jsonschema.Draft202012Validator.check_schema(schema)
     return jsonschema.Draft202012Validator(schema)
 
 
 def test_valid_examples_pass_and_invalid_example_is_rejected():
-    for name in ("row-lora-a", "row-lora-b"):
+    for name in ("TrainingDataRow.valid1", "TrainingDataRow.valid2"):
         v().validate(json.loads((S / "examples" / f"{name}.json").read_text(encoding="utf-8")))
-    bad = json.loads((S / "examples" / "row-invalid-two-messages.json").read_text(encoding="utf-8"))
+    bad = json.loads((S / "examples" / "TrainingDataRow.invalid1.json").read_text(encoding="utf-8"))
     assert list(v().iter_errors(bad))

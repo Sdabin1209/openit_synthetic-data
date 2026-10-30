@@ -1,0 +1,15 @@
+{
+  "tolerance": {
+    "max_invalid_rows": 0,
+    "max_invalid_rate": 0,
+    "max_pii_suspect_rows": 0
+  },
+  "pending_policy": "report",
+  "total_rows": 10,
+  "invalid_rows": 0,
+  "valid_by_file": {
+    "lora_a_train.jsonl": 10
+  },
+  "pending_total": 0,
+  "pii_rows_total": 0
+}

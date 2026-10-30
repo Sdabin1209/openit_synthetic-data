@@ -1,0 +1,49 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://openit.invalid/synthetic-data/schemas/SeedPairingInput.schema.json",
+  "title": "SeedPairingInput",
+  "description": "시드를 문항 세트에 짝짓는 입력. 학습 풀의 문항 세트만 후보다.",
+  "type": "object",
+  "properties": {
+    "seeds": {
+      "type": "array",
+      "items": {
+        "$ref": "Seed.schema.json"
+      }
+    },
+    "contexts": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "ref": {
+            "type": "object"
+          },
+          "usage": {
+            "enum": [
+              "TRAIN_POOL",
+              "HELD_OUT_EVAL"
+            ]
+          }
+        },
+        "required": [
+          "ref",
+          "usage"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "fallback_question_set_id": {
+      "type": [
+        "string",
+        "null"
+      ]
+    }
+  },
+  "required": [
+    "seeds",
+    "contexts",
+    "fallback_question_set_id"
+  ],
+  "additionalProperties": false
+}

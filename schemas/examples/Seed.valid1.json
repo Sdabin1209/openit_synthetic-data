@@ -1,0 +1,10 @@
+{
+  "case_id": "c1",
+  "version": 1,
+  "role": "LORA_B",
+  "input": {
+    "action": "ASK"
+  },
+  "expected": "네",
+  "question_set": null
+}

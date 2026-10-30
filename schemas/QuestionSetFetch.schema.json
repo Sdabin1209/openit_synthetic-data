@@ -1,0 +1,65 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://openit.invalid/synthetic-data/schemas/QuestionSetFetch.schema.json",
+  "title": "QuestionSetFetch",
+  "description": "읽어 온 문항 세트: ArtifactRef, QuestionBank(계약), 검수 결과(읽었을 때만), 변경 분류의 후속 작업(읽었을 때만; null이면 변경 기록 없음).",
+  "type": "object",
+  "properties": {
+    "ref": {
+      "type": "object"
+    },
+    "bank": {
+      "type": "object"
+    },
+    "approvals": {
+      "anyOf": [
+        {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "decision": {
+                "type": "string"
+              },
+              "clinical_basis_approved": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "decision",
+              "clinical_basis_approved"
+            ],
+            "additionalProperties": false
+          }
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "change_checked": {
+      "type": "boolean"
+    },
+    "follow_ups": {
+      "anyOf": [
+        {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        {
+          "type": "null"
+        }
+      ]
+    }
+  },
+  "required": [
+    "ref",
+    "bank",
+    "approvals",
+    "change_checked",
+    "follow_ups"
+  ],
+  "additionalProperties": false
+}

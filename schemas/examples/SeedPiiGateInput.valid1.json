@@ -1,0 +1,11 @@
+{
+  "hits": {
+    "c1": [
+      "email"
+    ]
+  },
+  "patterns": [
+    "email"
+  ],
+  "max_suspect": 0
+}

@@ -1,0 +1,14 @@
+{
+  "manifest": {
+    "dataset_id": "ds-1",
+    "version": "v1",
+    "files": [
+      {
+        "path": "lora_a/train.jsonl"
+      }
+    ]
+  },
+  "files": {
+    "lora_a/train.jsonl": "/tmp/x"
+  }
+}

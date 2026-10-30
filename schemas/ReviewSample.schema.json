@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://openit.invalid/synthetic-data/schemas/ReviewSample.schema.json",
+  "title": "ReviewSample",
+  "description": "감수용 목록(JSONL 텍스트). 게시 대상이 아니다.",
+  "type": "object",
+  "properties": {
+    "text": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "text"
+  ],
+  "additionalProperties": false
+}
