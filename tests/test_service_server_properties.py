@@ -69,6 +69,44 @@ def test_in_flight_request_finishes_when_server_is_shutting_down(tmp_path):
     assert out["r"][0] == 200
 
 
+def _drain_server(tmp_path, monkeypatch, channels, grace):
+    """드레인이 보는 최소 인터페이스만 가진 가짜 waitress 서버(active_channels)로 DatasetServer를 만든다."""
+    fake = types.SimpleNamespace(active_channels=channels)
+    monkeypatch.setattr(mod, "create_server", lambda app, **kw: fake)
+    from test_service import Service, FileDatasetStore, Survey, SURVEY_DIR, parse_tokens, RT
+    clock = FakeClock()
+    svc = Service(FileDatasetStore(tmp_path / "root" / "datasets", Survey(SURVEY_DIR).contract_version), tmp_path / "root",
+                  parse_tokens(f"model-lab={RT}"), parse_tokens(f"synthetic-data={WT}"), log=lambda m: None, clock=clock)
+    return mod.make_server(svc, "127.0.0.1", 0, drain_grace=grace), clock
+
+
+def test_drain_gives_up_when_the_grace_passes_with_a_request_that_never_ends(tmp_path, monkeypatch):
+    """(우리 코드) 끝나지 않는 진행 중 요청이 있으면 drain_grace가 지난 뒤 포기한다. 시계는 시험이 흘린다(poll 한 번에 1초), 실제로 기다리지 않는다."""
+    busy = types.SimpleNamespace(requests=[1], total_outbufs_len=0, request=None)      # 요청이 하나 처리 중인 채널(끝나지 않는다)
+    srv, clock = _drain_server(tmp_path, monkeypatch, {1: busy}, grace=8)
+    polls = []
+    assert srv._drain(lambda: (polls.append(1), clock.advance(1.0))) is False
+    assert len(polls) == 8 and busy.requests == [1]      # 한도(8초)만큼 흘린 뒤 포기했고 요청은 끝나지 않은 채다
+
+
+def test_drain_returns_at_once_when_nothing_is_in_flight(tmp_path, monkeypatch):
+    idle = types.SimpleNamespace(requests=[], total_outbufs_len=0, request=None)
+    srv, clock = _drain_server(tmp_path, monkeypatch, {1: idle}, grace=8)
+    polls = []
+    assert srv._drain(lambda: polls.append(1)) is True and polls == []
+
+
+def test_drain_finishes_when_the_request_ends_before_the_grace(tmp_path, monkeypatch):
+    busy = types.SimpleNamespace(requests=[1], total_outbufs_len=0, request=None)
+    srv, clock = _drain_server(tmp_path, monkeypatch, {1: busy}, grace=8)
+
+    def poll():
+        clock.advance(1.0)
+        if clock() >= 1003.0:
+            busy.requests = []      # 3초째에 요청이 끝난다
+    assert srv._drain(poll) is True
+
+
 def test_sigterm_handler_stops_the_server_loop(tmp_path, monkeypatch):
     """(우리 코드) 진입점(wiring/service.main)이 SIGTERM·SIGINT에 서버 정지 사건을 세운다. 실제 신호·프로세스 없이 등록된 처리기를 직접 부른다(신호 전달은 운영체제 몫).
     설정 값 확인(1)도 겸한다: DATASET_STORE_DRAIN_GRACE가 서버에 간다."""

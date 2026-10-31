@@ -7,6 +7,7 @@
 |---|---|---|---|
 | test_import.py::test_pii_patterns_are_fast_on_adversarial_text | 개인정보 패턴이 입력을 폭주(ReDoS)시키지 않는다 | 3 (시간 단언 지움, 방어 장치 확인) | `test_pii_patterns_have_bounded_non_nested_repeats`: 모든 반복 수량자에 상한, 중첩 반복 없음, 입력 길이 상한이 있고 악성 입력이 끝난다 |
 | test_service_server_properties.py::test_in_flight_request_finishes_when_server_is_shutting_down | 종료 신호 뒤에도 진행 중 요청은 끝까지 응답한다 | 1 (드레인 한도가 주입된 시계로 잰다) | 같은 이름. 시작·해제 Event와 멈춘 가짜 시계로 순서를 맞춘다(sleep 없음) |
+| (추가) test_drain_gives_up_when_the_grace_passes_with_a_request_that_never_ends 외 2건 | 드레인 한도가 지나면 포기하고, 요청이 먼저 끝나면 정상 종료한다 | 1 (가짜 시계 + 최소 가짜 채널) | `_drain(poll)`로 분리해 시험 |
 | test_service_server_properties.py::test_sigterm_stops_the_service_process_cleanly | 진입점이 SIGTERM에 서버를 멈추고 드레인 설정을 넘긴다 | 2 (실제 프로세스·신호를 지움) | `test_sigterm_handler_stops_the_server_loop`: 등록된 처리기를 직접 불러 정지 사건과 `DATASET_STORE_DRAIN_GRACE` 값을 확인. 프로세스 기동·왕복은 smoke_service.sh의 몫 |
 
 ## 그 밖에 시간에 기대던 시험(같은 기준으로 처리)

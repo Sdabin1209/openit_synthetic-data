@@ -436,11 +436,19 @@ class DatasetServer:
             while not self._stop.is_set():
                 wasyncore.loop(timeout=0.1, map=self._map, count=1)
             wasyncore.dispatcher.close(self._srv)           # 새 연결을 받지 않는다(trigger는 작업 스레드가 쓰므로 닫지 않는다)
-            deadline = self._clock() + self._grace
-            while self._clock() < deadline and any(self._busy(c) for c in list(self._srv.active_channels.values())):
-                wasyncore.loop(timeout=0.1, map=self._map, count=1)
+            self._drain(lambda: wasyncore.loop(timeout=0.1, map=self._map, count=1))
         finally:
             self._done.set()
+
+    def _drain(self, poll) -> bool:
+        """진행 중인 요청이 모두 끝날 때까지 poll을 부른다. 한도(drain_grace)가 주입된 시계로 지나면 포기하고 False를 돌려준다(True: 모두 끝남).
+        poll과 채널 목록(active_channels)을 인자·속성으로만 보므로 시험이 가짜 시계와 끝나지 않는 가짜 채널로 포기 경로를 확인한다(ADR 0023)."""
+        deadline = self._clock() + self._grace
+        while any(self._busy(c) for c in list(self._srv.active_channels.values())):
+            if self._clock() >= deadline:
+                return False
+            poll()
+        return True
 
     @staticmethod
     def _busy(ch) -> bool:
