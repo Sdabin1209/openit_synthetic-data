@@ -8,7 +8,6 @@ import tarfile
 import threading
 import urllib.error
 import urllib.request
-from pathlib import Path
 
 import pytest
 from synthetic_data.components.dataset_store import FileDatasetStore
@@ -50,11 +49,6 @@ class FakeClock:
 
 
 class Srv:
-    @staticmethod
-    def IDLE(sec):
-        """유휴 연결 timeout 설정(구현마다 이름이 다르므로 한 곳에 둔다)."""
-        return {"channel_timeout": sec}
-
     SERVER_KW = ("channel_timeout", "connection_limit", "threads", "drain_grace")
 
     def __init__(self, tmp_path, **kw):

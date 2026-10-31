@@ -3,12 +3,10 @@ from __future__ import annotations
 
 import json
 
-import pytest
-
 import doubles
 from doubles import OLD_PIPELINE_SCHEMA_VERSION
 from boundary_contracts import PIPELINE_SCHEMA_VERSION
-from conftest import SURVEY_DIR, make_cfg_raw
+from conftest import make_cfg_raw
 from ref_server import ReferenceServer, ref_of
 from synthetic_data.__main__ import main
 

@@ -19,7 +19,7 @@ from synthetic_data.wiring.plans import parse_config
 from synthetic_data.wiring.plans import parse_import_config
 from synthetic_data.components.dataset_store import MemoryDatasetStore
 
-from conftest import SURVEY_DIR, make_cfg_raw, run as run_job_helper
+from conftest import make_cfg_raw, run as run_job_helper
 
 EX = Path(conformance.__file__).parent / "examples"
 BAD = Path(conformance.__file__).parent / "examples_invalid"

@@ -328,7 +328,7 @@ def test_pii_patterns_have_bounded_non_nested_repeats():
         for op, av in items:
             name = str(op)
             if name in ("MAX_REPEAT", "MIN_REPEAT"):
-                lo, hi, sub = av
+                _lo, hi, sub = av
                 assert hi < MAXREPEAT, "상한 없는 반복"
                 assert depth == 0 or not _has_repeat(sub), "중첩 반복"
                 walk(sub, depth + 1)

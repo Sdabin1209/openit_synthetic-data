@@ -11,7 +11,6 @@ from boundary_contracts.errors import BoundaryError
 from boundary_contracts.sdk import DatasetStore
 
 from conftest import write_files
-from synthetic_data.components.dataset_store import DatasetStoreBase
 
 
 def code(excinfo):

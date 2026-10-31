@@ -9,8 +9,6 @@ import signal
 import threading
 import types
 
-import pytest
-
 from synthetic_data.components import link_dataset_store_server as mod
 from conftest import HANG_GUARD_SECONDS
 from test_service import FakeClock, Srv, WT
@@ -20,7 +18,6 @@ def test_waitress_receives_the_configured_limits(tmp_path, monkeypatch):
     """(1) 값 확인: 연결 상한·유휴 timeout·스레드 수·본문 상한이 waitress에 그대로 간다(시간을 재지 않는다)."""
     seen = {}
     monkeypatch.setattr(mod, "create_server", lambda app, **kw: seen.update(kw) or object())
-    s = Srv.__new__(Srv)
     from test_service import Service, FileDatasetStore, Survey, SURVEY_DIR, parse_tokens, RT
     svc = Service(FileDatasetStore(tmp_path / "root" / "datasets", Survey(SURVEY_DIR).contract_version), tmp_path / "root",
                   parse_tokens(f"model-lab={RT}"), parse_tokens(f"synthetic-data={WT}"), log=lambda m: None, max_body=1234, clock=FakeClock())

@@ -69,7 +69,7 @@ PYTHONPATH=tests python -m synthetic_data run --config configs/dev.job.json [--c
 | `INVALID_RECORD`(비식별) | 실패 사례 저장소가 `deidentified=false`를 냈다. 실행이 거부된 것이 정상이다. ops-feedback에 알린다 |
 | `FAILED_PRECONDITION` | 지정한 문항 세트 버전에 검수 승인이 없다(`reviewed_only`),  |
 | `NOTHING_TO_DO` | `affected_only`인데 `REGENERATE_SAMPLES`가 없거나 품질 검사 뒤 샘플이 없다. `report.json`의 `notes`, `dropped` |
-| `dropped` 비율이 큼 | `reasons` 코드는 `synthetic_data/quality.py`. 시드 사례 또는 문항 정의 문제 |
+| `dropped` 비율이 큼 | `reasons` 코드는 `synthetic_data/components/sample_quality.py`. 시드 사례 또는 문항 정의 문제 |
 | 해시 불일치 | 저장된 파일이 바뀌었다. 새 버전으로 다시 게시 |
 
 ## 컨테이너
@@ -78,7 +78,7 @@ PYTHONPATH=tests python -m synthetic_data run --config configs/dev.job.json [--c
 
 영역 빌드 진입점: `bash scripts/build-image.sh <BuildImageRequest 파일>`(ADR 0018). 실제 빌드 확인은 `scripts/smoke_build_image.sh`(소스 경로는 환경 변수로 받는다).
 
-run-once 잡(`run`, `import`)은 이미지 없이 `requirements.lock`으로 환경을 고정한다(헤드 승인, D22 (2)). I2 서버(dataset-store)는 `Dockerfile`이 있고 `scripts/smoke_service.sh`로 확인한다. 이미지 빌드에는 `--build-arg REVISION=<커밋 hex>`가 필요하다(기본 n/a이면 빌드가 멈춘다, 계약 ImageLabels).
+run-once 잡(`run`, `import`)은 개발에서는 `requirements.lock` 환경으로, 운영에서는 dataset-store 이미지의 `io.openit.jobs` 선언으로 돈다(ADR 0019). I2 서버(dataset-store)는 `Dockerfile`이 있고 `scripts/smoke_service.sh`로 확인한다. 이미지 빌드에는 `--build-arg REVISION=<커밋 hex>`가 필요하다(기본 n/a이면 빌드가 멈춘다, 계약 ImageLabels).
 
 ## 비밀은 NAME_FILE로 (D84)
 

@@ -17,7 +17,7 @@ import: 설정(JSON) + jsonl 6개 ─▶ 행 검증 ─▶ 허용치 판정 ─�
 
 문항 세트마다 시나리오 계획(파서 21종, 생성기 시나리오)을 만들고 시나리오 ID를 문항 세트 버전과 생성기에 무관하게 해시로 정했다. 분할이 시나리오 단위인 이유는 7절 이하에 남아 있다. 제거 사유는 ADR 0010.
 
-## 3. 시드 수집 (`seeds.py`)
+## 3. 시드 수집 (`components/seed_collect.py`)
 
 I7 `FailureStore`로만 읽는다. `review_status=CONFIRMED`이고 `expected`가 있는 사례만 쓴다(소비자 규칙). `deidentified`가 true가 아니면 `BoundaryError(INVALID_RECORD)`로 **전체 실행을 거부**한다(브리프 5절). 그 밖의 건너뜀(trace 스키마 위반, 계약 버전 불일치, 종류 판별 불가, 문항이 지정 문항 세트에 없음)은 사유와 함께 보고서 `skipped_seeds`에 남는다. FailureCase 1.1의 `question_set`과 `expected_kind`가 있으면 그것을 쓴다(그 문항 세트가 이번 실행의 학습 풀에 있어야 함). 없는 1.0 레코드는 설정 `seeds.question_set_id`와 expected 형태 판별로 폴백한다(CR-001 결정).
 시드 샘플은 `origin=FAILURE_CASE_SEED`, `seed_case_id`를 갖고, 원문 정답을 그대로 쓴다. 시드는 사람이 확정한 정답이라 품질 검사에서 문진 스키마 통과만 확인한다.
@@ -34,7 +34,7 @@ v1 `ParserOutput` 라벨 기준 구현이었다. v2 정답은 데이터셋 담�
 
 제거 사유는 ADR 0010. 시드 샘플은 노이즈 변형을 만들지 않는다(원문 위치가 v2 출력에 없다).
 
-## 7. 품질 검사기 (`quality.py`)와 중복 제거
+## 7. 품질 검사기 (`components/sample_quality.py`)와 중복 제거(`components/sample_dedupe.py`)
 
 샘플마다 사유 코드를 낸다. 하나라도 있으면 그 샘플을 빼고 `report.json`의 `dropped`에 센다.
 - 공통(2.0.0): 경계 스키마(ActionExtractionSample/ResponseSample)만 검사한다. v1의 의미 검사(아래 파서·생성기 항목)는 v1 필드에 묶여 있어 빠졌고, v2 의미 검사는 계약의 규칙 검사기(`check_action_extraction`) 연결 여부가 **미정**이다. 아래 파서·생성기 항목은 v1 시점의 설계 기록이다.
@@ -43,7 +43,7 @@ v1 `ParserOutput` 라벨 기준 구현이었다. v2 정답은 데이터셋 담�
 - 중복 제거: (역할, 입력)이 같은 샘플은 하나만 남긴다. 같은 입력에 다른 정답이면(라벨 잡음) 합성끼리는 모두 빼고, 시드가 있으면 시드를 남긴다. 분할 **전에** 하므로 같은 입력이 학습과 평가에 걸치지 않는다.
 - **감수 샘플링**: (역할, 종류)마다 해시 순으로 `review.per_kind`개를 `review_sample.jsonl`에 쓴다(사람 감수용, 게시 대상 아님).
 
-## 8. 분할 (`split.py`)
+## 8. 분할 (`components/split_assign.py`)
 
 - 분할 단위는 **시나리오**다. 같은 `scenario_id`(노이즈 변형, 같은 시나리오의 문항 세트 버전들)는 같은 쪽에 간다.
 - `HELD_OUT_EVAL`로 지정한 문항 세트의 시나리오는 모두 EVAL이다. 이들은 `*/eval_unseen.jsonl`로 따로 쓰고 모든 파일의 `files[].question_sets`에 그 파일의 문항 세트를 적는다(D32 보지 못한 문항 평가). 같은 문항 세트를 학습 풀과 보류에 함께 지정하면 설정 오류.
@@ -51,13 +51,13 @@ v1 `ParserOutput` 라벨 기준 구현이었다. v2 정답은 데이터셋 담�
 - **O11 미결정**: 평가셋의 구성과 합성·실제 비율, 지표, 임계치는 정하지 않았다. `split.ratios`는 설정에 반드시 적어야 하며 코드 기본값이 없다. 저장소의 예시 설정 값(0.8/0.1/0.1)은 동작 확인용이다.
 - 게시 때 저장소가 한 번 더 확인한다: EVAL의 `scenario_id`가 TRAIN·VALIDATION과 겹치면 `INVALID_RECORD`.
 
-## 9. 패키징 (`package.py`)
+## 9. 패키징 (`components/run_package.py`, 게시기는 `components/import_package.py`)
 
 `<role>/<split>.jsonl`(lora_a/lora_b, train/validation/eval/eval_unseen). 줄은 키 정렬·구분자 고정 JSON, 샘플 ID 순이라 같은 샘플 집합은 같은 바이트다. 파일 해시는 `canonical.file_hash`, 매니페스트 해시는 `canonical.content_hash`. 매니페스트는 계약 버전, 문항 세트 ArtifactRef 목록, 생성기 버전, 시드 사례 ID, 분할별 파일과 개수, 규칙 세대을 담는다. 샘플은 쓰기 전에 경계 스키마와 문진 스키마로 검증한다(품질 검사 단계).
 
 ## 10. 재현성
 
-- 난수: 전역 `random`을 쓰지 않고 `rng.derive_int(seed, 용도, ...)`로만 파생. 시각·프로세스 상태를 내용에 쓰지 않는다. 딕셔너리는 정렬해서 직렬화한다.
+- 난수: 전역 `random`을 쓰지 않고 `canonical.sha256_hash`에서 파생하는 `_derive_int(seed, 용도, ...)`(`split_assign`, `review_sample`)로만 파생. 시각·프로세스 상태를 내용에 쓰지 않는다. 딕셔너리는 정렬해서 직렬화한다.
 - `dataset_digest`: 파일 해시 목록, 문항 세트, 계약 버전, `generator_version`(게시 도구 식별자), 시드 사례 ID, `action_rules_version`의 `canonical` 해시. `created_at`·`version`·`ext`는 뺀다. 같은 입력과 시드는 같은 digest다(시험: `test_reproducible_*`, 메모리/파일 저장소와 작업 디렉터리가 달라도 같음).
 - 매니페스트 `content_hash`에는 `created_at`이 들어간다. 설정에서 고정하면 `content_hash`도 같다. 지정하지 않으면 실행 시각이다. 이 때문에 같은 digest의 버전이 저장소에 이미 있으면 잡이 다시 게시하지 않고 `ALREADY_PUBLISHED`로 끝난다(CR-005).
 - `version`을 생략하면 `v<digest 앞 32자>`다.
@@ -66,13 +66,13 @@ v1 `ParserOutput` 라벨 기준 구현이었다. v2 정답은 데이터셋 담�
 
 - `python -m synthetic_data run --config <파일>`: 설정 하나로 끝까지 돌고 종료한다(run-once). 새 문항 세트 버전이나 실패 사례가 생길 때 스케줄러가 같은 설정으로 부르면 된다(D39). 어댑터(문항 읽기, 실패 사례 읽기)는 설정의 `factory`(`module:function`)가 만든다. 이웃 영역의 메모리 구현이 나오면 설정만 바꾼다.
 - `reviewed_only`(기본 true): 버전을 지정하지 않으면 `latest(..., reviewed_only=True)`, 지정하면 `get_reviews`에서 APPROVED + `clinical_basis_approved`를 확인한다.
-- `regeneration.mode = affected_only`: 문항 세트마다 `get_change(ref)`를 읽어 `REGENERATE_SAMPLES`가 있으면 `affected_slots`의 문항으로 제한해 새 데이터셋 버전을 만든다. 없으면 그 문항 세트는 제외하고 모두 제외되면 `NOTHING_TO_DO`. `affected_slots`는 `<question_id>.<slot_id>`이고 마지막 `.`에서 나눈다(CR-003 결정, CONVENTIONS 10절).
+- `regeneration.mode = affected_only`: 문항 세트마다 `get_change(ref)`를 읽어 `REGENERATE_SAMPLES` 후속 작업이 있는 문항 세트만 쓰고(`components/question_set_admit.py`), 없으면 그 문항 세트는 제외한다. 모두 제외되면 `NOTHING_TO_DO`. v1 생성 경로를 제거한 뒤(ADR 0010)에는 변경 분류의 `affected_slots`로 문항을 더 좁히지 않는다(시드가 문항 세트에 속하는지만 본다). 이 한계는 브리프의 "해당 문항의 샘플을 다시 만든다"보다 좁다: 열린 항목으로 STATUS에 적었다.
 - 출력: 작업 디렉터리의 `report.json`(건수, 건너뜀·버린 사유, 결과)과 `review_sample.jsonl`.
 
-## 12. 데이터셋 저장소 (I2, `store/`)
+## 12. 데이터셋 저장소 (I2, `components/dataset_store.py`)
 
 - 파일 구현(`FileDatasetStore`): `<root>/<dataset_id>/<version>/{manifest.json, meta.json, files/}`. 임시 디렉터리에 다 쓰고 디렉터리 이름 바꾸기(rename)로 확정하므로 중간 실패가 보이지 않는다. 게시 순서는 `meta.json`의 seq. O10(저장소의 실제 기술)은 이번 구간에서 "파일 기반, 가볍게"로 정했고 DB 전환은 열려 있다(제안: 규모가 커지면 객체 저장소).
-- 메모리 구현(`MemoryDatasetStore`): 같은 베이스 클래스(`store/base.py`)를 쓰므로 검증·오류·멱등성이 같다. 적합성 시험(`tests/test_store_conformance.py`)을 둘 다 통과한다.
+- 메모리 구현(`MemoryDatasetStore`): 같은 베이스 클래스(`DatasetStoreBase`, 같은 파일)를 쓰므로 검증·오류·멱등성이 같다. 적합성 시험(`tests/test_store_conformance.py`)을 둘 다 통과한다.
 - 게시 검증 순서: 매니페스트 스키마 -> pipeline 버전 -> content_hash -> (이미 있으면 멱등/CONFLICT) -> 문진 스키마 정수 버전 -> files 키 일치 -> 파일 복사 후 해시 -> 줄마다 스키마·분할·문항 세트·시드 ID -> sample_count -> 분할 간 시나리오 분리. 어느 하나라도 실패하면 아무것도 저장되지 않는다.
 - 읽기: `get_manifest`는 content_hash를 다시 확인하고, `open_file`은 파일 해시를 다시 확인한다(`INTEGRITY_ERROR`).
 

@@ -11,7 +11,6 @@ import pytest
 
 from boundary_contracts import canonical
 from boundary_contracts.errors import BoundaryError
-from conftest import SURVEY_DIR
 from synthetic_data.wiring.import_job import run_import
 from synthetic_data.components.dataset_store import FileDatasetStore, MemoryDatasetStore
 from test_import import cfg_for, write_input

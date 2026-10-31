@@ -2,9 +2,6 @@
 기대값: 계약 I2의 멱등 규칙(같은 입력은 같은 결과)과 docs/design.md 10절·CR-005(version 지정 여부와 무관하게 digest가 같으면 이미 게시됨)."""
 from __future__ import annotations
 
-import pytest
-
-from boundary_contracts.errors import BoundaryError
 from conftest import make_cfg_raw, run
 from synthetic_data.wiring.import_job import run_import
 from synthetic_data.components.dataset_store import MemoryDatasetStore

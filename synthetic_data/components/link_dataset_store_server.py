@@ -6,15 +6,13 @@
 환경 변수는 읽지 않는다(wiring/service.py가 읽어 넘긴다). 로그는 표준 출력으로, 토큰과 본문은 남기지 않는다."""
 from __future__ import annotations
 
-import hmac
-import re
 import shutil
 import tarfile
 import tempfile
 import threading
 from collections import defaultdict, deque
 from contextlib import contextmanager
-from pathlib import Path, PurePosixPath
+from pathlib import Path
 
 from boundary_contracts import PIPELINE_SCHEMA_VERSION, BoundaryError, canonical
 from openit_link import App, Request, Response, Route

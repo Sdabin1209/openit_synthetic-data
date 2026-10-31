@@ -44,12 +44,12 @@ store = FileDatasetStore(root, survey_contract_version)     # 또는 MemoryDatas
 2026-10-28(헤드 허가, ADR 0010): 위 I1·I7은 시드 잡 `run`만 소비한다. `import` 모드는 이웃 읽기 SDK를 쓰지 않고 파일 jsonl 6개를 읽는다. v1 합성 생성은 제거돼 I1은 문항 세트 참조·본문 확인용이다.
 | LoRA-A 출력 규칙의 세대 | 계약 규칙 데이터 | `boundary_contracts.action_rules.load_rules()["rules_version"]` | 매니페스트 `action_rules_version`. 설정 값은 기대값이라 다르면 거부 |
 
-- 이웃 코드를 가져오지 않는다. 의존은 boundary-contracts(Protocol, 오류, 해시), 문진 스키마(읽기 전용 파일)뿐이다.
+- 이웃 코드를 가져오지 않는다. 의존은 boundary-contracts(Protocol, 오류, 해시), openit-link(영역 통신 기반, D118), 문진 스키마(읽기 전용 파일)뿐이다.
 - 사용하는 비밀(D84: `NAME_FILE`로 파일 경로를 받고 `read_secret(NAME)`으로 읽는다. 환경 변수 `NAME`은 개발용):
   - 서버(dataset-store) 쪽, 복수형(역할=토큰 목록 파일): `DATASET_STORE_READ_TOKENS_FILE`, `DATASET_STORE_WRITE_TOKENS_FILE`.
   - 잡(`run`/`import`의 `store.kind=http`) 쪽, 단수형(쓰기 토큰 값 하나): `DATASET_STORE_WRITE_TOKEN_FILE`(`token_env` 설정으로 이름을 바꿀 수 있다).
   - 정본 배선은 deploy compose를 본다(이 목록은 이름만 적는다).
-- 지원 버전: 문진 스키마 정수 버전은 `CONTRACT_VERSION`과 정확히 일치해야 한다(현재 1, 다르면 `UNSUPPORTED_VERSION`). 경계 계약은 `pipeline_schema_version` MAJOR 2(쓰는 값은 설치된 `boundary_contracts.PIPELINE_SCHEMA_VERSION`, 계약 태그는 `requirements.lock`). 이웃 호출은 HTTP(`boundary_contracts.clients.HttpQuestionReader`/`HttpFailureStore`, 설정의 factory로 선택). 다른 MAJOR는 `UNSUPPORTED_VERSION`이다. 쓸 때는 엄격하다(`additionalProperties: false`라 모르는 필드는 `INVALID_RECORD`). 저장된 파일은 해석하지 않고 바이트 그대로 돌려주므로 `ext`는 보존된다.
+- 지원 버전: 문진 스키마 정수 버전은 `CONTRACT_VERSION`과 정확히 일치해야 한다(현재 1, 다르면 `UNSUPPORTED_VERSION`). 경계 계약은 `pipeline_schema_version` MAJOR 3(현재 3.1, 쓰는 값은 설치된 `boundary_contracts.PIPELINE_SCHEMA_VERSION`, 계약 태그는 `requirements.lock`). 이웃 호출은 HTTP(`openit_link.clients.HttpQuestionReader`/`HttpFailureStore`(계약 클라이언트 재수출), 설정의 factory로 선택). 다른 MAJOR는 `UNSUPPORTED_VERSION`이다. 쓸 때는 엄격하다(`additionalProperties: false`라 모르는 필드는 `INVALID_RECORD`). 저장된 파일은 해석하지 않고 바이트 그대로 돌려주므로 `ext`는 보존된다.
 - 시험용 대역은 `tests/doubles.py`(`FakeQuestionReader`, `FakeFailureStore`)에 있다. 소유 영역의 메모리 구현이 나오면 설정의 `factory` 문자열만 바꾼다.
 - 비식별되지 않은 실패 사례(`deidentified != true`)를 받으면 실행을 `INVALID_RECORD`로 거부한다.
 
@@ -73,6 +73,7 @@ store = FileDatasetStore(root, survey_contract_version)     # 또는 MemoryDatas
 | I1이 `UNAVAILABLE` | 잡이 `BoundaryError`로 끝나고 종료 코드 75, 아무것도 게시하지 않음 | 스케줄러가 재시도 |
 | I1/I7 데이터가 스키마·해시 위반 | `INVALID_RECORD`/`INTEGRITY_ERROR`로 잡 중단 | 상대 영역 확인 |
 | 비식별 안 된 사례 | 실행 거부 | ops-feedback에 알림 |
+| dataset-store 서버(이 영역)가 멈춤 | 소비자(model-lab)의 읽기와 이 영역 잡의 게시(`store.kind=http`)가 `UNAVAILABLE`. 서버는 게이트웨이 밖이라(노출 선언 전부 denied, ADR 0020) 시간 사슬(D119·D120)의 대상이 아니다 | 서버를 다시 띄운다. 저장소는 불변 파일이라 재기동으로 되살아난다 |
 
 잡의 종료 코드: 0 성공(게시, 이미 게시됨, 할 일 없음), 2 설정 오류, 3 경계 오류(재시도 불가), 75 경계 오류(재시도 가능).
 

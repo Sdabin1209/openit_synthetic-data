@@ -36,7 +36,7 @@
 ## 2.0.0 이전 (D74, D75)
 - 한 일: I2 DatasetStore, 품질 검사기, 시드 수집, 패키저를 v2 샘플(`ActionExtractionSample`/`ResponseSample`, 역할 `LORA_A`/`LORA_B`)로. requirements.lock v2.0.0(당시). 시험 85건 통과, 15건 보류(당시 수치. 현재는 위 시험 개수 참고).
 - (해소, 2026-10-28) 생성 파이프라인(scenario, labeler, generators, noise, plans, directives)과 보류 시험 15건은 ADR 0010으로 제거했다. 시드 경로는 `seeds.py`/`seed_samples.py`로 남겼다.
-- v2 의미 검사(targets, next_item, 건너뛰기 순서, save)는 turn-engine `validate_extraction`이 나온 뒤 연결(미정).
+- v2 의미 검사(targets, next_item, 건너뛰기 순서, save)는 계약의 `boundary_contracts.action_rules.check_action_extraction` 연결 여부가 미정이다(CR-006).
 
 
 ## 한 일 (시험으로 확인)
@@ -48,9 +48,9 @@
 
 ## 남은 일
 - 이웃 영역의 읽기 SDK/메모리 구현이 나오면 `tests/doubles.py`를 그쪽으로 교체(설정 factory만 변경).
-- turn-engine 연동(원격이 생긴 뒤 다음 구간): Directive를 `plan()`으로. DialoguePlannerInput은 합성 또는 turn-engine 예시 사용(승인됨). 그때까지 hand-built 표시 유지.
+- (turn-engine은 퇴역했다, D109. 이 항목은 없어졌다.)
 - O11 확정 후 평가셋 구성(합성·실제 비율, 지표, 임계치) 반영. 지금은 `split.ratios` 설정만 있다.
-- 컨테이너(D22): I2 서버(dataset-store)는 `Dockerfile`과 `scripts/smoke_service.sh`가 있다. run-once 잡(`run`, `import`)은 이미지가 아니라 `requirements.lock` 환경이다(docs/runbook.md).
+- 컨테이너(D22): I2 서버(dataset-store)는 `Dockerfile`과 `scripts/smoke_service.sh`가 있고, 잡(`run`, `import`)은 같은 이미지에서 `io.openit.jobs` 선언으로 돈다(ADR 0019, docs/runbook.md).
 
 ## 열림 (ADR 0010)
 - 시드 `run`은 유지(헤드 결정 2026-10-28, deploy 단계 7이 호출). 제거 여부는 데이터셋 담당 이전 계획과 함께 나중에 정한다. `regeneration.mode`·감수 샘플링: deploy는 설정 값(`regeneration.mode=full`, `review.per_kind=2`)을 써넣기만 하고 `review_sample.jsonl`이나 affected_only 동작을 읽는 곳은 grep으로 찾지 못했다. 삭제하지 않고 열림으로 둔다. 배포 E2E 설정이 v1 키(scenarios, generators, style_guide_version)를 아직 싣고 있어 무시하는 호환을 두었다(deploy가 고치면 제거).

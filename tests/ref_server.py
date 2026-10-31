@@ -15,7 +15,7 @@ import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, unquote, urlsplit
 
-from boundary_contracts import PIPELINE_SCHEMA_VERSION as V, BoundaryError, content_hash, sha256_hash
+from boundary_contracts import PIPELINE_SCHEMA_VERSION as V, BoundaryError, sha256_hash
 
 STATUS = {"INVALID_RECORD": 400, "PERMISSION_DENIED": 403, "NOT_FOUND": 404, "CONFLICT": 409,
           "FAILED_PRECONDITION": 412, "UNSUPPORTED_VERSION": 422, "INTEGRITY_ERROR": 422, "UNAVAILABLE": 503}
@@ -52,12 +52,6 @@ def make_tar(entries: dict[str, bytes]) -> bytes:
 
 def ref_of(id_: str, version: str, obj) -> dict:
     return {"id": id_, "version": version, "content_hash": sha256_hash(obj)}
-
-
-def sealed(rec: dict) -> dict:
-    rec = dict(rec)
-    rec["content_hash"] = content_hash(rec)
-    return rec
 
 
 class ReferenceServer:
@@ -378,80 +372,3 @@ class ReferenceServer:
         self.packages[key] = {"manifest": manifest, "files": adapter}
         self.eval_reports[manifest["eval_report_ref"]] = files.get("eval_report", b"")
         return self._j(manifest, 201)
-
-
-class RuntimeReferenceServer(ReferenceServer):
-    """HTTP.md I9(모델 추론 서버)를 따르는 참조 서버(계약 2.0.0). I1~I7 서버와 경로(`/v1/releases/{id}`)가 겹치므로 따로 띄운다.
-
-    실제 모델은 없다. `extract_fn(요청 dict) -> dict`와 `respond_fn(요청 dict) -> (문장, outcome)`을 바꿔 끼워 동작을 정한다.
-    기본값은 예시의 고정 출력이다. `extract_fn`의 출력이 `ActionExtraction`을 어기면 서버는 그대로 내지 않고 503 OUTPUT_INVALID(D75)를 낸다. 요청 본문은 서버가 스키마로 검증하고(400 INVALID_RECORD), 적재되지 않은 릴리스는 404다.
-    `available[릴리스 ID]`는 PUT 때의 결과다: "ok"(200 LOADED), "loading"(첫 PUT은 202 LOADING, 다음부터 LOADED),
-    "not_pass"(412), 없으면 404. 토큰 역할 "reader"는 PUT(적재)을 할 수 없고 추론 POST는 할 수 있다.
-    """
-
-    def __init__(self, tokens: dict[str, str]):
-        super().__init__(tokens)
-        self.available: dict[str, str] = {}
-        self.loaded: set[str] = set()
-        self._loading: set[str] = set()
-        self.extract_fn = lambda req: _example("ActionExtraction.next")
-        self.respond_fn = lambda req: ("네, 알겠습니다. 다음 질문을 드리겠습니다.", "ok")
-        self.attempts = 1
-        self.protections = ""
-
-    def _headers(self, outcome: str) -> dict:
-        h = {"X-Openit-Outcome": outcome, "X-Openit-Attempts": str(self.attempts)}
-        if self.protections:
-            h["X-Openit-Protections"] = self.protections
-        return h
-
-    def _checked(self, body: bytes, schema: str) -> dict:
-        from boundary_contracts import validator
-        b = self._body(body)
-        if list(validator(schema).iter_errors(b)):
-            raise BoundaryError("INVALID_RECORD", f"본문이 {schema} 스키마를 위반한다")
-        return b
-
-    def _route(self, method, path, q, body, role):
-        J = self._j
-        if path == "/v1/info" and method == "GET":
-            return J({"service": "model-runtime-reference", "runtime_version": "0.0.0", "supported_contract_versions": [1],
-                      "backend": "fake", "loaded": sorted(self.loaded), "serving_config_hash": {}})
-        g = re.fullmatch(r"/v1/releases/([^/]+)(|/extract|/respond)", path)
-        if not g:
-            raise BoundaryError("NOT_FOUND", "경로가 없다")
-        rid, op = g[1], g[2]
-        if not op:
-            if method == "PUT":
-                if role == "reader":
-                    raise BoundaryError("PERMISSION_DENIED", "읽기 토큰으로는 적재할 수 없다")
-                mode = self.available.get(rid)
-                if mode is None:
-                    raise BoundaryError("NOT_FOUND", "릴리스가 없다")
-                if mode == "not_pass":
-                    raise BoundaryError("FAILED_PRECONDITION", "승인되지 않은 릴리스")
-                if mode == "loading" and rid not in self._loading and rid not in self.loaded:
-                    self._loading.add(rid)
-                    return J({"release_id": rid, "state": "LOADING", "error": None}, 202)
-                self.loaded.add(rid)
-                return J({"release_id": rid, "state": "LOADED", "error": None})
-            if method == "GET":
-                state = "LOADED" if rid in self.loaded else "LOADING" if rid in self._loading else "ABSENT"
-                return J({"release_id": rid, "state": state, "error": None})
-            raise BoundaryError("NOT_FOUND", "경로가 없다")
-        if method != "POST":
-            raise BoundaryError("NOT_FOUND", "경로가 없다")
-        if rid not in self.loaded:
-            raise BoundaryError("NOT_FOUND", "적재되지 않은 릴리스")
-        if op == "/extract":
-            req = self._checked(body, "ActionExtractionInput")
-            out = self.extract_fn(req)
-            from boundary_contracts import validator
-            if list(validator("ActionExtraction").iter_errors(out)):
-                # D75: 값을 지어내지 않는다. 모델 출력이 끝내 형식을 못 지키면 503 UNAVAILABLE + details.reason=OUTPUT_INVALID
-                raise BoundaryError("UNAVAILABLE", "모델 출력이 ActionExtraction 형식을 지키지 못했다",
-                                    {"reason": "OUTPUT_INVALID", "attempts": self.attempts})
-            return 200, "application/json", json.dumps(out, ensure_ascii=False).encode(), self._headers("ok")
-        req = self._checked(body, "ResponseRequest")
-        text, outcome = self.respond_fn(req)
-        return 200, "text/plain; charset=utf-8", text.encode("utf-8"), self._headers(outcome)

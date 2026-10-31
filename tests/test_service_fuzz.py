@@ -10,7 +10,7 @@ import pytest
 
 from conftest import HANG_GUARD_SECONDS
 
-from test_service import RT, WT, Srv, body_of, tar_of
+from test_service import RT, WT, Srv, tar_of
 
 # 왜: HTTP.md가 정의한 오류 코드(+성공 코드). 5xx(503 제외)나 이 밖의 코드는 처리되지 않은 예외로 본다.
 OK = {200, 201, 204}

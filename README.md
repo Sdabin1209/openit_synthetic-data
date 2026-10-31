@@ -14,7 +14,7 @@
 | 입력 | ops-feedback | I7 `FailureStore`(HTTP 클라이언트) | 확정된 비식별 실패 사례(시드) |
 | 출력 | model-lab | I2 `DatasetStore` | `ActionExtractionSample`, `ResponseSample`, `DatasetManifest` |
 
-HTTP 경로는 이 영역 문서에 없어 `../boundary-contracts/HTTP.md`로 확인해야 하며 이번에 읽지 않았습니다(미확인). 비식별되지 않은 사례를 받으면 실행을 거부합니다.
+HTTP 경로와 오류의 정본은 `../boundary-contracts/HTTP.md`(I2 서버 면의 경로 표는 `components/link_dataset_store_server.py`)입니다. 비식별되지 않은 사례를 받으면 실행을 거부합니다.
 
 ## 2. 구조
 
@@ -41,7 +41,7 @@ import: 설정(JSON) + 학습 데이터 jsonl 6개 -> 행 검증 -> 허용치 �
 
 ## 3. 실행 방법
 
-전제: Python 3.10 이상(pyproject.toml), git, 계약·문진 스키마 태그를 받을 SSH 접근. 이웃 폴더는 시험에 필요 없습니다(둘 다 `requirements.lock`의 태그로 설치). Docker는 필요 없습니다. 잡은 이미지 없이 `requirements.lock`으로 고정하기로 헤드가 승인했습니다(docs/runbook.md). I2 서버만 Dockerfile이 있습니다.
+전제: Python 3.10 이상(pyproject.toml), git, 계약·문진 스키마 태그를 받을 SSH 접근. 이웃 폴더는 시험에 필요 없습니다(둘 다 `requirements.lock`의 태그로 설치). 개발과 시험에는 Docker가 필요 없습니다. 운영에서 잡은 dataset-store 이미지에서 이미지 라벨 `io.openit.jobs`(소스 `jobs.json`) 선언으로 돕니다(ADR 0019).
 
 ```bash
 # 설치 (멱등. .venv 생성, requirements.lock + pytest + -e . 설치)
@@ -67,10 +67,10 @@ PYTHONPATH=tests python -m synthetic_data run --config configs/dev.job.json [--c
 
 확인된 것은 5절의 실행 결과입니다. 문서의 진술에 기댄 것(이번에 다시 확인하지 않음):
 - I2 파일·메모리 구현이 같은 적합성 시험을 통과, 같은 입력과 시드는 같은 `dataset_digest`(docs/STATUS.md).
-- D84(NAME_FILE)와 boundary-contracts 갱신 반영, 비밀이 산출물에 안 나오는 시험 추가(CHANGELOG 0.2.2, 제안 버전). 버전은 pyproject 0.2.0, CHANGELOG는 0.2.2(제안)로 어긋나 있다(docs/STATUS.md).
+- D84(NAME_FILE) 반영과 비밀이 산출물에 안 나오는 시험(`tests/test_no_value_leak.py`). 패키지 버전은 pyproject 0.2.0이고 CHANGELOG의 0.2.1·0.2.2·0.3.0은 '제안 버전'으로 적용된 적이 없다(docs/STATUS.md).
 - 변경 요청 CR-001~005는 헤드가 결정(docs/STATUS.md). CR-007(v1 생성 경로 제거 제안)은 시드 경로를 남기는 범위까지 ADR 0010으로 실행했다.
 
-확인 못 한 것: 게시기를 운영 저장소에 게시한 적 없음, v2 의미 검사 미수행(CR-006), 이웃 영역과의 실제 HTTP 연동(운영 환경), 이미지·E2E(해당 없음 또는 미실행).
+확인 못 한 것: 게시기를 운영 저장소에 게시한 적 없음, v2 의미 검사 미수행(CR-006), 이웃 영역과의 실제 HTTP 연동(운영 환경), E2E(영역 시험이 아니라 deploy의 몫). 이미지 스모크는 5절.
 
 ### 타입 생성 (손으로 고치지 않는다)
 

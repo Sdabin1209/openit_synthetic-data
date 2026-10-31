@@ -52,7 +52,7 @@ def _major(version: str) -> int:
 
 
 class DatasetStoreBase:
-    """하위 클래스는 저장 방식(_load, _put, _versions, _read)만 구현한다."""
+    """하위 클래스는 저장 방식(_load_manifest, _commit, _list_versions, _open)만 구현한다."""
 
     def __init__(self, survey_contract_version: int):
         self.survey_contract_version = survey_contract_version     # 문진 스키마 정수 버전(D14). 파일 위치는 wiring이 읽어 넘긴다
@@ -173,8 +173,10 @@ class DatasetStoreBase:
                     raise _inv(f"{p}:{lineno}: 빈 줄")
                 try:
                     rec = json.loads(line.decode("utf-8"))
-                except (UnicodeDecodeError, json.JSONDecodeError) as e:
-                    raise _inv(f"{p}:{lineno}: JSON이 아니다: {e}") from e
+                except UnicodeDecodeError:
+                    raise _inv(f"{p}:{lineno}: UTF-8이 아니다") from None      # 왜: 예외 문구에는 문제의 바이트 값이 들어간다. 값은 오류에 싣지 않는다(ADR 0003)
+                except json.JSONDecodeError as e:
+                    raise _inv(f"{p}:{lineno}: JSON이 아니다({e.msg})") from None
                 where = f"{p}:{lineno}"
                 _contract(_SAMPLE_SCHEMA[role], rec, where)
                 if _major(rec["pipeline_schema_version"]) != SUPPORTED_PIPELINE_MAJOR:
