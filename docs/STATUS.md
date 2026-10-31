@@ -1,7 +1,7 @@
 # STATUS (synthetic-data)
 
 ## U431 (2026-10-31)
-- 계약 v3.1.2, openit-link v0.4.2로 고정. `affected_only`가 영향 문항 단위로 다시 만들도록 고쳤다(design.md 11절). 시험 3건.
+- 계약 v3.1.2, openit-link v0.4.3로 고정. `affected_only`가 영향 문항 단위로 다시 만들도록 고쳤다(design.md 11절). 시험 3건.
 
 ## U400 (2026-10-30, 영역 구조 개편)
 - 한 일: 컴포넌트 분해(`docs/components.md`), `schemas/` 58개, `types/` 생성, `components/`·`wiring/` 이동, `tests/test_structure.py`, 통신을 openit-link 위로(ADR 0021). 계약 핀 v3.1.1, openit-link v0.4.1(게시 본문도 스트리밍). 변경 요청 CR-S-001(닫음: ADR 0022 공개 진입점), CR-S-002(해소).
