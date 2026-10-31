@@ -15,6 +15,9 @@ from synthetic_data.wiring.survey import Survey
 from synthetic_data.components.dataset_store import FileDatasetStore, MemoryDatasetStore
 
 ROOT = Path(__file__).resolve().parent.parent
+# 매달림 감시(U422): 시험이 실제 시간으로 판정하지 않는다. 가짜에게서 신호를 기다리는 대기와 하위 프로세스·소켓 마감은 정상이면 즉시(또는 수 초) 끝나고 코드가 진짜로
+# 멈췄을 때만 이 값에 닿는다. 정상 경로(ms~수십 초)의 수십~수천 배이고 판정(옳고 그름)에 쓰지 않는다. 시험마다 숫자를 따로 쓰지 않고 이 상수 하나를 쓴다.
+HANG_GUARD_SECONDS = 300
 # 왜: 문진 스키마는 형제 폴더가 아니라 설치된 패키지(requirements.lock의 태그)에서 읽는다. 새 머신에는 이웃 폴더가 없다.
 SURVEY_DIR = survey_schema.contract_version_dir(1)
 # 왜: 규칙 세대는 계약의 규칙 데이터가 정본이다. 시험에도 리터럴을 두지 않는다(계약 3.0.0)

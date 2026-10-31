@@ -3,9 +3,12 @@
 from __future__ import annotations
 
 import http.client
+import socket
 import random
 
 import pytest
+
+from conftest import HANG_GUARD_SECONDS
 
 from test_service import RT, WT, Srv, body_of, tar_of
 
@@ -22,12 +25,13 @@ def rnd_text(r, n=12):
 
 def raw(srv, method, target, headers, body=None):
     host, port = srv.url.replace("http://", "").split(":")
-    c = http.client.HTTPConnection(host, int(port), timeout=30)
+    c = http.client.HTTPConnection(host, int(port), timeout=HANG_GUARD_SECONDS)      # 시간 초과는 None(허용)으로 처리돼 거짓 통과만 낼 수 있다(아래 except)
     try:
         c.putrequest(method, target, skip_host=False, skip_accept_encoding=True)
         for k, v in headers:
             c.putheader(k, v)
         c.endheaders(body)
+        c.sock.shutdown(socket.SHUT_WR)      # 요청을 다 보냈다고 알린다: Content-Length보다 짧은 본문에서 서버가 더 기다리지 않고 바로 닫는다(실제 시간을 기다리지 않는다)
         r = c.getresponse()
         r.read()
         return r.status

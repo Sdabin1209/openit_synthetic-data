@@ -317,14 +317,35 @@ def test_pii_suspect_counts_without_values(tmp_path, validators):
     assert rej.status == "REJECTED"
 
 
-def test_pii_patterns_are_fast_on_adversarial_text():
-    import time
+def test_pii_patterns_have_bounded_non_nested_repeats():
+    """ReDoS 방어(OWASP)는 시간을 재지 않고 구조로 본다: 모든 반복 수량자에 상한이 있고(무한 반복 없음) 중첩 반복이 없다."""
+    import re
     from synthetic_data.components import pii_scan
+    parser = getattr(re, "_parser", None) or __import__("sre_parse")
+    MAXREPEAT = parser.MAXREPEAT
+
+    def walk(items, depth):
+        for op, av in items:
+            name = str(op)
+            if name in ("MAX_REPEAT", "MIN_REPEAT"):
+                lo, hi, sub = av
+                assert hi < MAXREPEAT, "상한 없는 반복"
+                assert depth == 0 or not _has_repeat(sub), "중첩 반복"
+                walk(sub, depth + 1)
+            elif name == "SUBPATTERN":
+                walk(av[-1], depth)
+            elif name == "BRANCH":
+                for b in av[1]:
+                    walk(b, depth)
+
+    def _has_repeat(sub):
+        return any(str(op) in ("MAX_REPEAT", "MIN_REPEAT") for op, _ in sub)
+
+    for rx in pii_scan.PII_PATTERNS.values():
+        walk(parser.parse(rx.pattern), 0)
+    assert pii_scan.PII_SCAN_LIMIT > 0      # 입력 길이 상한도 있다
     evil = "a" * 19000 + "@" + "1" * 900 + "0" + "-" * 90
-    rec = {"input": {"user_utterance": evil}, "expected": evil}
-    t = time.time()
-    pii_scan.run({"items": [rec]})
-    assert time.time() - t < 30      # 재앙적 역추적(분 단위)을 잡는 바깥 마감이다. 정상은 수 ms이고 벽시계 1초 상한은 부하에 흔들렸다
+    pii_scan.run({"items": [{"input": {"user_utterance": evil}, "expected": evil}]})      # 상한 때문에 끝난다(시간은 재지 않는다)
 
 
 def test_same_utterance_same_question_different_state_is_reported_not_rejected(tmp_path, validators):

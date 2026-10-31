@@ -14,6 +14,8 @@ from pathlib import Path
 
 import pytest
 
+from conftest import HANG_GUARD_SECONDS
+
 from boundary_contracts import validator
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -72,7 +74,7 @@ def env(tmp_path):
 def run(tmp_path, fake, req):
     p = tmp_path / "req.json"
     p.write_text(json.dumps(req))
-    return subprocess.run(["bash", str(SCRIPT), str(p)], capture_output=True, text=True, timeout=300,
+    return subprocess.run(["bash", str(SCRIPT), str(p)], capture_output=True, text=True, timeout=HANG_GUARD_SECONDS,
                           env={**os.environ, "DOCKER": str(fake), "PYTHON": sys.executable})
 
 

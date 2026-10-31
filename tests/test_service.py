@@ -6,7 +6,6 @@ import io
 import json
 import tarfile
 import threading
-import time
 import urllib.error
 import urllib.request
 from pathlib import Path
@@ -14,7 +13,7 @@ from pathlib import Path
 import pytest
 from synthetic_data.components.dataset_store import FileDatasetStore
 
-from conftest import SURVEY_DIR
+from conftest import HANG_GUARD_SECONDS, SURVEY_DIR
 from synthetic_data.wiring.survey import Survey
 from synthetic_data.components.link_dataset_store_server import Service, make_server, parse_tokens
 
@@ -37,6 +36,19 @@ def body_of(manifest, blobs) -> bytes:
     return tar_of(e)
 
 
+class FakeClock:
+    """주입하는 가짜 단조 시계: 시간은 시험이 advance할 때만 흐른다(ADR 0023)."""
+
+    def __init__(self):
+        self.t = 1000.0
+
+    def __call__(self):
+        return self.t
+
+    def advance(self, dt):
+        self.t += dt
+
+
 class Srv:
     @staticmethod
     def IDLE(sec):
@@ -47,8 +59,9 @@ class Srv:
 
     def __init__(self, tmp_path, **kw):
         skw = {k: kw.pop(k) for k in self.SERVER_KW if k in kw}
+        self.clock = kw.pop("clock", None) or FakeClock()
         self.svc = Service(FileDatasetStore(tmp_path / "root" / "datasets", Survey(SURVEY_DIR).contract_version), tmp_path / "root", parse_tokens(f"model-lab={RT}"),
-                           parse_tokens(f"synthetic-data={WT}"), log=lambda s: None, **kw)
+                           parse_tokens(f"synthetic-data={WT}"), log=lambda s: None, clock=self.clock, **kw)
         self.httpd = make_server(self.svc, **skw)
         self.url = f"http://127.0.0.1:{self.httpd.server_address[1]}"
         threading.Thread(target=self.httpd.serve_forever, daemon=True).start()
@@ -59,7 +72,7 @@ class Srv:
             h["Authorization"] = "Bearer " + token
         req = urllib.request.Request(self.url + path, data=body, method=method, headers=h)
         try:
-            with urllib.request.urlopen(req, timeout=10) as r:
+            with urllib.request.urlopen(req, timeout=HANG_GUARD_SECONDS) as r:
                 return r.status, r.read(), r.headers
         except urllib.error.HTTPError as e:
             return e.code, e.read(), e.headers
@@ -193,9 +206,11 @@ def test_manifest_path_tampering_and_hash_mismatch(srv, captured):
 def test_size_limits(tmp_path, captured):
     s = Srv(tmp_path, max_body=1000)
     try:
-        st, body, _ = publish(s, captured)
-        # 본문 상한은 waitress(max_request_body_size)가 본문을 받기 전에 413으로 거절한다(RFC 9110 15.5.14). 이전 구현은 앱이 400 INVALID_RECORD로 답했다
-        assert st == 413
+        # 본문 상한 초과의 413은 openit_link.App(Route.max_body)이 내고 소켓에서 큰 본문을 보내는 시험은 연결 재설정 경쟁을 낳는다. 라이브러리 동작이라 시험하지 않고
+        # 우리가 넘기는 값만 본다: 게시 경로의 상한이 서비스 설정(max_body)이고 본문을 스트리밍으로 받으며, waitress에도 같은 값을 넘긴다
+        from synthetic_data.components.link_dataset_store_server import make_routes
+        post = next(r for r in make_routes(s.svc) if r.method == "POST")
+        assert post.max_body == 1000 and post.stream_body is True
         assert s.call("POST", "/v1/datasets", b"x" * 100, WT, {"Content-Length": "100"})[0] == 400
     finally:
         s.close()
@@ -222,19 +237,14 @@ def test_auth_failure_throttle_blocks_even_valid_token(tmp_path):
         s.close()
 
 
-def test_auth_failure_window_expires_and_frees_memory(tmp_path, monkeypatch):
-    # 왜 주입한 시계: 벽시계 0.3초 창은 부하에서 요청이 늦으면 차단 확인 전에 창이 닫혀 결과가 갈렸다. 서버 모듈의 monotonic을 시험이 쥔 시계로 바꾼다
-    import types
-    from synthetic_data.components import link_dataset_store_server as mod
-    now = [1000.0]
-    monkeypatch.setattr(mod, "time", types.SimpleNamespace(monotonic=lambda: now[0]))
-    s = Srv(tmp_path, auth_fail_limit=2)
+def test_auth_failure_window_expires_and_frees_memory(tmp_path):
+    s = Srv(tmp_path, auth_fail_limit=2)      # 주입한 가짜 시계: 시험이 시간을 흘린다(실제로 기다리지 않는다)
     s.svc.auth_fail_window = 0.3
     try:
         for _ in range(2):
             s.call("GET", "/v1/datasets", token="y" * 40)
         assert s.call("GET", "/v1/datasets")[0] == 503
-        now[0] += 0.4
+        s.clock.advance(0.4)
         assert s.call("GET", "/v1/datasets")[0] == 200
         assert "127.0.0.1" not in s.svc._fails                  # 창이 지나면 주소 항목이 사라진다
     finally:
@@ -243,7 +253,7 @@ def test_auth_failure_window_expires_and_frees_memory(tmp_path, monkeypatch):
 
 def test_write_role_must_be_synthetic_data(tmp_path):
     with pytest.raises(ValueError):
-        Service(FileDatasetStore(tmp_path / "r" / "datasets", Survey(SURVEY_DIR).contract_version), tmp_path / "r", {}, parse_tokens("other=" + WT), log=lambda s: None)
+        Service(FileDatasetStore(tmp_path / "r" / "datasets", Survey(SURVEY_DIR).contract_version), tmp_path / "r", {}, parse_tokens("other=" + WT), log=lambda s: None, clock=FakeClock())
 
 
 def test_secrets_not_in_responses(srv, captured):
@@ -287,7 +297,7 @@ def test_global_publish_limit_is_503(tmp_path, captured):
 def _raw(srv, data: bytes) -> bytes:
     import socket
     c = socket.create_connection(("127.0.0.1", srv.httpd.server_address[1]))
-    c.settimeout(30)      # 바깥 마감. 응답이 올 때까지 recv가 기다리므로 고정 sleep이 필요 없다
+    c.settimeout(HANG_GUARD_SECONDS)      # recv가 응답까지 기다리므로 고정 sleep이 필요 없다
     c.sendall(data)
     try:
         return c.recv(500)
@@ -400,7 +410,7 @@ def test_empty_dataset_dir_hidden_and_startup_cleans_tmp(tmp_path, captured):
 def test_same_token_for_read_and_write_refused(tmp_path):
     with pytest.raises(ValueError):
         Service(FileDatasetStore(tmp_path / "r" / "datasets", Survey(SURVEY_DIR).contract_version), tmp_path / "r", parse_tokens("model-lab=" + WT), parse_tokens("synthetic-data=" + WT),
-                log=lambda s: None)
+                log=lambda s: None, clock=FakeClock())
 
 
 def test_write_token_may_read_by_design(srv):

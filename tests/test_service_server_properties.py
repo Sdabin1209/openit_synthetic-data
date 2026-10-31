@@ -1,127 +1,98 @@
-"""HTTP 서버 구현(표준 도구로 교체)이 보장해야 하는 성질. 구현이 바뀌어도 이 성질은 같다(D111).
+"""dataset-store 서버의 성질. 시간·실제 소켓 타이밍에 기대는 시험은 두지 않는다(tests/TIMING.md).
 
-왜 따로 두나: 교체 전후에 같은 시험이 통과해야 '동작을 바꾸지 않았다'를 말할 수 있다.
-  1. 느린 클라이언트(헤더를 흘리는 연결)가 다른 요청을 막지 않는다.
-  2. 유휴 연결은 timeout 뒤 서버가 닫는다.
-  3. 종료 신호에 진행 중 요청은 끝까지 응답한다.
-  4. 상한을 넘는 본문은 거절하고 서버는 계속 일한다.
-  5. 연결을 많이 열었다 닫아도 서버가 회복한다."""
+느린 연결을 N초에 끊는가, 유휴 연결이 닫히는가, 큰 본문이 413인가, 연결 폭주 뒤 회복하는가, SIGTERM에 멈추는가는 waitress·openit_link·운영체제의 동작이다(분류 A: 라이브러리).
+의존은 시험하지 않는다(표준 관행). 이 영역의 책임은 둘이다: (1) 올바른 값을 넘겼는가(아래 test_*_values), (2) 우리 코드의 종료 절차가 맞는가(진행 중 요청 마무리).
+실제 서버가 끝까지 맞물리는지는 scripts/smoke_service.sh와 deploy E2E의 몫이다."""
 from __future__ import annotations
 
-import socket
+import signal
 import threading
-import time
+import types
 
-from test_service import Srv, WT
+import pytest
 
-
-def _conn(s):
-    c = socket.create_connection(("127.0.0.1", s.httpd.server_address[1]))
-    c.settimeout(30)      # 왜 30초: 판정은 응답·종료 여부이고 시간이 아니다. 이 값은 서버가 매달릴 때만 닿는 바깥 마감이다(부하 아래 느려져도 판정이 갈리지 않게 넉넉히)
-    return c
+from synthetic_data.components import link_dataset_store_server as mod
+from conftest import HANG_GUARD_SECONDS
+from test_service import FakeClock, Srv, WT
 
 
-def test_slow_header_clients_do_not_block_other_requests(tmp_path):
-    s = Srv(tmp_path, **Srv.IDLE(30.0))
-    slow = []
+def test_waitress_receives_the_configured_limits(tmp_path, monkeypatch):
+    """(1) 값 확인: 연결 상한·유휴 timeout·스레드 수·본문 상한이 waitress에 그대로 간다(시간을 재지 않는다)."""
+    seen = {}
+    monkeypatch.setattr(mod, "create_server", lambda app, **kw: seen.update(kw) or object())
+    s = Srv.__new__(Srv)
+    from test_service import Service, FileDatasetStore, Survey, SURVEY_DIR, parse_tokens, RT
+    svc = Service(FileDatasetStore(tmp_path / "root" / "datasets", Survey(SURVEY_DIR).contract_version), tmp_path / "root",
+                  parse_tokens(f"model-lab={RT}"), parse_tokens(f"synthetic-data={WT}"), log=lambda m: None, max_body=1234, clock=FakeClock())
+    mod.make_server(svc, "127.0.0.1", 0, threads=3, connection_limit=7, channel_timeout=11, drain_grace=5)
+    assert (seen["threads"], seen["connection_limit"], seen["channel_timeout"], seen["max_request_body_size"]) == (3, 7, 11, 1234)
+    assert seen["clear_untrusted_proxy_headers"] is True
+
+
+def test_defaults_are_the_documented_starting_values():
+    """ADR 0012·0017의 시작값(측정 안 함)이 그대로다. 값을 바꾸면 ADR을 먼저 고친다."""
+    assert (mod.DEFAULT_THREADS, mod.DEFAULT_CONNECTIONS, mod.DEFAULT_IDLE_TIMEOUT, mod.DEFAULT_DRAIN_GRACE) == (16, 32, 30, 8)
+
+
+def test_publish_route_uses_the_service_body_limit(tmp_path):
+    """(1) 값 확인: 413은 openit_link.Route(max_body)가 낸다(라이브러리). 우리는 서비스 설정을 그대로 넘기고 본문을 스트리밍으로 받는다."""
+    s = Srv(tmp_path, max_body=1000)
     try:
-        for _ in range(8):
-            c = _conn(s)
-            c.sendall(b"GET /v1/datasets HTTP/1.1\r\nHost: x\r\nX-A: ab")      # 헤더를 끝내지 않는다
-            slow.append(c)
-        # 느린 머리글 연결 8개가 있어도 다른 요청이 응답을 받는다. 응답 시간은 재지 않는다(call의 10초 마감이 바깥 마감, 벽시계 상한은 부하에 흔들린다)
-        assert s.call("GET", "/v1/datasets")[0] == 200
-    finally:
-        for c in slow:
-            c.close()
-        s.close()
-
-
-def test_idle_connection_is_closed_after_timeout(tmp_path):
-    s = Srv(tmp_path, **Srv.IDLE(1.0))
-    try:
-        c = _conn(s)
-        c.settimeout(60)      # 바깥 마감: 서버가 닫지 않으면 여기서 timeout 예외로 실패한다. 닫는 시점은 재지 않는다(부하에 흔들림)
-        assert c.recv(10) == b""                  # 아무것도 보내지 않으면 서버가 닫는다
-        c.close()
-        assert s.call("GET", "/v1/datasets")[0] == 200
+        post = next(r for r in mod.make_routes(s.svc) if r.method == "POST")
+        assert post.max_body == 1000 and post.stream_body is True
     finally:
         s.close()
 
 
 def test_in_flight_request_finishes_when_server_is_shutting_down(tmp_path):
-    s = Srv(tmp_path)
+    """(우리 코드) 종료 절차: 종료 신호를 받은 뒤에도 진행 중인 요청은 끝까지 응답한다. 사건으로만 순서를 맞춘다(sleep·벽시계 없음)."""
+    s = Srv(tmp_path)      # 가짜 시계는 멈춰 있어 드레인 한도가 지나지 않는다: 진행 중 요청이 끝나야만 close가 돌아온다
     orig = s.svc.list_ids
-    started = threading.Event()
+    started, release = threading.Event(), threading.Event()
 
-    def slow_list():
-        started.set()                             # 요청이 처리 중이라는 신호(고정 sleep 대신 사건으로 기다린다)
-        time.sleep(0.8)
+    def blocked_list():
+        started.set()                         # 요청이 처리 중이라는 신호
+        assert release.wait(HANG_GUARD_SECONDS)      # 종료 신호가 선 뒤 아래 스레드가 풀어 준다
         return orig()
-    s.svc.list_ids = slow_list
+    s.svc.list_ids = blocked_list
     out = {}
     t = threading.Thread(target=lambda: out.update(r=s.call("GET", "/v1/datasets")))
     t.start()
-    assert started.wait(30)                       # 요청이 처리 중이다
-    s.close()                                     # 종료 신호 + 서버 닫기
-    t.join(60)
+    assert started.wait(HANG_GUARD_SECONDS)
+
+    def release_after_stop():
+        assert s.httpd._stop.wait(HANG_GUARD_SECONDS)      # 종료 신호가 서면 곧바로 깨어난다(Event 대기)
+        release.set()
+    threading.Thread(target=release_after_stop, daemon=True).start()
+    s.close()                                 # 종료 신호 + 드레인 + 서버 닫기
+    t.join(HANG_GUARD_SECONDS)
     assert out["r"][0] == 200
 
 
-def test_oversized_body_is_refused_and_server_keeps_working(tmp_path):
-    s = Srv(tmp_path, max_body=1000)
-    try:
-        c = _conn(s)
-        c.sendall(b"POST /v1/datasets HTTP/1.1\r\nHost: x\r\nAuthorization: Bearer " + WT.encode()
-                  + b"\r\nContent-Length: 5000\r\n\r\n")      # 머리글만 보낸다: 서버가 Content-Length만 보고 413을 보내고 닫는 동안 본문을 보내면 연결 재설정 경쟁이 난다
-        status = c.recv(200).split(b" ")[1]
-        assert status in (b"400", b"413")
-        c.close()
-        assert s.call("GET", "/v1/datasets")[0] == 200
-    finally:
-        s.close()
-
-
-def test_server_recovers_after_connection_flood(tmp_path):
-    s = Srv(tmp_path)
-    flood = []
-    try:
-        for _ in range(60):
-            try:
-                flood.append(_conn(s))
-            except OSError:
-                break
-        for c in flood:
-            c.close()
-        deadline = time.monotonic() + 60      # 바깥 마감(회복 여부가 판정, 속도는 아니다)
-        code = None
-        while time.monotonic() < deadline:
-            code = s.call("GET", "/v1/datasets")[0]
-            if code == 200:
-                break
-            time.sleep(0.2)
-        assert code == 200
-    finally:
-        s.close()
-
-
-def test_sigterm_stops_the_service_process_cleanly(tmp_path):
-    """진입점(python -m synthetic_data.service)이 SIGTERM에 종료 코드 0으로 끝난다(컨테이너 stop)."""
-    import os
-    import signal
-    import subprocess
-    import sys
-    import urllib.request
+def test_sigterm_handler_stops_the_server_loop(tmp_path, monkeypatch):
+    """(우리 코드) 진입점(wiring/service.main)이 SIGTERM·SIGINT에 서버 정지 사건을 세운다. 실제 신호·프로세스 없이 등록된 처리기를 직접 부른다(신호 전달은 운영체제 몫).
+    설정 값 확인(1)도 겸한다: DATASET_STORE_DRAIN_GRACE가 서버에 간다."""
     from conftest import SURVEY_DIR
-    env = {**os.environ, "DATASET_STORE_ROOT": str(tmp_path / "r"), "DATASET_STORE_SURVEY_SCHEMA_DIR": str(SURVEY_DIR),
-           "DATASET_STORE_PORT": "0", "DATASET_STORE_HOST": "127.0.0.1", "DATASET_STORE_READ_TOKENS": "model-lab=" + "ab12cd34" * 4,
-           "DATASET_STORE_DRAIN_GRACE": "2"}
-    p = subprocess.Popen([sys.executable, "-m", "synthetic_data.service"], env=env, stdout=subprocess.PIPE, text=True)
-    try:
-        port = int(p.stdout.readline().split()[-1])
-        assert urllib.request.urlopen(f"http://127.0.0.1:{port}/healthz", timeout=30).status == 200
-        p.send_signal(signal.SIGTERM)
-        assert p.wait(timeout=60) == 0      # 바깥 마감: 종료 코드가 판정이고 종료 속도는 아니다(드레인 2초 + 부하 여유)
-    finally:
-        if p.poll() is None:
-            p.kill()
+    from synthetic_data.wiring import service as wsvc
+    handlers, made = {}, {}
+
+    class FakeSrv:
+        _stop = threading.Event()
+        server_address = ("127.0.0.1", 1234)
+
+        def serve_forever(self):
+            handlers[signal.SIGTERM](signal.SIGTERM, None)      # 종료 신호가 온 것으로 처리기를 부른다
+            assert self._stop.is_set()
+
+        def server_close(self):
+            made["closed"] = True
+
+    def fake_make_server(svc, host, port, **kw):
+        made.update(kw, host=host)
+        return FakeSrv()
+    monkeypatch.setattr(wsvc, "make_server", fake_make_server)
+    monkeypatch.setattr(wsvc.signal, "signal", lambda sig, fn: handlers.update({sig: fn}))
+    env = {"DATASET_STORE_ROOT": str(tmp_path / "r"), "DATASET_STORE_SURVEY_SCHEMA_DIR": str(SURVEY_DIR), "DATASET_STORE_PORT": "0",
+           "DATASET_STORE_HOST": "127.0.0.1", "DATASET_STORE_READ_TOKENS": "model-lab=" + "ab12cd34" * 4, "DATASET_STORE_DRAIN_GRACE": "2"}
+    assert wsvc.main(env) == 0
+    assert set(handlers) == {signal.SIGTERM, signal.SIGINT} and made["closed"] and made["drain_grace"] == 2.0

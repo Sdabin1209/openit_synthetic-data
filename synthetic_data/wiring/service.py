@@ -16,6 +16,7 @@ import os
 import shutil
 import signal
 import sys
+import time
 from pathlib import Path
 
 from boundary_contracts import BoundaryError, SecretError, read_secret
@@ -41,7 +42,7 @@ def main(env=os.environ) -> int:
         survey = Survey(Path(env.get("DATASET_STORE_SURVEY_SCHEMA_DIR", "/app/survey_schema")))
         version = survey.contract_version          # 스키마 디렉터리가 없으면 시작을 거부한다
         root = Path(settings["root"])
-        svc = Service(FileDatasetStore(root / "datasets", version), root, read, write, max_body=settings["max_body"],
+        svc = Service(FileDatasetStore(root / "datasets", version), root, read, write, max_body=settings["max_body"], clock=time.monotonic,
                       max_publishes=settings["max_publishes"], max_downloads=settings["max_downloads"], max_entries=settings["max_entries"],
                       auth_fail_limit=settings["auth_fail_limit"], min_free_gb=settings["min_free_gb"])
         srv = make_server(svc, env.get("DATASET_STORE_HOST", "0.0.0.0"), int(env.get("DATASET_STORE_PORT", 8080)),

@@ -12,7 +12,6 @@ import shutil
 import tarfile
 import tempfile
 import threading
-import time
 from collections import defaultdict, deque
 from contextlib import contextmanager
 from pathlib import Path, PurePosixPath
@@ -113,9 +112,10 @@ def unpack(tar_path: Path, dest: Path, *, max_bytes: int, max_entries: int = 100
 
 
 class Service:
-    """서버의 상태와 방어. store는 DatasetStore 구현(파일)이고 wiring이 주입한다."""
+    """서버의 상태와 방어. store는 DatasetStore 구현(파일)이고 wiring이 주입한다. clock은 단조 시계 함수(time.monotonic과 같은 모양)이고 wiring이 넣는다(ADR 0023):
+    인증 실패 창이 시계로만 흐르므로 시험이 가짜 시계로 시간을 직접 흘린다."""
 
-    def __init__(self, store, root: Path, read_tokens: dict, write_tokens: dict, *, max_body: int = 1 << 30,
+    def __init__(self, store, root: Path, read_tokens: dict, write_tokens: dict, *, clock, max_body: int = 1 << 30,
                  log=lambda s: print(s, flush=True),
                  max_publishes: int = 8, max_downloads: int = 8, max_entries: int = 1000,
                  auth_fail_limit: int = 10, auth_fail_window: float = 60.0,
@@ -125,7 +125,7 @@ class Service:
                 raise ValueError(f"쓰기 역할은 {WRITE_ROLE}만 허용한다")
         if set(read_tokens) & set(write_tokens):
             raise ValueError("같은 토큰이 읽기와 쓰기 양쪽에 설정돼 있다. 역할마다 다른 토큰을 쓴다")
-        self.root, self.read, self.write, self.max_body, self.log = Path(root), read_tokens, write_tokens, max_body, log
+        self.root, self.read, self.write, self.max_body, self.log, self.clock = Path(root), read_tokens, write_tokens, max_body, log, clock
         self.store = store
         self.tmp = self.root / ".tmp"
         self.auth_fail_limit, self.auth_fail_window, self.min_free_gb = auth_fail_limit, auth_fail_window, min_free_gb
@@ -155,7 +155,7 @@ class Service:
         return frozenset(self.tokens().values())
 
     def auth_blocked(self, addr: str) -> bool:
-        now = time.monotonic()
+        now = self.clock()
         with self._mu:
             q = self._fails.get(addr)
             if q is None:
@@ -171,7 +171,7 @@ class Service:
         with self._mu:
             q = self._fails[addr]
             if len(q) < self.auth_fail_limit:   # 차단 중에는 쌓지 않는다: deque 길이는 limit이 상한
-                q.append(time.monotonic())
+                q.append(self.clock())
 
     def ready(self) -> tuple:
         try:
@@ -423,6 +423,7 @@ class DatasetServer:
                                   cleanup_interval=min(5, max(1, int(channel_timeout))), max_request_body_size=svc.max_body, ident="dataset-store",
                                   clear_untrusted_proxy_headers=True)
         self._stop, self._done, self._grace = threading.Event(), threading.Event(), drain_grace
+        self._clock = svc.clock      # 드레인 한도도 주입된 시계로 잰다
         self._done.set()
 
     @property
@@ -435,8 +436,8 @@ class DatasetServer:
             while not self._stop.is_set():
                 wasyncore.loop(timeout=0.1, map=self._map, count=1)
             wasyncore.dispatcher.close(self._srv)           # 새 연결을 받지 않는다(trigger는 작업 스레드가 쓰므로 닫지 않는다)
-            deadline = time.monotonic() + self._grace
-            while time.monotonic() < deadline and any(self._busy(c) for c in list(self._srv.active_channels.values())):
+            deadline = self._clock() + self._grace
+            while self._clock() < deadline and any(self._busy(c) for c in list(self._srv.active_channels.values())):
                 wasyncore.loop(timeout=0.1, map=self._map, count=1)
         finally:
             self._done.set()

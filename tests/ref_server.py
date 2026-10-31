@@ -2,7 +2,7 @@
 
 레코드는 메모리 딕셔너리에 넣어 둔다. 서버는 넣어 둔 내용을 검증하지 않고 그대로 낸다(일부러 틀린 내용을 넣어
 클라이언트의 검증을 시험하려는 것이다). 토큰은 {토큰: 역할}이며 역할 "reader"는 읽기 전용이다.
-`overrides[경로] = (상태, 콘텐츠 타입, 바이트[, 헤더 딕셔너리])`로 응답을 통째로 바꾸고, `delay`로 응답을 늦춘다.
+`overrides[경로] = (상태, 콘텐츠 타입, 바이트[, 헤더 딕셔너리])`로 응답을 통째로 바꾸고, 
 """
 from __future__ import annotations
 
@@ -12,7 +12,6 @@ import json
 import re
 import tarfile
 import threading
-import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, unquote, urlsplit
 
@@ -65,7 +64,6 @@ class ReferenceServer:
     def __init__(self, tokens: dict[str, str]):
         self.tokens = tokens
         self.overrides: dict[str, tuple] = {}
-        self.delay = 0.0
         self.question_sets: dict[str, list[dict]] = {}   # id -> [{"bank", "ref", "reviews", "change"}]
         self.packages: dict[tuple, dict] = {}            # (id, version) -> {"manifest", "files", "report"}
         self.eval_reports: dict[str, bytes] = {}
@@ -128,8 +126,6 @@ class ReferenceServer:
         body = h.rfile.read(n) if n else b""
         u = urlsplit(h.path)
         query = {k: v[-1] for k, v in parse_qs(u.query).items()}
-        if self.delay:
-            time.sleep(self.delay)
         auth = h.headers.get("Authorization", "")
         role = self.tokens.get(auth[7:]) if auth.startswith("Bearer ") else None
         self.requests.append((h.command, h.path, role))
