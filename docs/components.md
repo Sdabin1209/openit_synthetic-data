@@ -1,6 +1,6 @@
 # 컴포넌트 (D117, 구조 규칙 6개)
 
-이 영역의 일을 업무 단계로 나눈 표다. 입력은 계약(boundary-contracts v3.1.1)과 `docs/brief.md`에서 받는다: 잡 설정(SyntheticJobConfigRun/Import)·학습 데이터 jsonl·문항 세트(I1)·실패 사례(I7)를 받고, 데이터셋(I2)·잡 결과·보고서를 낸다. 컴포넌트마다 입력 스키마와 출력 스키마가 `schemas/<타입>.schema.json`에 있고(코드 타입은 `synthetic_data/types/`에서 생성), 컴포넌트는 다른 컴포넌트를 import하지 않는다. 컴포넌트끼리는 `synthetic_data/wiring/`가 잇는다. 기존 코드는 정의의 근거가 아니라 빠진 업무 규칙과 거부 조건을 찾는 대조 자료로만 썼다.
+이 영역의 일을 업무 단계로 나눈 표다. 입력은 계약(boundary-contracts v3.1.2)과 `docs/brief.md`에서 받는다: 잡 설정(SyntheticJobConfigRun/Import)·학습 데이터 jsonl·문항 세트(I1)·실패 사례(I7)를 받고, 데이터셋(I2)·잡 결과·보고서를 낸다. 컴포넌트마다 입력 스키마와 출력 스키마가 `schemas/<타입>.schema.json`에 있고(코드 타입은 `synthetic_data/types/`에서 생성), 컴포넌트는 다른 컴포넌트를 import하지 않는다. 컴포넌트끼리는 `synthetic_data/wiring/`가 잇는다. 기존 코드는 정의의 근거가 아니라 빠진 업무 규칙과 거부 조건을 찾는 대조 자료로만 썼다.
 
 컴포넌트는 입력을 스키마로 검사하고(DESIGN.md 5절) 출력을 내기 전에 스키마로 검사한다. 저장소(디스크·메모리)나 이웃(HTTP) 같은 바깥 자원은 wiring이 주입한다(`publish_decision`의 `store`, `question_set_admit`의 `survey_check`, `link_*`의 클라이언트).
 

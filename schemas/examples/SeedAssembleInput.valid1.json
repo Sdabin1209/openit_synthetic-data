@@ -18,7 +18,8 @@
       },
       "question_ids": [
         "q1"
-      ]
+      ],
+      "affected_question_ids": null
     }
   ]
 }

@@ -3,12 +3,15 @@
 
 from __future__ import annotations
 
-from typing import Any, TypedDict
+from typing import Any, TypeAlias, TypedDict
 
 
 class Approval(TypedDict):
     decision: str
     clinical_basis_approved: bool
+
+
+AffectedQuestionId: TypeAlias = str
 
 
 class QuestionSetFetch(TypedDict):
@@ -17,3 +20,4 @@ class QuestionSetFetch(TypedDict):
     approvals: list[Approval] | None
     change_checked: bool
     follow_ups: list[str] | None
+    affected_question_ids: list[AffectedQuestionId] | None

@@ -235,6 +235,39 @@ def test_regeneration_affected_only_excludes_sets_without_follow_up(tmp_path, va
     assert res.status == "NOTHING_TO_DO"
 
 
+def _regen_run(tmp_path, validators, affected_slots):
+    change = {"pipeline_schema_version": PIPELINE_SCHEMA_VERSION, "classification_id": "cc-2", "to": {}, "change_kinds": ["SLOT"],
+              "affected_slots": affected_slots, "follow_ups": ["REGENERATE_SAMPLES"], "created_at": "2026-10-15T00:00:00Z"}
+    reader = doubles.make_question_reader()
+    reader.add("qs-main", "2", doubles.make_bank("main", wording=" (개정)"), change=change)
+    raw = make_cfg_raw(tmp_path, regeneration={"mode": "affected_only"}, question_sets=[{"id": "qs-main", "version": "2"}])
+    cfg, res = run(raw, MemoryDatasetStore(validators.contract_version), validators, reader=reader)
+    return res, json.loads((cfg.work_dir / "report.json").read_text())
+
+
+def test_regeneration_affected_only_rebuilds_only_the_affected_questions(tmp_path, validators):
+    """브리프 3-1: REGENERATE_SAMPLES이면 해당 문항의 샘플만 다시 만든다. 시드 fc-a는 Q3, fc-b는 다음 문항 Q4를 쓴다."""
+    res, rep = _regen_run(tmp_path, validators, ["Q3.hours"])
+    assert res.status == "PUBLISHED" and res.counts["origin.FAILURE_CASE_SEED"] == 1
+    assert any(k.startswith("lora_a.") for k in res.counts) and not any(k.startswith("lora_b.") for k in res.counts)
+    skipped = {x["case_id"]: x["reason"] for x in rep["skipped_seeds"]}
+    assert skipped == {"fc-b": "시드의 문항이 변경 분류의 영향 문항이 아님"}
+
+
+def test_regeneration_affected_only_with_no_listed_slots_rebuilds_everything(tmp_path, validators):
+    """영향 칸 목록이 비면 문항을 좁히지 않는다(전부 다시 만든다)."""
+    res, rep = _regen_run(tmp_path, validators, [])
+    assert res.counts["origin.FAILURE_CASE_SEED"] == 2 and rep["skipped_seeds"] == []
+
+
+def test_regeneration_full_mode_ignores_affected_slots(tmp_path, validators):
+    """full 모드는 변경 분류를 읽지 않으므로 문항 제한이 없다."""
+    reader = doubles.make_question_reader()
+    raw = make_cfg_raw(tmp_path, question_sets=[{"id": "qs-main"}])
+    _, res = run(raw, MemoryDatasetStore(validators.contract_version), validators, reader=reader)
+    assert res.counts["origin.FAILURE_CASE_SEED"] == 2
+
+
 def test_v1_generation_config_keys_are_rejected(tmp_path, validators):
     """제거된 v1 생성 키(scenarios·generators·style_guide_version)는 알 수 없는 키로 거부한다(ADR 0014)."""
     for key, val in (("scenarios", {"variants": 3}), ("generators", {"utterance": "rule"}), ("style_guide_version", "1")):

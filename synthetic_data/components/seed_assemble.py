@@ -38,6 +38,9 @@ def run(inp: dict) -> dict:
         if not used <= set(p["question_ids"]):
             skipped.append({"case_id": s["case_id"], "reason": "시드의 문항이 지정한 문항 세트에 없음"})
             continue
+        if p["affected_question_ids"] is not None and not used <= set(p["affected_question_ids"]):      # 변경 분류의 영향 문항만 다시 만든다(affected_only)
+            skipped.append({"case_id": s["case_id"], "reason": "시드의 문항이 변경 분류의 영향 문항이 아님"})
+            continue
         prefix, name = ("rs-" + _short_hash(scen, ref["version"]), "seed_lora_b") if s["role"] == "LORA_B" else ("as-" + _short_hash(scen, ref["version"], "clean"), "seed_lora_a")
         out.append(_record(prefix, scen, ref, "FAILURE_CASE_SEED", copy.deepcopy(s["input"]), copy.deepcopy(s["expected"]), {"kind": "SEED"}, s["case_id"]))
         stats[name] += 1

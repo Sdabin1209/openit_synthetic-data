@@ -9,7 +9,8 @@
     "bank": {
       "questions": []
     },
-    "usage": "TRAIN_POOL"
+    "usage": "TRAIN_POOL",
+    "affected_question_ids": null
   },
   "note": null,
   "error": null

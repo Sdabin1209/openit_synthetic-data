@@ -66,7 +66,7 @@ v1 `ParserOutput` 라벨 기준 구현이었다. v2 정답은 데이터셋 담�
 
 - `python -m synthetic_data run --config <파일>`: 설정 하나로 끝까지 돌고 종료한다(run-once). 새 문항 세트 버전이나 실패 사례가 생길 때 스케줄러가 같은 설정으로 부르면 된다(D39). 어댑터(문항 읽기, 실패 사례 읽기)는 설정의 `factory`(`module:function`)가 만든다. 이웃 영역의 메모리 구현이 나오면 설정만 바꾼다.
 - `reviewed_only`(기본 true): 버전을 지정하지 않으면 `latest(..., reviewed_only=True)`, 지정하면 `get_reviews`에서 APPROVED + `clinical_basis_approved`를 확인한다.
-- `regeneration.mode = affected_only`: 문항 세트마다 `get_change(ref)`를 읽어 `REGENERATE_SAMPLES` 후속 작업이 있는 문항 세트만 쓰고(`components/question_set_admit.py`), 없으면 그 문항 세트는 제외한다. 모두 제외되면 `NOTHING_TO_DO`. v1 생성 경로를 제거한 뒤(ADR 0010)에는 변경 분류의 `affected_slots`로 문항을 더 좁히지 않는다(시드가 문항 세트에 속하는지만 본다). 이 한계는 브리프의 "해당 문항의 샘플을 다시 만든다"보다 좁다: 열린 항목으로 STATUS에 적었다.
+- `regeneration.mode = affected_only`: 문항 세트마다 `get_change(ref)`를 읽어 `REGENERATE_SAMPLES` 후속 작업이 있는 문항 세트만 쓰고(`components/question_set_admit.py`), 없으면 그 문항 세트는 제외한다. 모두 제외되면 `NOTHING_TO_DO`. 그때 변경 분류의 `affected_slots`(`<문항ID>.<칸ID>`, 마지막 '.'에서 나눔, CR-003)에서 영향 문항 ID를 읽어(`link_question_reader`) 그 문항을 쓰는 시드만 다시 만든다(`seed_assemble`, 아닌 시드는 `skipped_seeds`에 사유 "변경 분류의 영향 문항이 아님"). 영향 칸 목록이 비면 문항을 좁히지 않는다. `full` 모드는 변경 분류를 읽지 않는다(브리프 3-1, U431).
 - 출력: 작업 디렉터리의 `report.json`(건수, 건너뜀·버린 사유, 결과)과 `review_sample.jsonl`.
 
 ## 12. 데이터셋 저장소 (I2, `components/dataset_store.py`)

@@ -95,8 +95,10 @@ def _seed_samples(cfg: Plan, ctxs: list, failure_store, survey: Survey, state: d
                                "fallback_question_set_id": cfg.seeds_question_set_id})
     state["skipped_seeds"] += paired["skipped"]
     qids = {(c["ref"]["id"], c["ref"]["version"], c["ref"]["content_hash"]): [q["question_id"] for q in c["bank"]["questions"]] for c in ctxs}
+    affected = {(c["ref"]["id"], c["ref"]["version"], c["ref"]["content_hash"]): c["affected_question_ids"] for c in ctxs}
     assembled = seed_assemble.run({"pairs": [{"seed": p["seed"], "ref": p["ref"],
-                                              "question_ids": qids[(p["ref"]["id"], p["ref"]["version"], p["ref"]["content_hash"])]} for p in paired["pairs"]]})
+                                              "question_ids": qids[(p["ref"]["id"], p["ref"]["version"], p["ref"]["content_hash"])],
+                                              "affected_question_ids": affected[(p["ref"]["id"], p["ref"]["version"], p["ref"]["content_hash"])]} for p in paired["pairs"]]})
     state["skipped_seeds"] += assembled["skipped"]
     return assembled["samples"], Counter(assembled["stats"])
 

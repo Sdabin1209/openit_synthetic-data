@@ -750,11 +750,37 @@ SCHEMAS: dict[str, dict] = {'ConfirmedCases': {'$id': 'https://openit.invalid/sy
                           'description': '판정: ADMITTED(쓴다), SKIPPED(REGENERATE_SAMPLES 없음), REJECTED(검수·무결성·형식 위반; '
                                          'error가 경계 오류 코드와 메시지).',
                           'properties': {'context': {'anyOf': [{'additionalProperties': False,
-                                                                'properties': {'bank': {'type': 'object'},
+                                                                'properties': {'affected_question_ids': {'anyOf': [{'items': {'minLength': 1,
+                                                                                                                              'type': 'string'},
+                                                                                                                    'type': 'array',
+                                                                                                                    'uniqueItems': True},
+                                                                                                                   {'type': 'null'}],
+                                                                                                         'description': '변경 '
+                                                                                                                        '분류의 '
+                                                                                                                        'affected_slots에서 '
+                                                                                                                        '읽은 '
+                                                                                                                        '문항 '
+                                                                                                                        'ID(정렬). '
+                                                                                                                        'null이면 '
+                                                                                                                        '문항 '
+                                                                                                                        '제한이 '
+                                                                                                                        '없다(변경 '
+                                                                                                                        '분류를 '
+                                                                                                                        '읽지 '
+                                                                                                                        '않았거나 '
+                                                                                                                        'REGENERATE_SAMPLES인데 '
+                                                                                                                        '영향 '
+                                                                                                                        '칸 '
+                                                                                                                        '목록이 '
+                                                                                                                        '비었다).'},
+                                                                               'bank': {'type': 'object'},
                                                                                'ref': {'type': 'object'},
                                                                                'usage': {'enum': ['TRAIN_POOL',
                                                                                                   'HELD_OUT_EVAL']}},
-                                                                'required': ['ref', 'bank', 'usage'],
+                                                                'required': ['ref',
+                                                                             'bank',
+                                                                             'usage',
+                                                                             'affected_question_ids'],
                                                                 'type': 'object'},
                                                                {'type': 'null'}]},
                                          'error': {'anyOf': [{'additionalProperties': False,
@@ -791,7 +817,14 @@ SCHEMAS: dict[str, dict] = {'ConfirmedCases': {'$id': 'https://openit.invalid/sy
                       'additionalProperties': False,
                       'description': '읽어 온 문항 세트: ArtifactRef, QuestionBank(계약), 검수 결과(읽었을 때만), 변경 분류의 후속 작업(읽었을 때만; '
                                      'null이면 변경 기록 없음).',
-                      'properties': {'approvals': {'anyOf': [{'items': {'additionalProperties': False,
+                      'properties': {'affected_question_ids': {'anyOf': [{'items': {'minLength': 1, 'type': 'string'},
+                                                                          'type': 'array',
+                                                                          'uniqueItems': True},
+                                                                         {'type': 'null'}],
+                                                               'description': '변경 분류의 affected_slots에서 읽은 문항 ID(정렬). '
+                                                                              'null이면 문항 제한이 없다(변경 분류를 읽지 않았거나 '
+                                                                              'REGENERATE_SAMPLES인데 영향 칸 목록이 비었다).'},
+                                     'approvals': {'anyOf': [{'items': {'additionalProperties': False,
                                                                         'properties': {'clinical_basis_approved': {'type': 'boolean'},
                                                                                        'decision': {'type': 'string'}},
                                                                         'required': ['decision',
@@ -804,7 +837,7 @@ SCHEMAS: dict[str, dict] = {'ConfirmedCases': {'$id': 'https://openit.invalid/sy
                                      'follow_ups': {'anyOf': [{'items': {'type': 'string'}, 'type': 'array'},
                                                               {'type': 'null'}]},
                                      'ref': {'type': 'object'}},
-                      'required': ['ref', 'bank', 'approvals', 'change_checked', 'follow_ups'],
+                      'required': ['ref', 'bank', 'approvals', 'change_checked', 'follow_ups', 'affected_question_ids'],
                       'title': 'QuestionSetFetch',
                       'type': 'object'},
  'QuestionSetQuery': {'$id': 'https://openit.invalid/synthetic-data/schemas/QuestionSetQuery.schema.json',
@@ -1067,11 +1100,37 @@ SCHEMAS: dict[str, dict] = {'ConfirmedCases': {'$id': 'https://openit.invalid/sy
                        'additionalProperties': False,
                        'description': '시드 샘플 조립 입력: 짝과 그 문항 세트의 문항 ID들.',
                        'properties': {'pairs': {'items': {'additionalProperties': False,
-                                                          'properties': {'question_ids': {'items': {'type': 'string'},
+                                                          'properties': {'affected_question_ids': {'anyOf': [{'items': {'minLength': 1,
+                                                                                                                        'type': 'string'},
+                                                                                                              'type': 'array',
+                                                                                                              'uniqueItems': True},
+                                                                                                             {'type': 'null'}],
+                                                                                                   'description': '변경 '
+                                                                                                                  '분류의 '
+                                                                                                                  'affected_slots에서 '
+                                                                                                                  '읽은 '
+                                                                                                                  '문항 '
+                                                                                                                  'ID(정렬). '
+                                                                                                                  'null이면 '
+                                                                                                                  '문항 '
+                                                                                                                  '제한이 '
+                                                                                                                  '없다(변경 '
+                                                                                                                  '분류를 '
+                                                                                                                  '읽지 '
+                                                                                                                  '않았거나 '
+                                                                                                                  'REGENERATE_SAMPLES인데 '
+                                                                                                                  '영향 '
+                                                                                                                  '칸 '
+                                                                                                                  '목록이 '
+                                                                                                                  '비었다).'},
+                                                                         'question_ids': {'items': {'type': 'string'},
                                                                                           'type': 'array'},
                                                                          'ref': {'type': 'object'},
                                                                          'seed': {'$ref': 'Seed.schema.json'}},
-                                                          'required': ['seed', 'ref', 'question_ids'],
+                                                          'required': ['seed',
+                                                                       'ref',
+                                                                       'question_ids',
+                                                                       'affected_question_ids'],
                                                           'type': 'object'},
                                                 'type': 'array'}},
                        'required': ['pairs'],

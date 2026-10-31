@@ -52,6 +52,22 @@
           "type": "null"
         }
       ]
+    },
+    "affected_question_ids": {
+      "anyOf": [
+        {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "변경 분류의 affected_slots에서 읽은 문항 ID(정렬). null이면 문항 제한이 없다(변경 분류를 읽지 않았거나 REGENERATE_SAMPLES인데 영향 칸 목록이 비었다)."
     }
   },
   "required": [
@@ -59,7 +75,8 @@
     "bank",
     "approvals",
     "change_checked",
-    "follow_ups"
+    "follow_ups",
+    "affected_question_ids"
   ],
   "additionalProperties": false
 }

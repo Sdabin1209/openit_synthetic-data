@@ -3,13 +3,16 @@
 
 from __future__ import annotations
 
-from typing import Any, Literal, TypedDict
+from typing import Any, Literal, TypeAlias, TypedDict
+
+AffectedQuestionId: TypeAlias = str
 
 
 class Context(TypedDict):
     ref: dict[str, Any]
     bank: dict[str, Any]
     usage: Literal['TRAIN_POOL', 'HELD_OUT_EVAL']
+    affected_question_ids: list[AffectedQuestionId] | None
 
 
 class Error(TypedDict):

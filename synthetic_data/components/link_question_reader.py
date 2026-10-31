@@ -47,10 +47,14 @@ def fetch(inp: dict, *, reader) -> dict:
     approvals = ([{"decision": r["decision"], "clinical_basis_approved": r["clinical_basis_approved"]} for r in reader.get_reviews(ref)]
                  if inp["want_approvals"] else None)
     bank = reader.get_question_bank(ref)
-    follow_ups = None
+    follow_ups, affected = None, None
     if inp["want_change"]:
         ch = reader.get_change(ref)
         follow_ups = None if ch is None else list(ch["follow_ups"])
-    out = {"ref": ref, "bank": bank, "approvals": approvals, "change_checked": bool(inp["want_change"]), "follow_ups": follow_ups}
+        # affected_slots는 SlotRef를 `<문항ID>.<칸ID>`로 직렬화한 문자열이다. 문항 ID에도 '.'가 있을 수 있어 마지막 '.'에서 나눈다(CR-003, 칸 ID는 점이 없다)
+        slots = [] if ch is None else [s.rsplit(".", 1)[0] for s in ch["affected_slots"] if "." in s]
+        affected = sorted(set(slots)) or None      # 비면 문항 제한 없음(전부 다시 만든다)
+    out = {"ref": ref, "bank": bank, "approvals": approvals, "change_checked": bool(inp["want_change"]), "follow_ups": follow_ups,
+           "affected_question_ids": affected}
     check("QuestionSetFetch", out)
     return out

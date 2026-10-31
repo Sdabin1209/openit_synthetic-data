@@ -45,3 +45,17 @@ def test_quality_rejects_a_output_that_breaks_the_save_rule(ctx, validators):
     s = v2_sample("LORA_A", 1, "TRAIN", ctx.ref)
     s["expected"]["values"][0]["save"] = False
     assert sample_quality.run({"role": "LORA_A", "sample": s})["reasons"] == ["schema_sample"]
+
+
+def test_affected_question_ids_split_slot_refs_at_the_last_dot():
+    """affected_slots의 `<문항ID>.<칸ID>`는 마지막 '.'에서 나눈다(문항 ID에 점이 있을 수 있다, CR-003). 결과는 정렬·중복 제거, 비면 None."""
+    from synthetic_data.components import link_question_reader
+    reader = doubles.make_question_reader()
+    change = {"pipeline_schema_version": "3.1", "classification_id": "cc-3", "to": {}, "change_kinds": ["SLOT"], "created_at": "2026-10-15T00:00:00Z",
+              "affected_slots": ["Q.1.hours", "Q3.hours", "Q3.minutes"], "follow_ups": ["REGENERATE_SAMPLES"]}
+    reader.add("qs-x", "1", doubles.make_bank("main"), change=change)
+    query = {"id": "qs-x", "version": "1", "reviewed_only": False, "want_approvals": False, "want_change": True}
+    assert link_question_reader.fetch(query, reader=reader)["affected_question_ids"] == ["Q.1", "Q3"]
+    reader.add("qs-y", "1", doubles.make_bank("main"), change={**change, "affected_slots": []})
+    assert link_question_reader.fetch({**query, "id": "qs-y"}, reader=reader)["affected_question_ids"] is None
+    assert link_question_reader.fetch({**query, "want_change": False}, reader=reader)["affected_question_ids"] is None

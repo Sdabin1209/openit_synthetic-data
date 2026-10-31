@@ -1,5 +1,9 @@
 # 변경 이력
 
+## 미배포 (2026-10-31, U431)
+- 의존: boundary-contracts v3.1.2, openit-link v0.4.2.
+- 변경(동작): `regeneration.mode=affected_only`에서 REGENERATE_SAMPLES인 문항 세트는 변경 분류 `affected_slots`의 문항을 쓰는 시드만 다시 만든다(이전에는 문항 세트 전체). 영향 칸 목록이 비면 제한 없음. 내부 스키마 `QuestionSetFetch`·`QuestionSetAdmission.context`·`SeedAssembleInput.pairs[]`에 `affected_question_ids`가 더해졌다. 시험 3건 추가.
+
 ## 미배포 (2026-10-30, U400: 영역 구조 개편 D117·D118)
 - 의존: boundary-contracts v3.1.1, openit-link v0.4.1(통신 기반). 동작(와이어 형식, 잡 출력, 종료 코드, digest·version)은 바꾸지 않았다.
 - 변경: 코드를 `components/`(29개), `wiring/`, `types/`로 옮겼다. `schemas/`에 영역 내부 타입 58개와 통과·거부 예시. 옛 모듈 경로(`synthetic_data.importer`, `.job`, `.store`, `.schemas`, `.service.app` 등)는 없어졌다. 설정 값으로 쓰이는 `synthetic_data.adapters:http_question_reader`·`http_failure_store`는 공개 진입점으로 유지한다(ADR 0022).

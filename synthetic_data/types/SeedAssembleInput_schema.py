@@ -3,15 +3,18 @@
 
 from __future__ import annotations
 
-from typing import Any, TypedDict
+from typing import Any, TypeAlias, TypedDict
 
 from . import Seed_schema
+
+AffectedQuestionId: TypeAlias = str
 
 
 class Pair(TypedDict):
     seed: Seed_schema.Seed
     ref: dict[str, Any]
     question_ids: list[str]
+    affected_question_ids: list[AffectedQuestionId] | None
 
 
 class SeedAssembleInput(TypedDict):

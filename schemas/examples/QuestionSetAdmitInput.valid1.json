@@ -10,7 +10,8 @@
     },
     "approvals": null,
     "change_checked": false,
-    "follow_ups": null
+    "follow_ups": null,
+    "affected_question_ids": null
   },
   "spec": {
     "id": "qs-main",
