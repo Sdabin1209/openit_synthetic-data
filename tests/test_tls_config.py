@@ -243,12 +243,11 @@ def test_publish_client_also_uses_the_egress_proxy(tmp_path, monkeypatch):
     link_dataset_publish.build(spec)
 
 
-def test_survey_schema_location_is_not_an_environment_input():
-    # R9.1: 계약 Env 스키마에 없는 입력 이름을 만들지 않는다. 이미지 안 경로는 모듈 상수다
+def test_job_survey_schema_location_is_not_an_environment_input():
+    # R9.1: 잡은 계약 Env 스키마에 없는 이름을 읽지 않는다(이미지 안 경로는 상수). dataset-store는 선언된 DATASET_STORE_SURVEY_SCHEMA_DIR를 읽는다(아래 시험)
     root = PKG.parent
     text = "\n".join(p.read_text(encoding="utf-8") for p in CODE) + (root / "Dockerfile").read_text(encoding="utf-8")
     assert "SYNTHETIC_SURVEY_SCHEMA_DIR" not in text and "SURVEY_SCHEMA_DIR=" not in text
-    assert 'env.get("DATASET_STORE_SURVEY_SCHEMA_DIR"' not in text
 
 
 def test_image_survey_dir_overrides_job_config_only_inside_the_image(tmp_path, monkeypatch):
@@ -258,3 +257,21 @@ def test_image_survey_dir_overrides_job_config_only_inside_the_image(tmp_path, m
     (tmp_path / "img").mkdir()
     monkeypatch.setattr(config, "IMAGE_SURVEY_SCHEMA_DIR", tmp_path / "img")
     assert config.survey_dir_override() == str(tmp_path / "img")      # 이미지 안: 이 경로가 우선
+
+
+def test_service_uses_declared_survey_dir_name_else_contract_default(tmp_path, monkeypatch):
+    # DatasetStoreEnv: DATASET_STORE_SURVEY_SCHEMA_DIR가 주어지면 그 값, 없으면 기본값 /app/survey_schema
+    from synthetic_data.wiring import service as wsvc
+    from conftest import SURVEY_DIR
+    seen = []
+    class Stop(Exception):
+        pass
+    def fake_survey(path):
+        seen.append(Path(path))
+        raise Stop
+    monkeypatch.setattr(wsvc, "Survey", fake_survey)
+    base = {"DATASET_STORE_ROOT": str(tmp_path / "r"), "DATASET_STORE_PORT": "0", "DATASET_STORE_READ_TOKENS": "model-lab=" + "ab12cd34" * 4}
+    for env in ({**base, "DATASET_STORE_SURVEY_SCHEMA_DIR": str(SURVEY_DIR)}, base):
+        with pytest.raises(Stop):
+            wsvc.main(env)
+    assert seen == [Path(SURVEY_DIR), Path("/app/survey_schema")]
