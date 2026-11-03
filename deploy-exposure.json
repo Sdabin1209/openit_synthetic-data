@@ -12,7 +12,8 @@
       ],
       "auth": {
         "kind": "denied"
-      }
+      },
+      "max_body_bytes": 1073741824
     },
     {
       "paths": [

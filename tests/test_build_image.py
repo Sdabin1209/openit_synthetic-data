@@ -197,6 +197,11 @@ def test_exposure_table_matches_code_routes():
     if re.search(r'base \+ "/\{d\}/versions', src):                           # 데이터셋 하위 경로들
         code.add("/v1/datasets/*")
     assert code == {"/healthz", "/readyz", "/metrics", "/v1/datasets", "/v1/datasets/*"} == table
+    # R10.13·3.4.7: 게시 경로 본문 상한 선언은 서비스 기본값(DATASET_STORE_MAX_BODY 1GiB)과 같고 클라이언트 max_tar_bytes(8GiB) 이하다
+    from synthetic_data.wiring import service as wsvc
+    import inspect
+    assert [r["max_body_bytes"] for r in exp["routes"] if "/v1/datasets" in r["paths"]] == [1 << 30] and (1 << 30) <= 8 * 2**30
+    assert "1 << 30" in inspect.getsource(wsvc.main)
     assert exp["egress"] == ["question-authoring", "ops-feedback"]      # INTERFACES 한눈에: synthetic-data는 I1·I7을 읽는다
 
 
