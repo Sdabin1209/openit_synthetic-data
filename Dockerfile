@@ -40,7 +40,8 @@ ENV PATH=/opt/venv/bin:$PATH PYTHONUNBUFFERED=1 PYTHONDONTWRITEBYTECODE=1 DATASE
 VOLUME /data
 USER 10001
 EXPOSE 8080
-HEALTHCHECK --interval=15s --timeout=3s CMD python -c "import urllib.request as u; u.urlopen('http://127.0.0.1:8080/healthz', timeout=2)"
+# 왜: 포트는 DATASET_STORE_PORT로 바뀔 수 있어 HEALTHCHECK도 같은 변수를 읽는다(기본 8080, 계약 DatasetStoreEnv). 0(빈 포트)은 컨테이너에서 쓰지 않는다.
+HEALTHCHECK --interval=15s --timeout=3s CMD python -c "import os, urllib.request as u; u.urlopen('http://127.0.0.1:%s/healthz' % os.environ.get('DATASET_STORE_PORT', '8080'), timeout=2)"
 LABEL io.openit.service="dataset-store" \
       io.openit.revision="${REVISION}" \
       io.openit.contracts.boundary="${BC_VERSION}" \

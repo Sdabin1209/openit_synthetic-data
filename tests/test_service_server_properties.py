@@ -131,3 +131,35 @@ def test_sigterm_handler_stops_the_server_loop(tmp_path, monkeypatch):
            "DATASET_STORE_HOST": "127.0.0.1", "DATASET_STORE_READ_TOKENS": "model-lab=" + "ab12cd34" * 4, "DATASET_STORE_DRAIN_GRACE": "2"}
     assert wsvc.main(env) == 0
     assert set(handlers) == {signal.SIGTERM, signal.SIGINT} and made["closed"] and made["drain_grace"] == 2.0
+
+
+from synthetic_data.wiring import service as wsvc
+
+# --- 기동 때 환경 변수 선언 검증(계약 DatasetStoreEnv, U73) ---
+def _good_env(tmp_path):
+    from conftest import SURVEY_DIR
+    return {"DATASET_STORE_ROOT": str(tmp_path / "r"), "DATASET_STORE_SURVEY_SCHEMA_DIR": str(SURVEY_DIR), "DATASET_STORE_PORT": "0",
+            "DATASET_STORE_READ_TOKENS": "model-lab=" + "ab12cd34" * 4, "PATH": "/usr/bin"}
+
+
+def test_env_declaration_accepts_a_proper_environment(tmp_path):
+    assert wsvc.env_violations(_good_env(tmp_path)) == []          # 접두 없는 PATH는 보지 않는다
+
+
+def test_env_declaration_rejects_unknown_name_and_names_only_the_variable(tmp_path, capsys):
+    env = {**_good_env(tmp_path), "DATASET_STORE_NOT_DECLARED": "x"}
+    assert wsvc.main(env) == 2
+    err = capsys.readouterr().err
+    assert "DATASET_STORE_NOT_DECLARED" in err and "ab12cd34" not in err      # 이름만, 토큰 값은 없다
+
+
+def test_env_declaration_rejects_bad_value_without_printing_it(tmp_path, capsys):
+    env = {**_good_env(tmp_path), "DATASET_STORE_MAX_BODY": "SECRETISH-not-a-number"}
+    assert wsvc.main(env) == 2
+    err = capsys.readouterr().err
+    assert "DATASET_STORE_MAX_BODY" in err and "SECRETISH" not in err
+
+
+def test_job_variables_are_not_checked_by_the_service_declaration(tmp_path):
+    env = {**_good_env(tmp_path), "SYNTHETIC_SURVEY_SCHEMA_DIR": "/x"}      # DATASET_STORE_ 접두가 아닌 변수는 대상이 아니다
+    assert wsvc.env_violations(env) == []

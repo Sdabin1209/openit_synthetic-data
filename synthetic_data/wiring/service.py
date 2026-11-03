@@ -19,7 +19,7 @@ import sys
 import time
 from pathlib import Path
 
-from boundary_contracts import BoundaryError, SecretError, read_secret
+from boundary_contracts import BoundaryError, SecretError, read_secret, validator
 
 from ..components.dataset_store import FileDatasetStore
 from ..components.link_dataset_store_server import (DEFAULT_CONNECTIONS, DEFAULT_DRAIN_GRACE, DEFAULT_IDLE_TIMEOUT, DEFAULT_THREADS, MIN_TOKEN_LEN,
@@ -28,7 +28,26 @@ from ..types.schema_registry import check
 from .survey import Survey
 
 
+def env_violations(env) -> list[str]:
+    """DATASET_STORE_ 접두 변수만 계약 DatasetStoreEnv로 검증하고 위반한 변수 이름만 돌려준다(U73). 왜: 값에는 토큰이 있어 오류 문구에 값을 싣지 않는다.
+    접두 없는 변수(PATH 등)와 잡의 변수(SYNTHETIC_*, DATASET_STORE_WRITE_TOKEN 단수는 서비스 환경에 없다)는 서비스가 보지 않는다."""
+    scoped = {k: v for k, v in env.items() if k.startswith("DATASET_STORE_")}
+    names = set()
+    for e in validator("DatasetStoreEnv").iter_errors(scoped):
+        if e.absolute_path:
+            names.add(str(e.absolute_path[0]))
+        elif isinstance(e.instance, str):          # propertyNames: 선언에 없는 이름. instance가 그 이름이다
+            names.add(e.instance)
+        else:
+            names.add("(필수 변수 없음: 토큰 변수 넷 중 하나)")
+    return sorted(names)
+
+
 def main(env=os.environ) -> int:
+    bad = env_violations(env)
+    if bad:
+        print(f"시작 실패: 환경 변수 선언(DatasetStoreEnv) 위반: {', '.join(bad)}", file=sys.stderr, flush=True)
+        return 2
     try:
         settings = {"read_tokens": read_secret("DATASET_STORE_READ_TOKENS", environ=env) or "",
                     "write_tokens": read_secret("DATASET_STORE_WRITE_TOKENS", environ=env) or "",
