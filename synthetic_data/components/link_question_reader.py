@@ -4,7 +4,11 @@
 클라이언트를 만드는 공장(http_question_reader)은 설정의 adapters.question_reader.factory가 가리킨다(계약 SyntheticJobConfigRun이 정한 설정 값)."""
 from __future__ import annotations
 
+import os
+from typing import Optional
+
 from boundary_contracts import SecretError, read_secret
+from boundary_contracts.clients import egress_proxy_from
 from openit_link.clients import HttpQuestionReader
 
 from ..types.schema_registry import check
@@ -24,10 +28,10 @@ def _token(token_env: str) -> str:
     return tok
 
 
-def http_question_reader(base_url: str, token_env: str, timeout: float = 30.0) -> HttpQuestionReader:
+def http_question_reader(base_url: str, token_env: str, timeout: float = 30.0, egress_proxy: Optional[str] = None) -> HttpQuestionReader:
     # R10.3: 사슬 표에 없는 호출은 30초(시작값, 측정 안 함)
     # 읽기 클라이언트는 읽기 모드다: 모르는 필드·열거값은 받아들이고, MAJOR 불일치는 UNSUPPORTED_VERSION, 형식·해시 위반은 INTEGRITY_ERROR로 올라온다.
-    return HttpQuestionReader(base_url, _token(token_env), timeout)
+    return HttpQuestionReader(base_url, _token(token_env), timeout, egress_proxy=egress_proxy if egress_proxy is not None else egress_proxy_from(os.environ))      # 영역 밖 호출은 자기 영역 게이트웨이 출구로만(R1.8). 환경에서는 OPENIT_EGRESS_PROXY 하나만 꺼낸다(R9.1)
 
 
 def _find_ref(reader, qid: str, version: str) -> dict:

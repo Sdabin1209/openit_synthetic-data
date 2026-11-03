@@ -1,10 +1,31 @@
 {
   "service": "dataset-store",
+  "egress": [
+    "question-authoring",
+    "ops-feedback"
+  ],
   "routes": [
     {
-      "paths": ["/v1/datasets", "/v1/datasets/*", "/healthz", "/readyz"],
-      "methods": [],
-      "auth": {"kind": "denied"}
+      "paths": [
+        "/v1/datasets",
+        "/v1/datasets/*"
+      ],
+      "auth": {
+        "kind": "denied"
+      }
+    },
+    {
+      "paths": [
+        "/healthz",
+        "/readyz",
+        "/metrics"
+      ],
+      "methods": [
+        "GET"
+      ],
+      "auth": {
+        "kind": "none"
+      }
     }
   ]
 }

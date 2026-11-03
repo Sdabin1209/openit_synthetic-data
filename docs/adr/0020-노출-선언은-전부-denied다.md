@@ -1,6 +1,6 @@
 # ADR 0020: 노출 선언(`io.openit.exposure`)은 전 경로 denied다
 
-상태: 채택 (2026-10-30). 계약 `Exposure`(boundary-contracts v2.6.0), OPEN_GAPS U47.
+상태: 채택 (2026-10-30).  일부 대체됨: 감시 경로는 ADR 0024. 계약 `Exposure`(boundary-contracts v2.6.0), OPEN_GAPS U47.
 
 ## 맥락
 deploy의 Caddyfile이 영역 API 경로·메서드·역할을 직접 알았다(구조 규칙 1 위반). 계약은 영역이 자기 이미지에 노출 표를 라벨로 선언하게 했다.

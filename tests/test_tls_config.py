@@ -4,10 +4,11 @@
 from __future__ import annotations
 
 import re
+import threading
 import shutil
 import ssl
 import subprocess
-import threading
+
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
 
@@ -122,3 +123,121 @@ def test_default_timeouts_follow_r10_3():
     assert import_plan.DEFAULT_TIMEOUT == run_plan.DEFAULT_TIMEOUT == 300.0      # tar 게시
     for fn in (link_question_reader.http_question_reader, link_failure_reader.http_failure_store):
         assert inspect.signature(fn).parameters["timeout"].default == 30.0
+
+
+# --- RUNTIME 3.4.4 대조 (R5.1, R10.11, R8.1, R3.10, R4.1, R1.8) ---
+def _get(srv, path, token=None):
+    import urllib.error
+    import urllib.request
+    req = urllib.request.Request(srv.url + path, headers={"Authorization": "Bearer " + token} if token else {})
+    try:
+        with urllib.request.urlopen(req, timeout=HANG_GUARD_SECONDS) as r:
+            return r.status, r.read(), r.headers
+    except urllib.error.HTTPError as e:
+        return e.code, e.read(), e.headers
+
+
+def test_health_bodies_follow_health_status_and_not_ready_spelling(tmp_path):
+    # R5.1: 200 + 비어 있지 않은 HealthStatus 본문, 아님은 503 + status=not_ready
+    import json
+    from boundary_contracts import validator
+    from test_service import Srv
+    s = Srv(tmp_path / "srv")
+    try:
+        for path, want in (("/healthz", "ok"), ("/readyz", "ready")):
+            st, body, _ = _get(s, path)
+            assert st == 200 and json.loads(body)["status"] == want
+            validator("HealthStatus").validate(json.loads(body))
+        good = s.svc.tmp
+        s.svc.tmp = tmp_path / "no-such-dir" / "x"      # 저장소 쓰기 불가를 만든다
+        st, body, _ = _get(s, "/readyz")
+        assert st == 503 and json.loads(body)["status"] == "not_ready"
+        validator("HealthStatus").validate(json.loads(body))
+        # R4.1: 저장소가 돌아오면 재시작 없이 다시 ready
+        s.svc.tmp = good
+        assert _get(s, "/readyz")[0] == 200
+    finally:
+        s.close()
+
+
+def test_metrics_is_unauthenticated_prometheus_text_and_200_while_storage_is_down(tmp_path):
+    # R10.11: 인증 없음(토큰이 틀려도 401·403 없음), Prometheus 텍스트, 저장소가 멈춰도 200
+    from test_service import Srv
+    s = Srv(tmp_path / "srv")
+    try:
+        s.svc.tmp = tmp_path / "no-such-dir" / "x"
+        assert _get(s, "/readyz")[0] == 503
+        for tok in (None, "wrong-token"):
+            st, body, h = _get(s, "/metrics", tok)
+            assert st == 200 and h["Content-Type"].startswith("text/plain")
+            text = body.decode()
+            assert "# TYPE dataset_store_up gauge\ndataset_store_up 1\n" in text
+    finally:
+        s.close()
+
+
+def test_internal_error_log_has_class_and_location_without_message(tmp_path, monkeypatch):
+    # R8.1: 앱 바깥 층(make_app)에서 잡은 503 내부 오류는 예외 종류와 위치(파일:줄)만 로그에 남기고 메시지는 남기지 않는다
+    import re
+    from synthetic_data.components import link_dataset_store_server as m
+    from test_service import Srv
+    class Exploding:
+        def __init__(self, *a, **k):
+            pass
+        def __call__(self, environ, start_response):
+            raise RuntimeError("SECRET-MESSAGE-31337")
+    monkeypatch.setattr(m, "App", Exploding)
+    logs = []
+    s = Srv(tmp_path / "srv", log=logs.append)
+    try:
+        st, body, _ = _get(s, "/v1/datasets")
+        assert st == 503 and b"SECRET-MESSAGE-31337" not in body
+        line = [l for l in logs if "내부 오류" in l]
+        assert line and re.search(r"내부 오류 RuntimeError \S+\.py:\d+", line[0]) and "SECRET-MESSAGE" not in line[0]
+    finally:
+        s.close()
+
+
+def test_job_clients_go_out_through_the_area_egress_proxy(tmp_path, monkeypatch):
+    # R1.8·CONVENTIONS 13: 이웃(I1)을 부르는 클라이언트는 OPENIT_EGRESS_PROXY의 CONNECT 터널로만 나간다.
+    # 가짜 프록시가 CONNECT 줄을 기록하고 403으로 거절한다 -> 계약 클라이언트는 직접 연결하지 않았다.
+    import socket
+    from synthetic_data.wiring.run_job import load_factory
+    seen = []
+    ls = socket.socket()
+    ls.bind(("127.0.0.1", 0))
+    ls.listen(1)
+
+    def serve():
+        c, _ = ls.accept()
+        seen.append(c.recv(4096).split(b"\r\n")[0])
+        c.sendall(b"HTTP/1.1 403 Forbidden\r\nContent-Length: 0\r\n\r\n")
+        c.close()
+    t = threading.Thread(target=serve, daemon=True)
+    t.start()
+    tok = tmp_path / "tok"
+    tok.write_text("t" * 40)
+    monkeypatch.setenv("SD_TEST_TOKEN_FILE", str(tok))
+    monkeypatch.setenv("OPENIT_EGRESS_PROXY", f"http://127.0.0.1:{ls.getsockname()[1]}")
+    spec = {"factory": "synthetic_data.adapters:http_question_reader", "kwargs": {"base_url": "https://question-authoring:8443", "token_env": "SD_TEST_TOKEN"}}
+    try:
+        with pytest.raises(BoundaryError):
+            load_factory(spec)(**spec["kwargs"]).latest("qs-main", reviewed_only=True)
+        t.join(HANG_GUARD_SECONDS)
+        assert seen == [b"CONNECT question-authoring:8443 HTTP/1.1"]
+    finally:
+        ls.close()
+
+
+def test_publish_client_also_uses_the_egress_proxy(tmp_path, monkeypatch):
+    # R1.8: 잡의 게시 클라이언트(I2)도 OPENIT_EGRESS_PROXY를 egress_proxy로 받는다(잘못된 형식이면 클라이언트가 거부 = 값이 클라이언트까지 닿았다는 증거)
+    from synthetic_data.components import link_dataset_publish
+    tok = tmp_path / "tok"
+    tok.write_text("t" * 40)
+    monkeypatch.setenv("SD_TEST_TOKEN_FILE", str(tok))
+    spec = {"base_url": "https://dataset-store:8443", "token_env": "SD_TEST_TOKEN", "timeout": 300.0}
+    monkeypatch.setenv("OPENIT_EGRESS_PROXY", "http://example.org:3128")      # loopback 밖은 계약이 거부한다
+    with pytest.raises(ValueError):
+        link_dataset_publish.build(spec)
+    monkeypatch.setenv("OPENIT_EGRESS_PROXY", "http://127.0.0.1:3128")
+    link_dataset_publish.build(spec)

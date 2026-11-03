@@ -186,14 +186,18 @@ def test_exposure_table_matches_code_routes():
     코드의 모든 경로는 표의 denied 경로에 들어가야 하고, 표에는 코드에 없는 경로가 없어야 한다."""
     import re
     exp = json.loads((ROOT / "deploy-exposure.json").read_text(encoding="utf-8"))
-    assert all(r["auth"]["kind"] == "denied" for r in exp["routes"])
+    # I2 경로는 platform 공개 입구로 내지 않는다(denied). 서비스 사이 호출은 영역 게이트웨이가 TLS를 끝내 넘긴다(CONVENTIONS 13절).
+    # 감시 경로(/healthz·/readyz·/metrics)는 인증 없음(RUNTIME R5.1·R10.11)
+    assert {r["auth"]["kind"] for r in exp["routes"] if "/v1/datasets" in r["paths"]} == {"denied"}
+    assert {r["auth"]["kind"] for r in exp["routes"] if "/metrics" in r["paths"]} == {"none"}
     table = {p for r in exp["routes"] for p in r["paths"]}
     src = (ROOT / "synthetic_data" / "components" / "link_dataset_store_server.py").read_text(encoding="utf-8")
-    code = {"/healthz", "/readyz"}                                             # openit_link.App이 낸다(D118)
+    code = {"/healthz", "/readyz", "/metrics"}                                             # openit_link.App이 낸다(D118)
     code |= set(re.findall(r'base = "(/v1/datasets)"', src))                   # 경로 표의 뿌리
     if re.search(r'base \+ "/\{d\}/versions', src):                           # 데이터셋 하위 경로들
         code.add("/v1/datasets/*")
-    assert code == {"/healthz", "/readyz", "/v1/datasets", "/v1/datasets/*"} == table
+    assert code == {"/healthz", "/readyz", "/metrics", "/v1/datasets", "/v1/datasets/*"} == table
+    assert exp["egress"] == ["question-authoring", "ops-feedback"]      # INTERFACES 한눈에: synthetic-data는 I1·I7을 읽는다
 
 
 def test_label_comes_from_installed_wheel_not_from_request_and_stale_request_fails(env):

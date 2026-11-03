@@ -3,7 +3,10 @@
 `<NAME>_FILE`이 가리키는 파일의 내용이 우선이고, 없으면 환경 변수 `<NAME>`(개발·시험용)."""
 from __future__ import annotations
 
+import os
+
 from boundary_contracts import SecretError, read_secret
+from boundary_contracts.clients import egress_proxy_from
 from openit_link.clients import HttpDatasetStore
 
 from ..types.schema_registry import check
@@ -21,4 +24,4 @@ def build(spec: dict) -> HttpDatasetStore:
         raise TokenError(str(e)) from None
     if not tok:
         raise TokenError(f"쓰기 토큰 {spec['token_env']}이(가) 없다: {spec['token_env']}_FILE(파일 경로) 또는 {spec['token_env']}(개발용)를 설정한다")
-    return HttpDatasetStore(spec["base_url"], tok, spec["timeout"])
+    return HttpDatasetStore(spec["base_url"], tok, spec["timeout"], egress_proxy=egress_proxy_from(os.environ))      # 게시도 자기 영역 게이트웨이 출구(R1.8)

@@ -10,6 +10,7 @@ import urllib.error
 import urllib.request
 
 import pytest
+from conftest import write_files
 from synthetic_data.components.dataset_store import FileDatasetStore
 
 from conftest import HANG_GUARD_SECONDS, SURVEY_DIR
@@ -410,3 +411,48 @@ def test_same_token_for_read_and_write_refused(tmp_path):
 def test_write_token_may_read_by_design(srv):
     """쓰기 토큰은 읽기를 포함한다는 설계 고정. 근거는 ADR 0012(게시자가 자기 게시를 확인, 같은 토큰을 읽기에도 두면 시작 거부)."""
     assert srv.call("GET", "/v1/datasets", token=WT)[0] == 200
+
+
+def test_publish_failing_midway_leaves_no_trace_and_resend_works(tmp_path, captured, monkeypatch):
+    """R10.8·R3.10 (매트릭스 C05 F21·F27): 게시 도중 저장소 쓰기가 실패하면 503 UNAVAILABLE, 흔적(읽히는 버전·임시 폴더)이 없고,
+    같은 요청을 그대로 다시 보내면 201, 또 보내면 200, 다른 내용이면 409다."""
+    from synthetic_data.components import dataset_store as ds
+    m, blobs = captured
+    s = Srv(tmp_path)
+    try:
+        real = ds._fsync_tree
+        def failing(top):
+            raise OSError(28, "No space left on device")
+        monkeypatch.setattr(ds, "_fsync_tree", failing)
+        st, body, _ = publish(s, captured)
+        rec = json.loads(body)
+        assert st == 503 and rec["code"] == "UNAVAILABLE"
+        did, ver = m["dataset_id"], m["version"]
+        assert s.call("GET", f"/v1/datasets/{did}/versions/{ver}")[0] == 404
+        assert json.loads(s.call("GET", f"/v1/datasets/{did}/versions")[1])["items"] == []
+        droot = tmp_path / "root" / "datasets"
+        assert [p for p in droot.rglob("*") if p.name.startswith(".tmp-") or p.name == "manifest.json"] == []      # 임시 폴더·반쪽 버전 없음
+        monkeypatch.setattr(ds, "_fsync_tree", real)
+        assert publish(s, captured)[0] == 201
+        assert publish(s, captured)[0] == 200
+    finally:
+        s.close()
+
+
+def test_oversized_publish_is_413_with_boundary_error_body(tmp_path, captured):
+    """R10.13·R3.5: 본문 상한을 넘으면 413 + BoundaryError 본문(INVALID_RECORD, http_status 413), 아무것도 저장하지 않는다."""
+    s = Srv(tmp_path, max_body=1000)
+    try:
+        m, blobs = captured
+        body = body_of(m, blobs)
+        assert len(body) > 1000
+        st, resp, _ = s.call("POST", "/v1/datasets", body, WT)
+        assert st == 413      # 본문 형식은 전송 계층이 정할 수 있다. 계약 클라이언트는 본문과 무관하게 413을 INVALID_RECORD로 옮긴다(R3.5, _TRANSPORT_LIMIT)
+        from openit_link.clients import HttpDatasetStore
+        from boundary_contracts.errors import BoundaryError
+        with pytest.raises(BoundaryError) as ei:      # 계약 클라이언트로 실제 게시: 413 -> INVALID_RECORD(http_status 413), 재시도하지 않는다
+            HttpDatasetStore(s.url, WT, 30).publish(m, write_files(tmp_path / "pub", blobs))
+        assert ei.value.code == "INVALID_RECORD" and ei.value.details.get("http_status") == 413
+        assert json.loads(s.call("GET", "/v1/datasets")[1])["items"] == []
+    finally:
+        s.close()

@@ -2,7 +2,11 @@
 계약 클라이언트(openit_link.clients, D118)로 CONFIRMED의 최신 버전만 쪽 단위로 모두 읽는다. 클라이언트 공장(http_failure_store)은 설정의 factory가 가리킨다."""
 from __future__ import annotations
 
+import os
+from typing import Optional
+
 from boundary_contracts import SecretError, read_secret
+from boundary_contracts.clients import egress_proxy_from
 from openit_link.clients import HttpFailureStore
 
 from ..types.schema_registry import check
@@ -22,8 +26,8 @@ def _token(token_env: str) -> str:
     return tok
 
 
-def http_failure_store(base_url: str, token_env: str, timeout: float = 30.0) -> HttpFailureStore:
-    return HttpFailureStore(base_url, _token(token_env), timeout)
+def http_failure_store(base_url: str, token_env: str, timeout: float = 30.0, egress_proxy: Optional[str] = None) -> HttpFailureStore:
+    return HttpFailureStore(base_url, _token(token_env), timeout, egress_proxy=egress_proxy if egress_proxy is not None else egress_proxy_from(os.environ))      # 영역 밖 호출은 자기 영역 게이트웨이 출구로만(R1.8). 환경에서는 OPENIT_EGRESS_PROXY 하나만 꺼낸다(R9.1)
 
 
 def fetch(inp: dict, *, store) -> dict:

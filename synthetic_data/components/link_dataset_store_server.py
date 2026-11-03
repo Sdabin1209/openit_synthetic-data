@@ -6,6 +6,7 @@
 환경 변수는 읽지 않는다(wiring/service.py가 읽어 넘긴다). 로그는 표준 출력으로, 토큰과 본문은 남기지 않는다."""
 from __future__ import annotations
 
+import os
 import shutil
 import tarfile
 import tempfile
@@ -186,7 +187,7 @@ class Service:
             p.unlink()
             return True, {"status": "ready"}
         except Exception:
-            return False, {"status": "not-ready"}
+            return False, {"status": "not_ready"}
 
     @contextmanager
     def dataset_lock(self, dataset_id: str):
@@ -383,9 +384,31 @@ def make_app(svc: Service):
         start_response("503 Service Unavailable", [("Content-Type", "application/json"), ("Content-Length", str(len(body)))])
         return [body]
 
+    counts: dict = defaultdict(int)
+    counts_mu = threading.Lock()
+
+    def metrics_body() -> bytes:
+        # R10.11: Prometheus 텍스트 형식(exposition format 0.0.4). 프로세스 안의 값만 낸다: 저장소가 멈춰도 200이다(준비 상태는 /readyz만 503).
+        with counts_mu:
+            rows = sorted(counts.items())
+        lines = ["# HELP dataset_store_up 프로세스가 살아 있으면 1", "# TYPE dataset_store_up gauge", "dataset_store_up 1",
+                 "# HELP dataset_store_http_requests_total 처리한 HTTP 요청 수(상태 코드별)", "# TYPE dataset_store_http_requests_total counter"]
+        lines += [f'dataset_store_http_requests_total{{status="{k}"}} {v}' for k, v in rows]
+        return ("\n".join(lines) + "\n").encode()
+
+    def where(e: BaseException) -> str:
+        tb = e.__traceback__
+        while tb is not None and tb.tb_next is not None:
+            tb = tb.tb_next
+        return f"{os.path.basename(tb.tb_frame.f_code.co_filename)}:{tb.tb_lineno}" if tb else "-"
+
     def app(environ, start_response):
         path = environ.get("PATH_INFO", "/")
         addr = environ.get("REMOTE_ADDR", "-")
+        if path == "/metrics" and environ.get("REQUEST_METHOD") == "GET":      # 인증 없음, 인증 실패 횟수 제한 밖(R10.11)
+            body = metrics_body()
+            start_response("200 OK", [("Content-Type", "text/plain; version=0.0.4; charset=utf-8"), ("Content-Length", str(len(body)))])
+            return [body]
         status = []
         if path not in ("/healthz", "/readyz") and svc.auth_blocked(addr):
             out = respond_unavailable(start_response, "인증 시도가 너무 많다. 잠시 뒤 다시 시도한다")
@@ -397,11 +420,13 @@ def make_app(svc: Service):
             try:
                 out = inner(environ, sr)
             except Exception as e:
-                svc.log(f"내부 오류 {type(e).__name__}")
+                svc.log(f"내부 오류 {type(e).__name__} {where(e)}")      # R8.1: 예외 종류와 위치만. 메시지·본문은 남기지 않는다
                 out = respond_unavailable(start_response, "서비스 내부 오류")
                 status.append("503")
             if status and status[0] == "401":
                 svc.note_auth_failure(addr)      # 유효한 토큰의 403(역할 부족)은 실패 횟수에 넣지 않는다
+        with counts_mu:
+            counts[status[0] if status else "-"] += 1
         svc.log(f"{environ['REQUEST_METHOD']} {path} {status[0] if status else '-'}")
         return out
 
