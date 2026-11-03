@@ -84,3 +84,10 @@ def test_https_call_trusts_private_root_via_ssl_cert_file(tmp_path, monkeypatch)
     finally:
         httpd.shutdown()
         httpd.server_close()
+
+
+def test_client_refuses_plain_http_outside_loopback():
+    # 계약 v3.4.1: loopback 밖 http://는 생성 시 거부된다. 이 영역은 계약 클라이언트로만 이웃을 부르므로(직접 urllib 호출 없음) 이 거부가 곧 영역의 보증이다.
+    with pytest.raises(ValueError):
+        HttpDatasetStore("http://dataset-store:8080", "tok", 5)
+    HttpDatasetStore("http://127.0.0.1:1", "tok", 5)
