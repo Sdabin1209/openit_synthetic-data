@@ -4,6 +4,19 @@
 # 환경 변수: SMOKE_WHEELS(미리 만든 wheel 폴더. 없으면 태그에서 만든다), SMOKE_BC_VERSION(기본 requirements.lock의 boundary-contracts 태그),
 #            SURVEY_SCHEMA(기본 ../survey-service/schema; 읽기만 한다)
 set -eu
+# 실패하면 컨테이너를 지우기 전에 상태와 로그를 남긴다(정리 순서 결함 수정 2026-11-03: 지우고 나면 실패 원인을 볼 수 없다).
+# inspect 는 State 만 낸다(전체 inspect 는 환경 변수가 섞인다).
+smoke_diag() {
+  local rc=$1; shift
+  [ "$rc" -eq 0 ] && return 0
+  for c in "$@"; do
+    [ -n "$c" ] || continue
+    docker inspect "$c" >/dev/null 2>&1 || continue
+    echo "=== 실패(종료 코드 $rc): 컨테이너 $c 진단 ===" >&2
+    docker inspect -f 'status={{.State.Status}} exit={{.State.ExitCode}} oom={{.State.OOMKilled}} error={{.State.Error}} started={{.State.StartedAt}} finished={{.State.FinishedAt}}' "$c" >&2 || true
+    docker logs --tail 100 "$c" >&2 2>&1 || true
+  done
+}
 cd "$(dirname "$0")/.."
 BC_VER=${SMOKE_BC_VERSION:-$(grep ^boundary-contracts requirements.lock | sed "s/.*@v//")}
 SCHEMA=${SURVEY_SCHEMA:-../survey-service/schema}
@@ -22,9 +35,9 @@ LWHL=$(ls "$LBUILT"/openit_link-*.whl | head -1)
 TAG="synthetic-data-dataset-store:smoke-$$"
 NAME="synthetic-data-dataset-store-smoke-$$"
 SECRETS=$(mktemp -d)
-trap 'rm -rf "${BUILT:-}" "${LBUILT:-}" "$SECRETS"; docker rm -f "$NAME" >/dev/null 2>&1 || true; docker volume rm "$NAME-data" >/dev/null 2>&1 || true; docker rmi "$TAG" >/dev/null 2>&1 || true' EXIT
+trap 'smoke_diag $? "$NAME"; rm -rf "${BUILT:-}" "${LBUILT:-}" "$SECRETS"; docker rm -f "$NAME" >/dev/null 2>&1 || true; docker volume rm "$NAME-data" >/dev/null 2>&1 || true; docker rmi "$TAG" >/dev/null 2>&1 || true' EXIT
 # wheel 폴더 전체가 아니라 고른 wheel 하나만 컨텍스트로 준다
-WCTX=$(mktemp -d); cp "$WHL" "$LWHL" "$WCTX"/; trap 'rm -rf "${BUILT:-}" "${LBUILT:-}" "$WCTX" "$SECRETS"; docker rm -f "$NAME" >/dev/null 2>&1 || true; docker volume rm "$NAME-data" >/dev/null 2>&1 || true; docker rmi "$TAG" >/dev/null 2>&1 || true' EXIT
+WCTX=$(mktemp -d); cp "$WHL" "$LWHL" "$WCTX"/; trap 'smoke_diag $? "$NAME"; rm -rf "${BUILT:-}" "${LBUILT:-}" "$WCTX" "$SECRETS"; docker rm -f "$NAME" >/dev/null 2>&1 || true; docker volume rm "$NAME-data" >/dev/null 2>&1 || true; docker rmi "$TAG" >/dev/null 2>&1 || true' EXIT
 docker build -q --build-context wheels="$WCTX" --build-context survey_schema="$SCHEMA" \
   --build-arg "BC_SPEC=/wheels/$(basename "$WHL")" --build-arg "LINK_SPEC=/wheels/$(basename "$LWHL")" --build-arg "BC_VERSION=v$BC_VER" --build-arg "SURVEY_SCHEMA_VERSION=$(sed -n 's/^openit-survey-schema @ .*@survey-schema-v\([0-9][0-9]*\)\..*/\1/p' requirements.lock)" \
   --build-arg "REVISION=$(git rev-parse --short HEAD)" -t "$TAG" .
