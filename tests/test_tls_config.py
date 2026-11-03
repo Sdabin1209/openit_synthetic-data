@@ -91,3 +91,13 @@ def test_client_refuses_plain_http_outside_loopback():
     with pytest.raises(ValueError):
         HttpDatasetStore("http://dataset-store:8080", "tok", 5)
     HttpDatasetStore("http://127.0.0.1:1", "tok", 5)
+
+
+def test_server_binds_only_to_the_given_host(tmp_path):
+    # DATASET_STORE_HOST=127.0.0.1이면 그 주소에만 붙는다(0.0.0.0이 아니다). 사이드카 뒤에서 바깥 인터페이스에 평문을 열지 않기 위해서다.
+    from test_service import Srv
+    s = Srv(tmp_path / "srv")
+    try:
+        assert s.httpd.server_address[0] == "127.0.0.1"
+    finally:
+        s.close()

@@ -131,6 +131,7 @@ def test_sigterm_handler_stops_the_server_loop(tmp_path, monkeypatch):
            "DATASET_STORE_HOST": "127.0.0.1", "DATASET_STORE_READ_TOKENS": "model-lab=" + "ab12cd34" * 4, "DATASET_STORE_DRAIN_GRACE": "2"}
     assert wsvc.main(env) == 0
     assert set(handlers) == {signal.SIGTERM, signal.SIGINT} and made["closed"] and made["drain_grace"] == 2.0
+    assert made["host"] == "127.0.0.1"      # DATASET_STORE_HOST가 바인드 주소로 그대로 간다(U99)
 
 
 from synthetic_data.wiring import service as wsvc
