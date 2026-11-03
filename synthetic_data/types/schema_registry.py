@@ -1310,42 +1310,44 @@ SCHEMAS: dict[str, dict] = {'ConfirmedCases': {'$id': 'https://openit.invalid/sy
                  'type': 'object'},
  'TrainingDataRow': {'$id': 'https://openit.invalid/synthetic-data/TrainingDataRow.schema.json',
                      '$schema': 'https://json-schema.org/draft/2020-12/schema',
-                     'description': '영역 소유 형식(U49: 외부 데이터셋 담당과의 형식이라 계약으로 승격하지 않았다). 데이터셋 담당이 만들고 synthetic-data '
-                                    'import가 읽는다. 파일 6개: lora_{a,b}_{train,val,test}.jsonl (UTF-8, 한 줄에 객체 하나). '
-                                    '역할(LORA_A/B)과 분할(TRAIN/VALIDATION/EVAL)은 행이 아니라 파일 이름이 정한다(ADR 0002); 행의 split 값은 '
-                                    '읽지 않는다(개수만 센다). 모르는 키 정책: 무시(읽기 모드; 데이터셋 담당이 필드를 더해도 import가 깨지지 않게). 이 스키마가 못 보는 '
-                                    '것(코드가 검사): user content는 JSON 문자열로 LORA_A는 ActionExtractionInput, LORA_B는 '
-                                    'ResponseRequest 스키마를 통과해야 하고, assistant content는 LORA_A면 ActionExtraction JSON '
-                                    '문자열, LORA_B면 ResponseText 평문이어야 한다.',
-                     'properties': {'human_review': {'description': '생략 가능. enum은 '
-                                                                    'ActionExtractionSample/ResponseSample 스키마의 '
-                                                                    'human_review와 같다. 이 밖의 값은 sample_schema 단계에서 행 '
-                                                                    '거부.',
+                     'description': '영역 소유 형식(U49: 외부 데이터셋 담당과의 형식이라 계약으로 승격하지 않았다). 데이터셋 담당(학습 서버)의 최종 데이터 한 행이다. 헤드가 '
+                                    '학습 서버 train.jsonl을 읽기 전용으로 확인한 최상위 키(2026-11-03): action, asked_item, '
+                                    'canonical_scenario_id, generation, label_source, lora_a_input, lora_a_target, '
+                                    'lora_b_input, lora_b_target, next_type, normalizer_plan, pattern_type, '
+                                    'previous_turns, question_id, record_type, scenario_family, scenario_id, source, '
+                                    'split, style_tag, subtype, user_utterance, validation. 파일은 '
+                                    'lora_{a,b}_{train,val,test}.jsonl 6개(UTF-8, 한 줄에 객체 하나). 역할(LORA_A/B)과 '
+                                    '분할(TRAIN/VALIDATION/EVAL)은 행이 아니라 파일 이름이 정한다(ADR 0002); 행의 split 값은 읽지 않는다(개수만 '
+                                    '센다). 이 영역이 쓰는 키: scenario_id, 역할별 입출력 쌍(LORA_A는 lora_a_input·lora_a_target, '
+                                    'LORA_B는 lora_b_input·lora_b_target), 있으면 human_review. 나머지 키는 무시한다(읽기 모드; 데이터셋 '
+                                    '담당이 필드를 더해도 import가 깨지지 않게). 이 스키마가 못 보는 것(코드가 검사): 파일의 역할에 맞는 입출력 쌍이 있는지, '
+                                    'lora_a_input은 ActionExtractionInput, lora_a_target은 ActionExtraction, '
+                                    'lora_b_input은 ResponseRequest 스키마를 통과하는지. lora_b_target은 {response_text}이고 '
+                                    'response_text가 ResponseText(계약 샘플의 expected)가 된다. 추정(확인 못 함): 한 행이 두 역할의 키를 모두 '
+                                    '담는지, 역할 파일마다 자기 쪽 키만 담는지 모른다. 그래서 두 경우 모두 받고 다른 역할의 키는 읽지 않는다.',
+                     'properties': {'human_review': {'description': '생략 가능(학습 서버 행의 확인된 키 목록에는 없다). 있으면 '
+                                                                    'ActionExtractionSample/ResponseSample의 '
+                                                                    'human_review와 같은 enum이어야 하고, 이 밖의 값은 '
+                                                                    'sample_schema 단계에서 행 거부.',
                                                      'enum': ['auto_only',
                                                               'pending',
                                                               'human_ok',
                                                               'human_flagged',
                                                               'human_edited']},
-                                    'messages': {'maxItems': 3,
-                                                 'minItems': 3,
-                                                 'prefixItems': [{'properties': {'content': {'type': 'string'},
-                                                                                 'role': {'const': 'system'}},
-                                                                  'required': ['role', 'content'],
-                                                                  'type': 'object'},
-                                                                 {'properties': {'content': {'type': 'string'},
-                                                                                 'role': {'const': 'user'}},
-                                                                  'required': ['role', 'content'],
-                                                                  'type': 'object'},
-                                                                 {'properties': {'content': {'type': 'string'},
-                                                                                 'role': {'const': 'assistant'}},
-                                                                  'required': ['role', 'content'],
-                                                                  'type': 'object'}],
-                                                 'type': 'array'},
+                                    'lora_a_input': {'description': '계약 ActionExtractionInput(코드가 검사).',
+                                                     'type': 'object'},
+                                    'lora_a_target': {'description': '계약 ActionExtraction(reason·targets·note 포함 가능, '
+                                                                     '코드가 검사).',
+                                                      'type': 'object'},
+                                    'lora_b_input': {'description': '계약 ResponseRequest(코드가 검사).', 'type': 'object'},
+                                    'lora_b_target': {'description': '{response_text}. 문장이 ResponseText가 된다.',
+                                                      'properties': {'response_text': {'type': 'string'}},
+                                                      'required': ['response_text'],
+                                                      'type': 'object'},
                                     'scenario_id': {'description': '같은 시나리오는 분할 사이에 걸치지 않아야 한다(평가 누수 방지, 코드가 검사).',
                                                     'type': 'string'},
-                                    'split': {'description': '읽지 않는다(파일 이름이 정본). 관측된 값: train, val, test.',
-                                              'type': 'string'}},
-                     'required': ['messages', 'scenario_id'],
+                                    'split': {'description': '읽지 않는다(파일 이름이 정본).', 'type': 'string'}},
+                     'required': ['scenario_id'],
                      'title': '외부 학습 데이터 jsonl 한 행',
                      'type': 'object'},
  'VersionsRequest': {'$id': 'https://openit.invalid/synthetic-data/schemas/VersionsRequest.schema.json',

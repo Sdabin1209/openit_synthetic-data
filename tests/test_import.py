@@ -19,13 +19,16 @@ from synthetic_data.components.dataset_store import MemoryDatasetStore
 QS = [{"id": "qs-external", "version": "1", "content_hash": "sha256:" + "0" * 64}]
 
 
+EXTRA_KEYS = {"action": "NEXT", "asked_item": "Q3", "canonical_scenario_id": "c", "generation": "g", "label_source": "l", "next_type": "NEXT",
+              "normalizer_plan": {}, "pattern_type": "p", "previous_turns": [], "question_id": "Q3", "record_type": "r", "scenario_family": "f",
+              "source": "s", "style_tag": "t", "subtype": "st", "user_utterance": "u", "validation": {}}      # 학습 서버 행의 나머지 최상위 키(읽지 않는다)
+
+
 def row(role, n, scenario, **over):
-    if role == "LORA_A":
-        user, asst = json.dumps(doubles.a_input(f"발화 {n}"), ensure_ascii=False), json.dumps(doubles.a_expected(), ensure_ascii=False)
-    else:
-        user, asst = json.dumps(doubles.b_input(f"발화 {n}"), ensure_ascii=False), doubles.b_expected()
-    r = {"human_review": "auto_only", "scenario_id": scenario, "split": "x",
-         "messages": [{"role": "system", "content": "sys"}, {"role": "user", "content": user}, {"role": "assistant", "content": asst}]}
+    """학습 서버 최종 데이터의 행 모양(헤드가 읽기 전용으로 확인한 키, 2026-11-03). 한 행에 두 역할의 키가 다 있는 경우를 만든다."""
+    r = {**EXTRA_KEYS, "human_review": "auto_only", "scenario_id": scenario, "split": "x",
+         "lora_a_input": doubles.a_input(f"발화 {n}"), "lora_a_target": doubles.a_expected(),
+         "lora_b_input": doubles.b_input(f"발화 {n}"), "lora_b_target": {"response_text": doubles.b_expected()}}
     r.update(over)
     return r
 
@@ -91,8 +94,8 @@ def test_changed_input_changes_digest(tmp_path, validators):
 
 def bad_mutator(name, lines):
     if name == "lora_a_train.jsonl":
-        lines = lines + ["이건 JSON이 아님", {"messages": []}, row("LORA_A", 99, "sc-bad")]
-        lines[-1]["messages"][2]["content"] = json.dumps({"action": "NEXT"})      # v2 출력 위반
+        lines = lines + ["이건 JSON이 아님", {"scenario_id": "sc-nokeys"}, row("LORA_A", 99, "sc-bad")]
+        lines[-1]["lora_a_target"] = {"action": "NEXT"}      # v2 출력 위반
     if name == "lora_b_val.jsonl":
         lines = lines + [row("LORA_B", 98, "sc-bad2", human_review="weird")]
     return lines
@@ -106,7 +109,7 @@ def test_invalid_rows_rejected_with_counts_by_reason(tmp_path, validators):
     r = report(tmp_path)
     assert r["total_rows"] == 22 and r["invalid_rows"] == 4 and r["valid_rows"] == 18
     reasons = r["invalid_reasons_by_file"]["lora_a_train.jsonl"]
-    assert any(k.startswith("record_json") for k in reasons) and any(k.startswith("record_shape") for k in reasons)
+    assert any(k.startswith("record_json") for k in reasons) and any(k.startswith("record_shape") for k in reasons)      # 키가 빠진 행은 record_shape
     assert any(k.startswith("output_schema") for k in reasons)
     assert any(k.startswith("sample_schema") for k in r["invalid_reasons_by_file"]["lora_b_val.jsonl"])
     assert r["result"]["status"] == "REJECTED"
@@ -130,6 +133,55 @@ def test_rate_over_tolerance_rejects_even_if_count_ok(tmp_path, validators):
     assert res.status == "REJECTED"
 
 
+def test_rows_with_the_training_server_keys_pass(tmp_path, validators):
+    """학습 서버 최종 데이터의 키(두 역할의 쌍과 나머지 키가 한 행에 다 있는 모양)를 받아 계약 샘플로 게시한다."""
+    write_input(tmp_path / "in")
+    res = run_import(cfg_for(tmp_path), store=MemoryDatasetStore(validators.contract_version), survey=validators)
+    assert res.status == "PUBLISHED" and report(tmp_path)["invalid_rows"] == 0
+
+
+def test_rows_carrying_only_their_own_role_keys_pass(tmp_path, validators):
+    """역할 파일마다 자기 쪽 키만 담은 행도 받는다(한 행이 두 역할 키를 다 담는지는 확인하지 못했다)."""
+    def own(name, lines):
+        drop = ("lora_b_input", "lora_b_target") if name.startswith("lora_a_") else ("lora_a_input", "lora_a_target")
+        return [{k: v for k, v in l.items() if k not in drop} for l in lines]
+    write_input(tmp_path / "in", mutate=own)
+    assert run_import(cfg_for(tmp_path), store=MemoryDatasetStore(validators.contract_version), survey=validators).status == "PUBLISHED"
+
+
+@pytest.mark.parametrize("drop", ["lora_a_input", "lora_a_target"])
+def test_row_missing_a_key_is_rejected(tmp_path, validators, drop):
+    def miss(name, lines):
+        if name == "lora_a_train.jsonl":
+            lines[0] = {k: v for k, v in lines[0].items() if k != drop}
+        return lines
+    write_input(tmp_path / "in", mutate=miss)
+    res = run_import(cfg_for(tmp_path), store=MemoryDatasetStore(validators.contract_version), survey=validators)
+    assert res.status == "REJECTED"
+    assert any(k.startswith("record_shape") for k in report(tmp_path)["invalid_reasons_by_file"]["lora_a_train.jsonl"])
+
+
+def test_lora_b_target_without_response_text_is_rejected(tmp_path, validators):
+    def bad(name, lines):
+        if name == "lora_b_train.jsonl":
+            lines[0]["lora_b_target"] = {"text": "x"}
+        return lines
+    write_input(tmp_path / "in", mutate=bad)
+    res = run_import(cfg_for(tmp_path), store=MemoryDatasetStore(validators.contract_version), survey=validators)
+    assert res.status == "REJECTED"
+    assert any(k.startswith("record_shape") for k in report(tmp_path)["invalid_reasons_by_file"]["lora_b_train.jsonl"])
+
+
+def test_old_messages_format_is_rejected(tmp_path, validators):
+    """옛 형식(messages 3개)은 더 받지 않는다."""
+    def old(name, lines):
+        return [{"scenario_id": l["scenario_id"], "messages": [{"role": "system", "content": "s"}, {"role": "user", "content": "{}"},
+                                                               {"role": "assistant", "content": "{}"}]} for l in lines]
+    write_input(tmp_path / "in", mutate=old)
+    res = run_import(cfg_for(tmp_path), store=MemoryDatasetStore(validators.contract_version), survey=validators)
+    assert res.status == "REJECTED" and all(k.startswith("record_shape") for k in report(tmp_path)["invalid_reasons_total"])
+
+
 def test_v1_shaped_rows_all_rejected(tmp_path, validators):
     """v1 내용(다른 형식)은 명확한 사유로 전부 실패한다."""
     def v1(name, lines):
@@ -137,7 +189,7 @@ def test_v1_shaped_rows_all_rejected(tmp_path, validators):
     write_input(tmp_path / "in", mutate=v1)
     res = run_import(cfg_for(tmp_path), store=MemoryDatasetStore(validators.contract_version), survey=validators)
     assert res.status == "REJECTED"
-    assert set(report(tmp_path)["invalid_reasons_total"]) == {"record_shape: messages가 [system,user,assistant] 각각 문자열 content를 가진 3개가 아니다"}
+    assert set(report(tmp_path)["invalid_reasons_total"]) == {"record_shape: lora_a_input·lora_a_target가 없거나 형식이 틀리다", "record_shape: lora_b_input·lora_b_target가 없거나 형식이 틀리다"}
 
 
 def test_missing_file_is_input_error(tmp_path, validators):
@@ -196,9 +248,8 @@ def test_cli_exit_codes(tmp_path):
 
 # ---- 점검 반영(SD-1~SD-4, SD-7, 의심 패턴) ----
 def set_utt(r, text):
-    u = json.loads(r["messages"][1]["content"])
-    u["user_utterance"] = text
-    r["messages"][1]["content"] = json.dumps(u, ensure_ascii=False)
+    r["lora_a_input"]["user_utterance"] = text
+    r["lora_b_input"]["user_utterance"] = text      # 어느 역할 파일에 쓰든 그 역할의 입력에 발화가 들어간다
     return r
 
 
@@ -229,8 +280,7 @@ def test_other_question_same_utterance_is_not_a_leak(tmp_path, validators):
             lines[0] = set_utt(row("LORA_A", 1, "sc-t-x"), "네")
         if name == "lora_a_test.jsonl":
             r = set_utt(row("LORA_A", 2, "sc-e-x"), "네")
-            u = json.loads(r["messages"][1]["content"]); u["question_id"] = "Q4"
-            r["messages"][1]["content"] = json.dumps(u, ensure_ascii=False)
+            r["lora_a_input"]["question_id"] = "Q4"
             lines[0] = r
         return lines
     write_input(tmp_path / "in", mutate=same)
@@ -245,9 +295,8 @@ def test_no_input_values_in_reasons_report_or_manifest(tmp_path, validators):
     def leak(name, lines):
         if name == "lora_a_train.jsonl":
             bad = row("LORA_A", 91, "sc-bad", human_review=SECRET)
-            bad["messages"][2]["content"] = json.dumps({"action": SECRET, "values": [{"key": SECRET}], "next_item": 5}, ensure_ascii=False)
-            u = json.loads(bad["messages"][1]["content"]); u["extra_" + "field"] = SECRET; u["state"] = {"a": SECRET}
-            bad["messages"][1]["content"] = json.dumps(u, ensure_ascii=False)
+            bad["lora_a_target"] = {"action": SECRET, "values": [{"key": SECRET}], "next_item": 5}
+            bad["lora_a_input"]["extra_" + "field"] = SECRET; bad["lora_a_input"]["state"] = {"a": SECRET}
             lines = lines + [bad, "{" + SECRET]
         return lines
     write_input(tmp_path / "in", mutate=leak)
@@ -355,8 +404,7 @@ def test_same_utterance_same_question_different_state_is_reported_not_rejected(t
             lines[0] = set_utt(row("LORA_A", 1, "sc-t-x"), "네 맞아요")
         if name == "lora_a_test.jsonl":
             r = set_utt(row("LORA_A", 2, "sc-e-x"), "네 맞아요")
-            u = json.loads(r["messages"][1]["content"]); u["state"] = {"Q3.hours": {"value": 5, "status": "ANSWERED"}}
-            r["messages"][1]["content"] = json.dumps(u, ensure_ascii=False)
+            r["lora_a_input"]["state"] = {"Q3.hours": {"value": 5, "status": "ANSWERED"}}
             lines[0] = r
         return lines
     write_input(tmp_path / "in", mutate=diff_state)

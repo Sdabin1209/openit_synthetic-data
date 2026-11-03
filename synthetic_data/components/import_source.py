@@ -1,6 +1,6 @@
 """입력 디렉터리 읽기(바깥 자원: 디스크). ImportSourceRequest -> ImportSource.
 
-입력 디렉터리에 lora_{a,b}_{train,val,test}.jsonl 6개가 있어야 한다. 역할과 분할은 파일 이름이 정한다(docs/adr/0002, 파일 이름은 V2_DRAFT 기록의 추정).
+입력 디렉터리에 lora_{a,b}_{train,val,test}.jsonl 6개가 있어야 한다. 역할과 분할은 파일 이름이 정한다(docs/adr/0002, 파일 이름은 헤드가 전달했다, 2026-11-03: lora_{a,b}_{train,val,test}.jsonl).
 줄은 \\n으로 나누고 끝의 \\r을 떼며, UTF-8이 아닌 줄은 text를 null로 둔다(행 검증이 record_encoding으로 집계한다)."""
 from __future__ import annotations
 

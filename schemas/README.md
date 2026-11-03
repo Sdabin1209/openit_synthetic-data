@@ -10,7 +10,7 @@
 
 | 기존 거부 | 옮긴 곳 |
 |---|---|
-| 행 모양: messages가 [system,user,assistant] 세 개, content는 문자열 | `TrainingDataRow` |
+| 행 모양: 역할의 입출력 쌍(lora_a_input·lora_a_target / lora_b_input·lora_b_target={response_text})이 객체 | `TrainingDataRow`(역할별 키 존재는 코드) |
 | scenario_id가 문자열 | `TrainingDataRow` |
 | 입력 파일 이름이 역할·분할을 정함(lora_a는 LORA_A, _val은 VALIDATION 등) | `ImportSource`, `ImportTallyInput`의 `allOf` if/then |
 | 줄 판정: 통과면 샘플과 빈 사유, 실패면 sample null과 사유 | `RowVerdict`의 `oneOf` |
