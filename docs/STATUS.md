@@ -46,7 +46,6 @@
 - (0.1.2) v1.2.0, I1·I7 HTTP 연결과 통합 시험, 오류 보고, GPU 호스트 runbook. 시험 92건.
 - docs/design.md, boundary.md, runbook.md, CHANGELOG.md.
 - I2 DatasetStore 파일·메모리 구현과 같은 적합성 시험(47건 통과, 전체 83건).
-- (v1 시점 기록, 제거됨) 규칙 기반 생성기 경로. 지금 `run`은 시드 -> 품질 -> 분할 -> 패키징 -> 게시가 끝까지 돈다(`configs/dev.job.json`, 이웃은 `tests/doubles.py` 대역).
 - 같은 입력과 시드는 같은 `dataset_digest`와(`created_at` 고정 시) 같은 `content_hash`.
 
 ## 남은 일
@@ -56,7 +55,7 @@
 - 컨테이너(D22): I2 서버(dataset-store)는 `Dockerfile`과 `scripts/smoke_service.sh`가 있고, 잡(`run`, `import`)은 같은 이미지에서 `io.openit.jobs` 선언으로 돈다(ADR 0019, docs/runbook.md).
 
 ## 열림 (ADR 0010)
-- 시드 `run`은 유지(헤드 결정 2026-10-28, deploy 단계 7이 호출). 제거 여부는 데이터셋 담당 이전 계획과 함께 나중에 정한다. `regeneration.mode`·감수 샘플링: deploy는 설정 값(`regeneration.mode=full`, `review.per_kind=2`)을 써넣기만 하고 `review_sample.jsonl`이나 affected_only 동작을 읽는 곳은 grep으로 찾지 못했다. 삭제하지 않고 열림으로 둔다. 배포 E2E 설정이 v1 키(scenarios, generators, style_guide_version)를 아직 싣고 있어 무시하는 호환을 두었다(deploy가 고치면 제거).
+- 시드 `run`은 유지(헤드 결정 2026-10-28, deploy 단계 7이 호출). 제거 여부는 데이터셋 담당 이전 계획과 함께 나중에 정한다. `regeneration.mode`·감수 샘플링: deploy는 설정 값(`regeneration.mode=full`, `review.per_kind=2`)을 써넣기만 하고 `review_sample.jsonl`이나 affected_only 동작을 읽는 곳은 grep으로 찾지 못했다. 삭제하지 않고 열림으로 둔다.
 
 ## 변경 요청
 CR-001~005 모두 헤드가 결정(2026-10-15, D43). 반영: FailureCase 1.1 필드 사용과 폴백, SlotRef 마지막 '.' 분할, boundary-contracts v1.1.0 고정과 패키지 스키마 사용.
