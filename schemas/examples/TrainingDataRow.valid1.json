@@ -1,28 +1,19 @@
 {
+  "human_review": "auto_only",
   "scenario_id": "sc-TRAIN-0",
   "split": "train",
-  "question_id": "Q3",
-  "record_type": "x",
-  "source": "s",
-  "label_source": "l",
-  "validation": {},
-  "lora_a_input": {
-    "question_id": "Q3",
-    "current_question": "하루에 몇 시간 주무세요?",
-    "user_utterance": "다섯 시간쯤 자요",
-    "state": {}
-  },
-  "lora_a_target": {
-    "values": [
-      {
-        "key": "Q3.hours",
-        "value": 5,
-        "precision": "approximate",
-        "status": "ANSWERED",
-        "save": true
-      }
-    ],
-    "action": "NEXT",
-    "next_item": "Q4"
-  }
+  "messages": [
+    {
+      "role": "system",
+      "content": "sys"
+    },
+    {
+      "role": "user",
+      "content": "{\"question_id\": \"Q3\", \"current_question\": \"하루에 몇 시간 주무세요?\", \"user_utterance\": \"발화 1\", \"state\": {}}"
+    },
+    {
+      "role": "assistant",
+      "content": "{\"values\": [{\"key\": \"Q3.hours\", \"value\": 5, \"precision\": \"approximate\", \"status\": \"ANSWERED\", \"save\": true}], \"action\": \"NEXT\", \"next_item\": \"Q4\"}"
+    }
+  ]
 }

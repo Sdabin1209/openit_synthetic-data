@@ -84,7 +84,7 @@ PYTHONPATH=tests python -m synthetic_data run --config configs/dev.job.json [--c
 
 ## 5. 시험 상태
 
-시험 상태(이 영역 시험 개수는 이 절에만 적는다). 이 작업 환경(워크스페이스의 worktree, 계약 v3.2.0·openit-link v0.4.3을 태그에서 설치한 `.venv`)에서 `python -m pytest -q -rs`로 확인한다. 개수는 이 문서에 적지 않고 실행 명령으로 센다(L26). 건너뜀 1건은 `SD_REFERENCE_DATA_DIR`(실제 학습 데이터 파일 경로)가 없어서다. 구조 검사 `head/scripts/structure-check.py`: 통과. 이미지 스모크 `scripts/smoke_service.sh`와 빌드 진입점 `scripts/smoke_build_image.sh`: 같은 환경에서 SMOKE_OK와 BuildImageResult 확인(`/healthz`·`/readyz`·권한·게시·조회). 줄 검증 속도는 한 줄 약 0.5ms(LoRA-A 대표 행 2000줄 측정)이고 실제 C1 데이터 6개(64,459행) 전체로는 돌리지 않았다. 돌리지 않은 것: 서비스끼리 도는 시험, 운영 이웃 영역과의 연동. 서비스끼리 도는 시험의 결과는 deploy/docs/E2E_RESULTS.md를 본다.
+시험 상태(이 영역 시험 개수는 이 절에만 적는다). 이 작업 환경(워크스페이스의 worktree, 계약 v3.1.2·openit-link v0.4.3을 태그에서 설치한 `.venv`)에서 `python -m pytest -q -rs`로 확인한다. 개수는 이 문서에 적지 않고 실행 명령으로 센다(L26). 건너뜀 1건은 `SD_REFERENCE_DATA_DIR`(실제 학습 데이터 파일 경로)가 없어서다. 구조 검사 `head/scripts/structure-check.py`: 통과. 이미지 스모크 `scripts/smoke_service.sh`와 빌드 진입점 `scripts/smoke_build_image.sh`: 같은 환경에서 SMOKE_OK와 BuildImageResult 확인(`/healthz`·`/readyz`·권한·게시·조회). 줄 검증 속도는 한 줄 약 0.5ms(LoRA-A 대표 행 2000줄 측정)이고 실제 C1 데이터 6개(64,459행) 전체로는 돌리지 않았다. 돌리지 않은 것: 서비스끼리 도는 시험, 운영 이웃 영역과의 연동. 서비스끼리 도는 시험의 결과는 deploy/docs/E2E_RESULTS.md를 본다.
 
 ## 6. 이 영역의 열린 항목 (head/docs/OPEN_GAPS.md)
 
@@ -114,6 +114,6 @@ v2 의미 검사는 계약의 `boundary_contracts.action_rules.check_action_extr
 | `docs/runbook.md` | 실행, GPU 호스트, 설정 필드, 문제 대응, 비밀 |
 | `docs/STATUS.md` | 한 일, 남은 일, 막힌 것 |
 | `docs/CHANGELOG.md` | 변경 이력 |
-| `docs/adr/` | 구조 선택의 '왜' (ADR 0001~0024, 목록은 `docs/adr/README.md`) |
+| `docs/adr/` | 구조 선택의 '왜' (ADR 0001~0023, 목록은 `docs/adr/README.md`) |
 | `docs/change-requests/` | 헤드에게 낸 변경 요청 CR-001~009, CR-S-001·002 |
 | `docs/rules/` | 헤드가 전달한 업무 규칙(출처 SOURCE.md) |

@@ -3,22 +3,30 @@
 
 from __future__ import annotations
 
-from typing import Any, Literal, TypedDict
+from typing import Literal, TypedDict
 
 from typing_extensions import NotRequired
 
 
-class LoraBTarget(TypedDict):
-    response_text: str
+class Message(TypedDict):
+    role: Literal['system']
+    content: str
+
+
+class Message1(TypedDict):
+    role: Literal['user']
+    content: str
+
+
+class Message2(TypedDict):
+    role: Literal['assistant']
+    content: str
 
 
 class Jsonl(TypedDict):
+    messages: tuple[Message, Message1, Message2]
     scenario_id: str
     split: NotRequired[str]
     human_review: NotRequired[
         Literal['auto_only', 'pending', 'human_ok', 'human_flagged', 'human_edited']
     ]
-    lora_a_input: NotRequired[dict[str, Any]]
-    lora_a_target: NotRequired[dict[str, Any]]
-    lora_b_input: NotRequired[dict[str, Any]]
-    lora_b_target: NotRequired[LoraBTarget]
