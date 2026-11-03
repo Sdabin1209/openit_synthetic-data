@@ -123,7 +123,14 @@ class Service:
                 raise ValueError(f"쓰기 역할은 {WRITE_ROLE}만 허용한다")
         if set(read_tokens) & set(write_tokens):
             raise ValueError("같은 토큰이 읽기와 쓰기 양쪽에 설정돼 있다. 역할마다 다른 토큰을 쓴다")
-        self.root, self.read, self.write, self.max_body, self.log, self.clock = Path(root), read_tokens, write_tokens, max_body, log, clock
+        self.root, self.read, self.write, self.max_body, self.clock = Path(root), read_tokens, write_tokens, max_body, clock
+
+        def safe_log(msg):      # R10.5: 로그 쓰기 실패(표준 출력 닫힘·디스크 가득)로 요청을 실패시키지 않는다
+            try:
+                log(msg)
+            except Exception:
+                pass
+        self.log = safe_log
         self.store = store
         self.tmp = self.root / ".tmp"
         self.auth_fail_limit, self.auth_fail_window, self.min_free_gb = auth_fail_limit, auth_fail_window, min_free_gb

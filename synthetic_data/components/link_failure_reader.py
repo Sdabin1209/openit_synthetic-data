@@ -22,7 +22,7 @@ def _token(token_env: str) -> str:
     return tok
 
 
-def http_failure_store(base_url: str, token_env: str, timeout: float = 10.0) -> HttpFailureStore:
+def http_failure_store(base_url: str, token_env: str, timeout: float = 30.0) -> HttpFailureStore:
     return HttpFailureStore(base_url, _token(token_env), timeout)
 
 

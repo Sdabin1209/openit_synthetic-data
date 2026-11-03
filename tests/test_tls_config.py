@@ -101,3 +101,24 @@ def test_server_binds_only_to_the_given_host(tmp_path):
         assert s.httpd.server_address[0] == "127.0.0.1"
     finally:
         s.close()
+
+
+def test_log_write_failure_does_not_fail_the_request(tmp_path):
+    # R10.5: 로그 쓰기가 예외를 내도 요청은 200이다(요청 로그 줄이 실패해도 응답을 막지 않는다)
+    from test_service import Srv
+    def broken(msg):
+        raise OSError("로그 쓰기 실패")
+    s = Srv(tmp_path / "srv", log=broken)
+    try:
+        st, body, _ = s.call("GET", "/healthz", token=None)
+        assert st == 200
+    finally:
+        s.close()
+
+
+def test_default_timeouts_follow_r10_3():
+    from synthetic_data.components import import_plan, run_plan, link_question_reader, link_failure_reader
+    import inspect
+    assert import_plan.DEFAULT_TIMEOUT == run_plan.DEFAULT_TIMEOUT == 300.0      # tar 게시
+    for fn in (link_question_reader.http_question_reader, link_failure_reader.http_failure_store):
+        assert inspect.signature(fn).parameters["timeout"].default == 30.0

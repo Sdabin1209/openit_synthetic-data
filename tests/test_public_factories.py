@@ -23,7 +23,7 @@ def test_public_factory_imports_and_signature(spec):
     f = load(spec)
     sig = inspect.signature(f)
     assert list(sig.parameters) == ["base_url", "token_env", "timeout"]
-    assert sig.parameters["timeout"].default == 10.0
+    assert sig.parameters["timeout"].default == 30.0
     assert sig.parameters["base_url"].default is inspect.Parameter.empty and sig.parameters["token_env"].default is inspect.Parameter.empty
 
 

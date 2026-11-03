@@ -55,7 +55,7 @@ class Srv:
         skw = {k: kw.pop(k) for k in self.SERVER_KW if k in kw}
         self.clock = kw.pop("clock", None) or FakeClock()
         self.svc = Service(FileDatasetStore(tmp_path / "root" / "datasets", Survey(SURVEY_DIR).contract_version), tmp_path / "root", parse_tokens(f"model-lab={RT}"),
-                           parse_tokens(f"synthetic-data={WT}"), log=lambda s: None, clock=self.clock, **kw)
+                           parse_tokens(f"synthetic-data={WT}"), log=kw.pop("log", lambda s: None), clock=self.clock, **kw)
         self.httpd = make_server(self.svc, **skw)
         self.url = f"http://127.0.0.1:{self.httpd.server_address[1]}"
         threading.Thread(target=self.httpd.serve_forever, daemon=True).start()
