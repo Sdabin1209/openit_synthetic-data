@@ -8,7 +8,6 @@ from pathlib import Path
 
 from ..types.schema_registry import check, check_contract, SchemaViolation
 
-SURVEY_DIR_ENV = "SYNTHETIC_SURVEY_SCHEMA_DIR"
 DEFAULT_TOKEN_ENV = "DATASET_STORE_WRITE_TOKEN"     # 서버의 DATASET_STORE_WRITE_TOKENS(목록, 복수형)와 이름이 겹치지 않게 단수형
 DEFAULT_TIMEOUT = 300.0    # R10.3: tar 묶음을 주고받는 호출(I2 게시)은 300초. 시작값, 측정 안 함(ADR 0013)
 

@@ -2,10 +2,11 @@
 from __future__ import annotations
 
 import json
-import os
 from pathlib import Path
 
-SURVEY_DIR_ENV = "SYNTHETIC_SURVEY_SCHEMA_DIR"
+# 왜 환경 변수가 아닌가: 이미지 안의 문진 스키마 위치는 영역 안 값이다. 환경 변수로 받으면 계약 Env 스키마에 없는 입력 이름이 생긴다(R9.1).
+# 이미지는 Dockerfile이 이 경로에 스키마를 복사한다. 이 경로가 디렉터리일 때만(= 이미지 안일 때만) 설정의 survey_schema_dir보다 우선한다(CR-009의 임시 처리를 이어받음).
+IMAGE_SURVEY_SCHEMA_DIR = Path("/app/survey_schema")
 
 
 class ConfigError(ValueError):
@@ -24,4 +25,4 @@ def read_json_file(config_path: Path) -> tuple[dict, Path]:
 
 
 def survey_dir_override():
-    return os.environ.get(SURVEY_DIR_ENV) or None
+    return str(IMAGE_SURVEY_SCHEMA_DIR) if IMAGE_SURVEY_SCHEMA_DIR.is_dir() else None

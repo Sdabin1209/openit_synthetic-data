@@ -122,7 +122,7 @@ def test_default_timeouts_follow_r10_3():
     import inspect
     assert import_plan.DEFAULT_TIMEOUT == run_plan.DEFAULT_TIMEOUT == 300.0      # tar 게시
     for fn in (link_question_reader.http_question_reader, link_failure_reader.http_failure_store):
-        assert inspect.signature(fn).parameters["timeout"].default == 30.0
+        assert inspect.signature(fn).parameters["timeout"].default == 10.0
 
 
 # --- RUNTIME 3.4.4 대조 (R5.1, R10.11, R8.1, R3.10, R4.1, R1.8) ---
@@ -241,3 +241,20 @@ def test_publish_client_also_uses_the_egress_proxy(tmp_path, monkeypatch):
         link_dataset_publish.build(spec)
     monkeypatch.setenv("OPENIT_EGRESS_PROXY", "http://127.0.0.1:3128")
     link_dataset_publish.build(spec)
+
+
+def test_survey_schema_location_is_not_an_environment_input():
+    # R9.1: 계약 Env 스키마에 없는 입력 이름을 만들지 않는다. 이미지 안 경로는 모듈 상수다
+    root = PKG.parent
+    text = "\n".join(p.read_text(encoding="utf-8") for p in CODE) + (root / "Dockerfile").read_text(encoding="utf-8")
+    assert "SYNTHETIC_SURVEY_SCHEMA_DIR" not in text and "SURVEY_SCHEMA_DIR=" not in text
+    assert 'env.get("DATASET_STORE_SURVEY_SCHEMA_DIR"' not in text
+
+
+def test_image_survey_dir_overrides_job_config_only_inside_the_image(tmp_path, monkeypatch):
+    from synthetic_data import config
+    monkeypatch.setattr(config, "IMAGE_SURVEY_SCHEMA_DIR", tmp_path / "absent")
+    assert config.survey_dir_override() is None            # 개발 환경: 설정의 survey_schema_dir을 쓴다
+    (tmp_path / "img").mkdir()
+    monkeypatch.setattr(config, "IMAGE_SURVEY_SCHEMA_DIR", tmp_path / "img")
+    assert config.survey_dir_override() == str(tmp_path / "img")      # 이미지 안: 이 경로가 우선

@@ -28,8 +28,8 @@ def _token(token_env: str) -> str:
     return tok
 
 
-def http_question_reader(base_url: str, token_env: str, timeout: float = 30.0, egress_proxy: Optional[str] = None) -> HttpQuestionReader:
-    # R10.3: 사슬 표에 없는 호출은 30초(시작값, 측정 안 함)
+def http_question_reader(base_url: str, token_env: str, timeout: float = 10.0, egress_proxy: Optional[str] = None) -> HttpQuestionReader:
+    # R10.3: 사슬 표에 없는 서비스 사이 호출의 계약 클라이언트 timeout 기본값은 10초(소켓 단위, 시작값·측정 안 함). 설정이 값을 주면 그 값
     # 읽기 클라이언트는 읽기 모드다: 모르는 필드·열거값은 받아들이고, MAJOR 불일치는 UNSUPPORTED_VERSION, 형식·해시 위반은 INTEGRITY_ERROR로 올라온다.
     return HttpQuestionReader(base_url, _token(token_env), timeout, egress_proxy=egress_proxy if egress_proxy is not None else egress_proxy_from(os.environ))      # 영역 밖 호출은 자기 영역 게이트웨이 출구로만(R1.8). 환경에서는 OPENIT_EGRESS_PROXY 하나만 꺼낸다(R9.1)
 

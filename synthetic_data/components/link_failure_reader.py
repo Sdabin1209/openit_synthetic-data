@@ -26,7 +26,7 @@ def _token(token_env: str) -> str:
     return tok
 
 
-def http_failure_store(base_url: str, token_env: str, timeout: float = 30.0, egress_proxy: Optional[str] = None) -> HttpFailureStore:
+def http_failure_store(base_url: str, token_env: str, timeout: float = 10.0, egress_proxy: Optional[str] = None) -> HttpFailureStore:
     return HttpFailureStore(base_url, _token(token_env), timeout, egress_proxy=egress_proxy if egress_proxy is not None else egress_proxy_from(os.environ))      # 영역 밖 호출은 자기 영역 게이트웨이 출구로만(R1.8). 환경에서는 OPENIT_EGRESS_PROXY 하나만 꺼낸다(R9.1)
 
 

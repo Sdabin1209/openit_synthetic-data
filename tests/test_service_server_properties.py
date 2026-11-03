@@ -127,7 +127,8 @@ def test_sigterm_handler_stops_the_server_loop(tmp_path, monkeypatch):
         return FakeSrv()
     monkeypatch.setattr(wsvc, "make_server", fake_make_server)
     monkeypatch.setattr(wsvc.signal, "signal", lambda sig, fn: handlers.update({sig: fn}))
-    env = {"DATASET_STORE_ROOT": str(tmp_path / "r"), "DATASET_STORE_SURVEY_SCHEMA_DIR": str(SURVEY_DIR), "DATASET_STORE_PORT": "0",
+    monkeypatch.setattr(wsvc, "SURVEY_SCHEMA_DIR", SURVEY_DIR)      # 이미지 안 경로 상수(R9.1: 환경 변수 아님)
+    env = {"DATASET_STORE_ROOT": str(tmp_path / "r"), "DATASET_STORE_PORT": "0",
            "DATASET_STORE_HOST": "127.0.0.1", "DATASET_STORE_READ_TOKENS": "model-lab=" + "ab12cd34" * 4, "DATASET_STORE_DRAIN_GRACE": "2"}
     assert wsvc.main(env) == 0
     assert set(handlers) == {signal.SIGTERM, signal.SIGINT} and made["closed"] and made["drain_grace"] == 2.0
@@ -139,7 +140,7 @@ from synthetic_data.wiring import service as wsvc
 # --- 기동 때 환경 변수 선언 검증(계약 DatasetStoreEnv, U73) ---
 def _good_env(tmp_path):
     from conftest import SURVEY_DIR
-    return {"DATASET_STORE_ROOT": str(tmp_path / "r"), "DATASET_STORE_SURVEY_SCHEMA_DIR": str(SURVEY_DIR), "DATASET_STORE_PORT": "0",
+    return {"DATASET_STORE_ROOT": str(tmp_path / "r"), "DATASET_STORE_PORT": "0",
             "DATASET_STORE_READ_TOKENS": "model-lab=" + "ab12cd34" * 4, "PATH": "/usr/bin"}
 
 

@@ -2,7 +2,7 @@
   DATASET_STORE_READ_TOKENS_FILE / DATASET_STORE_READ_TOKENS    역할=토큰,역할=토큰 (읽기 경로)
   DATASET_STORE_WRITE_TOKENS_FILE / DATASET_STORE_WRITE_TOKENS  synthetic-data=토큰   (POST. 쓰기 역할은 synthetic-data만)
   DATASET_STORE_ROOT         저장 볼륨(기본 /data)
-  DATASET_STORE_SURVEY_SCHEMA_DIR  문진 스키마 디렉터리(CONTRACT_VERSION과 schemas/, 기본 /app/survey_schema)
+  (문진 스키마 디렉터리는 환경 변수가 아니라 모듈 상수 SURVEY_SCHEMA_DIR(/app/survey_schema)다, R9.1)
   DATASET_STORE_PORT         기본 8080 (0이면 빈 포트)
   DATASET_STORE_MAX_BODY     게시 본문 최대 바이트(기본 1GiB). waitress max_request_body_size
   DATASET_STORE_SOCKET_TIMEOUT  유휴 연결 timeout 초(waitress channel_timeout)
@@ -26,6 +26,10 @@ from ..components.link_dataset_store_server import (DEFAULT_CONNECTIONS, DEFAULT
                                                     Service, check_token_strength, make_server, parse_tokens)
 from ..types.schema_registry import check
 from .survey import Survey
+
+
+# 이미지 안 경로(영역 안 값). 환경 변수로 받지 않는다(R9.1). Dockerfile이 여기에 스키마를 복사한다.
+SURVEY_SCHEMA_DIR = Path("/app/survey_schema")
 
 
 def env_violations(env) -> list[str]:
@@ -58,7 +62,7 @@ def main(env=os.environ) -> int:
         check("ServiceSettings", settings)      # 토큰이 하나도 없으면(읽기·쓰기 모두 빈 문자열) 여기서 거부한다
         read, write = parse_tokens(settings["read_tokens"]), parse_tokens(settings["write_tokens"])
         check_token_strength({**read, **write}, min_len=settings["min_token_len"])
-        survey = Survey(Path(env.get("DATASET_STORE_SURVEY_SCHEMA_DIR", "/app/survey_schema")))
+        survey = Survey(SURVEY_SCHEMA_DIR)
         version = survey.contract_version          # 스키마 디렉터리가 없으면 시작을 거부한다
         root = Path(settings["root"])
         svc = Service(FileDatasetStore(root / "datasets", version), root, read, write, max_body=settings["max_body"], clock=time.monotonic,
