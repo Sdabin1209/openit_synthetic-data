@@ -1,5 +1,8 @@
 # STATUS (synthetic-data)
 
+## wo-320 (2026-11-03)
+- 계약 v3.2.0, openit-link v0.4.4 핀. dataset-store 기동 때 환경 변수 선언 검증. HEALTHCHECK가 포트 변수 사용. 게시기 행 형식은 바꾸지 않았다(`messages` 형식이 맞다, 헤드가 시나리오 파일을 학습 파일로 오인했던 것을 되돌렸다).
+
 ## U431 (2026-10-31)
 - 계약 v3.1.2, openit-link v0.4.3로 고정. `affected_only`가 영향 문항 단위로 다시 만들도록 고쳤다(design.md 11절). 시험 3건.
 

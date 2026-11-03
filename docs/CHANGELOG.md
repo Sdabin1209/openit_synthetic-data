@@ -1,5 +1,10 @@
 # 변경 이력
 
+## 미배포 (2026-11-03, 계약 3.2.0)
+- 의존: boundary-contracts v3.2.0, openit-link v0.4.4.
+- 변경(동작): dataset-store 기동 때 `DATASET_STORE_` 접두 환경 변수를 계약 `DatasetStoreEnv`로 검증하고 위반이면 변수 이름만 적어 종료 코드 2. 잡(`import`·`run`)은 이 검증을 하지 않는다.
+- 변경: Dockerfile HEALTHCHECK가 `DATASET_STORE_PORT`를 읽는다.
+
 ## 미배포 (2026-10-31, U431)
 - 의존: boundary-contracts v3.1.2, openit-link v0.4.3.
 - 변경(동작): `regeneration.mode=affected_only`에서 REGENERATE_SAMPLES인 문항 세트는 변경 분류 `affected_slots`의 문항을 쓰는 시드만 다시 만든다(이전에는 문항 세트 전체). 영향 칸 목록이 비면 제한 없음. 내부 스키마 `QuestionSetFetch`·`QuestionSetAdmission.context`·`SeedAssembleInput.pairs[]`에 `affected_question_ids`가 더해졌다. 시험 3건 추가.
