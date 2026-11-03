@@ -67,7 +67,8 @@ def make_bank(flavor: str = "main", *, wording: str = "") -> dict:
                    {"code": "REG", "label": "규칙적", "synonyms": ["꼬박꼬박"]},
                    {"code": "IRR", "label": "불규칙", "synonyms": ["들쭉날쭉"]}])]),
         ]
-    return {"version": 1, "questions": qs, "session_settings": {
+    # 문진 스키마 4.0.0(2026-11-03): 문진표 ID·제목이 필수다. 시험 ID는 add(set_id, …)의 ID와 같아야 운영 검사(release-gate)의 뜻과 맞다
+    return {"question_set_id": "qs-" + flavor, "title": f"시험 문진표({flavor})", "version": 1, "questions": qs, "session_settings": {
         "risk_phrases": ["가슴이 너무 아파요"], "confirm_limit": 2, "unrecognized_streak_limit": 3, "ask_limit": 5,
         "fixed_sentences": fixed,
         "guide_list": [{"guide_id": "g1", "selection_criterion": "용어의 뜻을 물을 때", "per_question": False,
