@@ -1,16 +1,17 @@
 """dataset-store 백업·복구 잡(RUNTIME R10.1): 잡 선언·노출 선언의 계약 검증, 연결(환경 -> 입력), 백업->복구 왕복과 변이.
-왕복은 Debian 공식 패키지의 restic 과 restic-rest-server(scripts/fetch-test-tools.sh)로 실제 REST 프로토콜을 쓴다. 두 도구가 PATH 에 없으면 왕복만 건너뛴다(사유를 출력).
+왕복은 Debian 공식 패키지의 restic 과 restic-rest-server(scripts/fetch-test-tools.sh)로 실제 REST 프로토콜을 쓴다. 두 도구가 PATH 에 없으면 왕복을 건너뛰고 pytest 는 종료 코드 77(SKIP, 통과 아님)로 끝난다(tests/conftest.py).
 시험 서버는 시험이 띄운 자식 프로세스이고 끝나면 그 PID 만 종료한다."""
 from __future__ import annotations
 
 import json
+import os
 import shutil
 import subprocess
 from pathlib import Path
 
 import pytest
 
-from conftest import HANG_GUARD_SECONDS
+from conftest import HANG_GUARD_SECONDS, TOOLS_MISSING_MARK
 
 from boundary_contracts import validator
 from synthetic_data import __main__ as entry
@@ -21,7 +22,7 @@ from synthetic_data.wiring import backup_job as wiring
 ROOT = Path(__file__).resolve().parent.parent
 JOBS = {j["name"]: j for j in json.loads((ROOT / "jobs.json").read_text(encoding="utf-8"))["jobs"]}
 HAVE_TOOLS = bool(shutil.which("restic") and shutil.which("restic-rest-server"))
-needs_tools = pytest.mark.skipif(not HAVE_TOOLS, reason="restic·restic-rest-server가 PATH에 없다(scripts/fetch-test-tools.sh 후 PATH=build/tools/usr/bin:$PATH)")
+needs_tools = pytest.mark.skipif(not HAVE_TOOLS, reason=TOOLS_MISSING_MARK + " restic·restic-rest-server가 PATH에 없다(scripts/fetch-test-tools.sh 후 PATH=build/tools/usr/bin:$PATH)")
 
 
 # --- 계약 ---------------------------------------------------------------------------------------------------------------------
@@ -216,3 +217,51 @@ def test_missing_restic_binary_is_a_non_retryable_failure(tmp_path, monkeypatch)
 def test_input_schema_rejects_bad_input():
     with pytest.raises(Exception):
         backup_job.run(clock=CLOCK, inp={"mode": "sync", "data_dir": "data", "exclude": [], "repository": "", "password_file": "pw"})
+
+
+def test_missing_tools_make_pytest_exit_77_not_0(tmp_path):
+    """도구가 없을 때 건너뜀이 통과(0)로 보이지 않는다. PATH 에서 restic 을 뺀 하위 pytest 가 왕복 시험만 골라 돌리면 종료 코드 77 이다."""
+    import os, sys
+    env = {k: v for k, v in os.environ.items() if k != "PATH"}
+    env["PATH"] = str(tmp_path)                                     # 빈 폴더: restic·restic-rest-server 가 없다
+    r = subprocess.run([sys.executable, "-m", "pytest", "-q", "-p", "no:cacheprovider", str(Path(__file__)), "-k", "round_trip_with_mutations"],
+                       env=env, cwd=str(ROOT), capture_output=True, text=True, timeout=HANG_GUARD_SECONDS)
+    assert r.returncode == 77, r.stdout[-400:]
+    assert "SKIP(77)" in r.stdout
+
+
+@needs_tools
+def test_forget_keeps_policy_and_restore_still_works(tmp_path, rest_server):
+    """보존·정리(ADR 0025): 같은 날 여러 번 백업하면 중간 스냅숏이 지워지고 최신은 남으며, 정리 뒤에도 복구된다."""
+    data = tmp_path / "data"; data.mkdir(); _populate(data)
+    ids = []
+    for i in range(3):
+        (data / "ds-b" / "x.bin").write_bytes(b"gen%d" % i)
+        out = backup_job.run(clock=CLOCK, inp=_inp(tmp_path, rest_server, "backup", data=data))
+        assert out["exit_code"] == 0
+        ids.append(out["result"]["snapshot_id"])
+    env = {"PATH": os.environ["PATH"], "RESTIC_REPOSITORY": f"rest:http://127.0.0.1:{rest_server}/area", "RESTIC_PASSWORD_FILE": str(tmp_path / "pw")}
+    listed = json.loads(subprocess.run(["restic", "snapshots", "--json", "--no-cache"], env=env, capture_output=True, text=True, check=True, timeout=HANG_GUARD_SECONDS).stdout)
+    left = [s["id"] for s in listed]
+    # 같은 날 안의 중간 스냅숏은 지워지고(restic 이 기간마다 하나씩만 남기는 규칙), 최신은 남는다. 정확히 몇 개가 남는지는 restic 의 규칙이라 단정하지 않는다
+    assert any(i.startswith(ids[-1][:8]) for i in left) and not any(i.startswith(ids[1][:8]) for i in left) and len(left) < len(ids)
+    (data / "ds-b" / "x.bin").write_bytes(b"broken")
+    assert backup_job.run(clock=CLOCK, inp=_inp(tmp_path, rest_server, "restore", data=data))["exit_code"] == 0
+    assert (data / "ds-b" / "x.bin").read_bytes() == b"gen2"
+
+
+def test_backup_runs_forget_with_the_documented_policy(tmp_path, monkeypatch):
+    """도구 없이도 본다: 백업이 성공하면 forget 을 정해 둔 값으로 부르고, forget 이 실패하면 잡이 실패다(75)."""
+    calls = []
+    def fake(args, env, timeout=None):
+        calls.append(args)
+        if args[0] == "backup":
+            return 0, '{"message_type":"summary","snapshot_id":"abc12345","total_bytes_processed":7}\n'
+        return (1 if args[0] == "forget" and fail else 0), ""
+    monkeypatch.setattr(backup_job, "_restic", fake)
+    for fail, code in ((False, 0), (True, 75)):
+        calls.clear()
+        out = backup_job.run(clock=CLOCK, inp=_inp(tmp_path, 1, "backup", data=tmp_path))
+        assert out["exit_code"] == code
+        f = [c for c in calls if c[0] == "forget"][0]
+        assert f[f.index("--keep-daily") + 1] == "7" and f[f.index("--keep-weekly") + 1] == "4" and f[f.index("--keep-monthly") + 1] == "6" and "--prune" in f

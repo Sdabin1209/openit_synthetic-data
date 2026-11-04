@@ -24,6 +24,27 @@ from boundary_contracts.action_rules import load_rules  # noqa: E402
 RULES_VERSION = str(load_rules()["rules_version"])
 
 
+# 왜: 백업 왕복 시험은 restic·restic-rest-server 가 있어야 돈다. 없을 때 건너뛴 채 종료 코드 0 으로 끝나면 통과로 읽힌다. 건너뛰었으면 77(SKIP, automake 관례, deploy 와 같은 규칙)로 끝낸다.
+# 다른 건너뜀(예: SD_REFERENCE_DATA_DIR 없음)은 이 규칙의 대상이 아니다. 사유 문장에 표지를 넣은 시험만 센다.
+TOOLS_MISSING_MARK = "[도구 없음: 종료 코드 77]"
+_tool_skips: list[str] = []
+
+
+def pytest_runtest_logreport(report):
+    if report.skipped and TOOLS_MISSING_MARK in str(report.longrepr):
+        _tool_skips.append(report.nodeid)
+
+
+def pytest_sessionfinish(session, exitstatus):
+    if _tool_skips and exitstatus == 0:
+        session.exitstatus = 77
+
+
+def pytest_terminal_summary(terminalreporter):
+    if _tool_skips:
+        terminalreporter.write_line(f"SKIP(77): 필요한 도구가 없어 {len(_tool_skips)}건을 건너뛰었다. 통과가 아니다(scripts/fetch-test-tools.sh)", red=True)
+
+
 def make_cfg_raw(tmp_path: Path, **over) -> dict:
     raw = {
         "dataset_id": "ds-test", "seed": 7, "created_at": "2026-10-15T00:00:00Z", 

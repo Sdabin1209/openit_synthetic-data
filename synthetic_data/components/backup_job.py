@@ -14,6 +14,9 @@ from ..types.schema_registry import check, check_contract
 
 # restic 종료 코드(restic 문서 "Exit codes"): 3 = 스냅숏은 만들었으나 일부 파일을 읽지 못함, 10 = 저장소 없음, 11 = 잠금 실패, 12 = 암호 틀림
 _REPO_MISSING, _LOCK, _WRONG_PASSWORD, _INCOMPLETE = 10, 11, 12, 3
+# 보존·정리(RUNTIME R10.1 이 영역의 ADR 에 맡긴 것, ADR 0025): 백업이 끝난 뒤 같은 잡 안에서 restic forget 으로 오래된 스냅숏을 지운다.
+# model-lab 의 백업 잡과 같은 값이다: 일별 7, 주별 4, 월별 6. 시작값이고 측정하지 않았다(데이터 증가량·복구 요구 시점을 보고 바꾼다). --prune 은 지운 스냅숏만 쓰던 데이터를 저장소에서 실제로 비운다.
+KEEP = ("--keep-daily", "7", "--keep-weekly", "4", "--keep-monthly", "6")
 # 왜 저장소 확인에만 시간 상한을 두나: restic 은 저장소에 닿지 못하면 내부에서 약 15분 동안 다시 시도하고(restic 0.18 에는 이 횟수를 줄이는 옵션이 없다),
 # 그동안 아무것도 내지 않아 deploy 가 시간 상한(잡 선언 timeout_seconds)으로 멈추면 재시도 가능(75)이 아니라 시간 초과 실패로 보인다. 그래서 첫 확인(`cat config`, 저장소 설정 한 개만 읽는다)에
 # 상한을 두고, 넘기면 닿지 못한 것으로 보아 75 를 낸다. 30초는 측정하지 않은 시작값이다(게이트웨이 CONNECT 와 TLS 가 정상이면 수 초 안에 끝난다는 가정, 측정 안 함, ADR 0025).
@@ -79,6 +82,10 @@ def _backup(inp: dict, env: dict) -> tuple[str, int]:
     if rc != 0:
         raise _failure_for(rc, "백업")
     s = _summary(out)
+    # 왜 실패로 보나: 정리가 안 되면 저장소가 계속 커진다. 숨기지 않고 잡을 실패로 내 다음 주기에 다시 하게 한다(백업 자체는 저장됐고 잡은 멱등이다).
+    rc, _ = _restic(["forget", "--no-cache", "--tag", "dataset-store", "--path", d, *KEEP, "--prune"], env)
+    if rc != 0:
+        raise _failure_for(rc, "보존 정리")
     return s["snapshot_id"], int(s.get("total_bytes_processed", 0))
 
 

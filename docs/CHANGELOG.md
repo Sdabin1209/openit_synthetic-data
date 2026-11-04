@@ -3,6 +3,7 @@
 ## 미배포 (2026-11-05, 계약 3.4.16)
 - 의존: boundary-contracts v3.4.16, openit-link v0.4.21.
 - 추가(동작): 잡 `dataset-backup`·`dataset-restore`(`python -m synthetic_data backup|restore`, 종료 코드 0/75/1/2, 마지막 줄 BackupJobResult), 노출 선언 egress `external:backup`, 이미지에 restic. 기존 동작은 바꾸지 않았다.
+- 추가(동작): 백업 잡이 성공 뒤 `restic forget --keep-daily 7 --keep-weekly 4 --keep-monthly 6 --prune`(ADR 0025). 정리 실패는 75.
 
 ## 미배포 (2026-11-03, 계약 3.2.0)
 - 의존: boundary-contracts v3.2.0, openit-link v0.4.4.
