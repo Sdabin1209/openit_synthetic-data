@@ -1,3 +1,7 @@
+# 기반 이미지는 digest 로 고정한다(공통 규칙 '빌드 때 고정'). 태그는 읽기 쉬우라고 남기며 digest 가 있으면 docker 는 digest 만 쓴다.
+# 값: 2026-11-05 이 PC 에서 `docker pull <태그>` 로 받은 뒤 `docker image inspect --format '{{index .RepoDigests 0}}' <태그>` 로 읽은 멀티 아키텍처 index digest 다(이 PC 에 이미 있던 python:3.12-slim 의 값, 태그 시각 2026-10-31).
+# 올리는 방법: 새 태그를 `docker pull` 하고 같은 명령으로 digest 를 다시 읽어 아래 ARG 한 곳만 바꾼 뒤 이미지 시험·스모크를 다시 돌린다. 레지스트리의 태그가 움직여도 이 digest 는 그대로다(자동으로 보안 갱신을 받지 않는 대가).
+ARG PYTHON_IMAGE=python:3.12-slim@sha256:aa943ce411423c7582288f18707ff66eddcbaeb510502d747a72aeb34f30d159
 # dataset-store 서비스(I2 서버, D100). 생성·게시 잡(run-once)은 이미지가 아니라 requirements.lock 환경이다(D22).
 # 통신 기반 openit-link(D118)는 requirements.lock의 태그로 wheel을 만들어 wheels 컨텍스트로 받는다(LINK_SPEC=/wheels/<wheel>; 계약 wheel과 같은 방식).
 # 문진 스키마는 복사본을 리포지토리에 두지 않으므로 빌드 컨텍스트로 받는다(ADR 0011):
@@ -10,7 +14,7 @@ FROM scratch AS wheels
 FROM scratch AS survey_schema
 # 기본은 빈 컨텍스트(빌드 인자 없으면 빌드가 CONTRACT_VERSION 없음으로 실패한다).
 
-FROM python:3.12-slim AS build
+FROM ${PYTHON_IMAGE} AS build
 # 정본은 requirements.lock의 boundary-contracts 줄이다. 빌드 인자로 받고 여기에 값을 적지 않는다.
 ARG BC_SPEC
 ARG LINK_SPEC
@@ -22,7 +26,7 @@ RUN --mount=type=ssh --mount=type=bind,from=wheels,target=/wheels \
     /opt/venv/bin/pip install --no-cache-dir -r /tmp/requirements-service.txt "${BC_SPEC}" \
  && /opt/venv/bin/pip install --no-cache-dir --no-deps "${LINK_SPEC}"      # --no-deps: link의 계약 의존(git+ssh 직접 URL)이 위의 BC_SPEC와 겹쳐 충돌하지 않게
 
-FROM python:3.12-slim
+FROM ${PYTHON_IMAGE}
 # 왜: 값 없음의 표기는 n/a 하나다(계약 ImageLabels, D108). revision은 hex만 허용되므로 기본값 그대로(n/a) 빌드하면 아래 검사가 멈춘다.
 ARG REVISION=n/a
 ARG BC_VERSION=n/a
