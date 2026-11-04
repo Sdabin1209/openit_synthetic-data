@@ -54,6 +54,7 @@ for i in $(seq 1 30); do curl -fsS "$URL/healthz" >/dev/null 2>&1 && break; slee
 echo "healthz: $(curl -fsS "$URL/healthz")"
 echo "readyz: $(curl -fsS "$URL/readyz")"
 echo "user: $(docker exec "$NAME" id -u)"
+echo "restic: $(docker exec "$NAME" restic version | cut -c1-40)"      # 백업·복구 잡(dataset-backup, dataset-restore)이 부르는 도구가 이미지에 있다
 echo "labels: $(docker inspect -f '{{json .Config.Labels}}' "$TAG")"
 [ "$(curl -s -o /dev/null -w '%{http_code}' "$URL/v1/datasets")" = 401 ]
 curl -s -i "$URL/v1/datasets" | grep -qi "^www-authenticate: Bearer"

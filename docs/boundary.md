@@ -77,6 +77,8 @@ store = FileDatasetStore(root, survey_contract_version)     # 또는 MemoryDatas
 
 잡의 종료 코드: 0 성공(게시, 이미 게시됨, 할 일 없음), 2 설정 오류, 3 경계 오류(재시도 불가), 75 경계 오류(재시도 가능).
 
+**백업·복구 잡(RUNTIME R10.1, ADR 0025)**: `dataset-backup`·`dataset-restore`는 볼륨 `datasets-data`(`needs`)를 `.tmp` 없이 platform 백업 저장소(restic REST, `OPENIT_BACKUP_URL`)로 보내고 되돌린다. 자기 영역 게이트웨이 출구(`OPENIT_EGRESS_PROXY`, 노출 선언 `external:backup`)로만 나간다. 비밀은 `OPENIT_BACKUP_CREDENTIALS_FILE`·`OPENIT_BACKUP_REPO_PASSWORD_FILE`. 종료 코드 0 ok, 75 재시도 가능, 1 실패(마지막 줄 BackupJobResult), 2 설정 오류. 백업 저장소가 멈추면 잡만 실패하고 서비스 출력은 바뀌지 않는다.
+
 ## 7. 건드리지 않는 것
 
 경계 계약과 문진 스키마를 수정하지 않는다. 문항 저장소와 실패 사례 저장소에 쓰지 않는다. 변경 요청 CR-001~005는 헤드가 결정했다(`docs/change-requests/`의 결정 절).

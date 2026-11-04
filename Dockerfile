@@ -28,6 +28,9 @@ ARG REVISION=n/a
 ARG BC_VERSION=n/a
 ARG SURVEY_SCHEMA_VERSION=n/a
 RUN printf '%s' "${REVISION}" | grep -Eq '^[0-9a-f]{7,40}$' || { echo "REVISION은 소스 커밋 hex(7~40자)여야 한다(--build-arg REVISION=...)" >&2; exit 1; }
+# 왜 restic을 apt로: 백업·복구 잡(RUNTIME R10.1, 저장소 프로토콜 restic REST)이 부르는 도구이고, Debian 공식 패키지가 표준 설치 경로다. 정확한 버전을 고정한다(잠금 파일 원칙; 값은 Debian 13 저장소의 현재 버전).
+ARG RESTIC_DEB_VERSION=0.18.0-1+b4
+RUN apt-get update && apt-get install -y --no-install-recommends "restic=${RESTIC_DEB_VERSION}" && rm -rf /var/lib/apt/lists/*
 COPY --from=build /opt/venv /opt/venv
 WORKDIR /app
 COPY synthetic_data /app/synthetic_data

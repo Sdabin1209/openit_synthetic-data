@@ -1,5 +1,8 @@
 # STATUS (synthetic-data)
 
+## 백업·복구 잡 (2026-11-05)
+- 계약 v3.4.16 고정. 잡 `dataset-backup`, `dataset-restore`와 노출 선언 `external:backup`을 더했다(ADR 0025). 왕복·변이 시험은 `tests/test_backup_job.py`(restic·restic-rest-server는 `scripts/fetch-test-tools.sh`). 한계: 시간 상한 둘은 측정하지 않았고, 실제 platform 백업 저장소·게이트웨이와는 돌리지 않았다, 보존(forget)은 미정(ADR 0025).
+
 ## wo-320 (2026-11-03)
 - 계약 v3.2.0, openit-link v0.4.4 핀. dataset-store 기동 때 환경 변수 선언 검증. HEALTHCHECK가 포트 변수 사용. 게시기 행 형식은 바꾸지 않았다(`messages` 형식이 맞다, 헤드가 시나리오 파일을 학습 파일로 오인했던 것을 되돌렸다).
 

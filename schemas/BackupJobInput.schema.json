@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://openit.invalid/synthetic-data/schemas/BackupJobInput.schema.json",
+  "title": "BackupJobInput",
+  "description": "dataset-store 데이터(datasets-data) 백업·복구 잡 한 번의 재료. repository는 restic 저장소 주소(rest:https://… 또는 시험용 로컬 경로), 자격과 암호는 값이 아니라 파일 경로·사용자 이름으로 받는다(비밀 D84).",
+  "type": "object",
+  "properties": {
+    "mode": {"enum": ["backup", "restore"]},
+    "data_dir": {"type": "string", "pattern": "^/", "description": "데이터 폴더(서비스의 DATASET_STORE_ROOT와 같은 컨테이너 경로)"},
+    "exclude": {"type": "array", "uniqueItems": true, "items": {"type": "string", "pattern": "^[^/]+$"}, "description": "data_dir 바로 아래에서 백업하지 않을 이름(요청 임시 폴더 .tmp)"},
+    "repository": {"type": "string", "minLength": 1},
+    "password_file": {"type": "string", "pattern": "^/"},
+    "rest_user": {"type": ["string", "null"]},
+    "rest_password": {"type": ["string", "null"]},
+    "proxy": {"type": ["string", "null"], "description": "자기 영역 게이트웨이 CONNECT 출구(OPENIT_EGRESS_PROXY)"}
+  },
+  "required": ["mode", "data_dir", "exclude", "repository", "password_file"],
+  "additionalProperties": false
+}

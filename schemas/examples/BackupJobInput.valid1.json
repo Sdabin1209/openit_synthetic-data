@@ -1,0 +1,1 @@
+{"mode": "backup", "data_dir": "/data", "exclude": [".tmp"], "repository": "rest:https://backup-store/synthetic-data", "password_file": "/run/secrets/pw", "rest_user": "synthetic-data", "rest_password": null, "proxy": "http://127.0.0.1:3128"}

@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://openit.invalid/synthetic-data/schemas/BackupJobOutput.schema.json",
+  "title": "BackupJobOutput",
+  "description": "백업·복구 잡의 결과(계약 BackupJobResult)와 종료 코드(0 ok, 75 재시도 가능, 1 그 밖의 실패).",
+  "type": "object",
+  "properties": {
+    "result": {"type": "object"},
+    "exit_code": {"enum": [0, 1, 75]}
+  },
+  "required": ["result", "exit_code"],
+  "additionalProperties": false
+}

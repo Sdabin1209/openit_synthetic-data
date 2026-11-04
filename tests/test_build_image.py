@@ -153,7 +153,7 @@ def test_repo_jobs_json_matches_contract_and_code():
     decl = json.loads((ROOT / "jobs.json").read_text(encoding="utf-8"))
     validator("JobsDeclaration").validate(decl)
     jobs = {j["name"]: j for j in decl["jobs"]}
-    assert set(jobs) == {"synthetic-run", "synthetic-import"}
+    assert set(jobs) == {"synthetic-run", "synthetic-import", "dataset-backup", "dataset-restore"}     # 뒤 둘은 tests/test_backup_job.py 가 본다
     for name, sub, schema in (("synthetic-run", "run", "SyntheticJobConfigRun"), ("synthetic-import", "import", "SyntheticJobConfigImport")):
         j = jobs[name]
         assert j["argv"][:4] == ["python", "-m", "synthetic_data", sub] and j["config"]["schema"] == schema
@@ -202,7 +202,7 @@ def test_exposure_table_matches_code_routes():
     import inspect
     assert [r["max_body_bytes"] for r in exp["routes"] if "/v1/datasets" in r["paths"]] == [1 << 30] and (1 << 30) <= 8 * 2**30
     assert "1 << 30" in inspect.getsource(wsvc.main)
-    assert exp["egress"] == ["question-authoring", "ops-feedback"]      # INTERFACES 한눈에: synthetic-data는 I1·I7을 읽는다
+    assert exp["egress"] == ["question-authoring", "ops-feedback", "external:backup"]      # INTERFACES 한눈에: synthetic-data는 I1·I7을 읽는다. external:backup 은 백업·복구 잡(RUNTIME R10.1, ADR 0025)
 
 
 def test_label_comes_from_installed_wheel_not_from_request_and_stale_request_fails(env):

@@ -44,6 +44,7 @@
 |---|---|---|---|---|
 | 게시 판정 | `components/publish_decision.py` | PublishDecisionInput | PublishOutcome | 같은 (dataset_id, version)에 digest가 같으면 ALREADY_PUBLISHED, 아니면 게시한다(저장소는 주입) |
 | 잡 출력 | `components/job_output.py` | JobOutputInput | JobOutputLine | 표준 출력의 결과 한 줄과 표준 오류의 설정 오류 한 줄을 계약(SyntheticJobResult/Error)으로 검사해 만든다 |
+| 백업·복구 | `components/backup_job.py` | BackupJobInput | BackupJobOutput | restic으로 데이터 폴더를 백업 저장소에 보내거나 최신 스냅숏을 되돌리고 계약 BackupJobResult와 종료 코드를 낸다(ADR 0025) |
 
 ## 저장소와 통신
 
@@ -60,5 +61,5 @@
 | `synthetic_data/__main__.py`, `service/__main__.py` | 진입점 |
 | `synthetic_data/config.py` | 설정 파일 읽기, 환경 변수에서 값 가져오기 |
 | `synthetic_data/adapters/__init__.py` | 공개 진입점(`synthetic_data.adapters:http_question_reader`가 배포 설정에 있다, ADR 0022). 로직 없음 |
-| `synthetic_data/wiring/` | 컴포넌트 연결(`import_job.py`, `run_job.py`), 주입(`stores.py`, `survey.py`, `publishing.py`), 설정→계획(`plans.py`), 서비스 기동(`service.py`) |
+| `synthetic_data/wiring/` | 컴포넌트 연결(`import_job.py`, `run_job.py`, `backup_job.py`), 주입(`stores.py`, `survey.py`, `publishing.py`), 설정→계획(`plans.py`), 서비스 기동(`service.py`) |
 | `synthetic_data/types/` | `schemas/`에서 생성(손으로 고치지 않는다) |

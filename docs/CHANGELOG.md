@@ -1,5 +1,9 @@
 # 변경 이력
 
+## 미배포 (2026-11-05, 계약 3.4.16)
+- 의존: boundary-contracts v3.4.16, openit-link v0.4.21.
+- 추가(동작): 잡 `dataset-backup`·`dataset-restore`(`python -m synthetic_data backup|restore`, 종료 코드 0/75/1/2, 마지막 줄 BackupJobResult), 노출 선언 egress `external:backup`, 이미지에 restic. 기존 동작은 바꾸지 않았다.
+
 ## 미배포 (2026-11-03, 계약 3.2.0)
 - 의존: boundary-contracts v3.2.0, openit-link v0.4.4.
 - 변경(동작): dataset-store 기동 때 `DATASET_STORE_` 접두 환경 변수를 계약 `DatasetStoreEnv`로 검증하고 위반이면 변수 이름만 적어 종료 코드 2. 잡(`import`·`run`)은 이 검증을 하지 않는다.
