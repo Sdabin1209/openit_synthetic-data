@@ -1,5 +1,5 @@
 """dataset-store 백업·복구 잡(RUNTIME R10.1): 잡 선언·노출 선언의 계약 검증, 연결(환경 -> 입력), 백업->복구 왕복과 변이.
-왕복은 Debian 공식 패키지의 restic 과 restic-rest-server(scripts/fetch-test-tools.sh)로 실제 REST 프로토콜을 쓴다. 두 도구가 PATH 에 없으면 왕복을 건너뛰고 pytest 는 종료 코드 77(SKIP, 통과 아님)로 끝난다(tests/conftest.py).
+왕복은 Debian 공식 패키지의 restic 과 restic-rest-server(scripts/setup-env.sh 가 scripts/fetch-test-tools.sh 로 build/tools 에 받는다)로 실제 REST 프로토콜을 쓴다. 두 도구가 PATH 에 없으면 왕복을 건너뛰고 pytest 는 종료 코드 77(SKIP, 통과 아님)로 끝난다(tests/conftest.py).
 시험 서버는 시험이 띄운 자식 프로세스이고 끝나면 그 PID 만 종료한다."""
 from __future__ import annotations
 
@@ -22,7 +22,7 @@ from synthetic_data.wiring import backup_job as wiring
 ROOT = Path(__file__).resolve().parent.parent
 JOBS = {j["name"]: j for j in json.loads((ROOT / "jobs.json").read_text(encoding="utf-8"))["jobs"]}
 HAVE_TOOLS = bool(shutil.which("restic") and shutil.which("restic-rest-server"))
-needs_tools = pytest.mark.skipif(not HAVE_TOOLS, reason=TOOLS_MISSING_MARK + " restic·restic-rest-server가 PATH에 없다(scripts/fetch-test-tools.sh 후 PATH=build/tools/usr/bin:$PATH)")
+needs_tools = pytest.mark.skipif(not HAVE_TOOLS, reason=TOOLS_MISSING_MARK + " restic·restic-rest-server가 PATH에 없다(scripts/setup-env.sh 가 build/tools 에 받는다)")
 
 
 # --- 계약 ---------------------------------------------------------------------------------------------------------------------
@@ -224,6 +224,7 @@ def test_missing_tools_make_pytest_exit_77_not_0(tmp_path):
     import os, sys
     env = {k: v for k, v in os.environ.items() if k != "PATH"}
     env["PATH"] = str(tmp_path)                                     # 빈 폴더: restic·restic-rest-server 가 없다
+    env["SD_TEST_TOOLS_DIR"] = str(tmp_path)                        # 표준 설치가 받은 build/tools 도 보지 않게 한다
     r = subprocess.run([sys.executable, "-m", "pytest", "-q", "-p", "no:cacheprovider", str(Path(__file__)), "-k", "round_trip_with_mutations"],
                        env=env, cwd=str(ROOT), capture_output=True, text=True, timeout=HANG_GUARD_SECONDS)
     assert r.returncode == 77, r.stdout[-400:]

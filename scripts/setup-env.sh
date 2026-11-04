@@ -30,4 +30,8 @@ if ! install; then
   install || { echo "setup-env: 설치 실패(네트워크 또는 git SSH 접근 확인: requirements.lock의 태그 설치)" >&2; exit 1; }
 fi
 
+# 왜 여기서: 백업·복구 왕복 시험이 restic·restic-rest-server 를 요구한다. 표준 설치가 시험 의존까지 받아야 새 환경에서 시험이 건너뛰어지지 않는다(종료 코드 77 은 통과가 아니다).
+# 진행 기록은 표준 오류로만 낸다(표준 출력의 마지막 줄은 보고 JSON). 멱등이다.
+bash "$(dirname "${BASH_SOURCE[0]}")/fetch-test-tools.sh" >&2 || { echo "setup-env: 시험 도구(restic) 받기 실패(docker와 네트워크 확인: scripts/fetch-test-tools.sh)" >&2; exit 1; }
+
 echo "setup-env: 완료. 시험: .venv/bin/python -m pytest -q" >&2

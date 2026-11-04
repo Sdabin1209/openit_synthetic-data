@@ -27,7 +27,7 @@ dataset-store의 데이터(볼륨 `datasets-data`, 컨테이너 경로 `DATASET_
 - restic 전체를 시간 상한 없이 두기: 닿지 못함이 시간 초과로 보인다. 위 이유로 첫 확인에만 상한을 둔다.
 
 ## 결과
-얻는 것: deploy가 라벨만 읽고 백업·복구를 주기로 돌릴 수 있다. 백업→복구 왕복과 변이(파일 변경·삭제·폴더 삭제, 백업 뒤 생긴 파일)를 실제 restic·restic-rest-server로 시험한다(`tests/test_backup_job.py`, 두 도구는 `scripts/fetch-test-tools.sh`가 Debian 공식 패키지에서 받는다. 없으면 왕복 시험은 건너뛴다).
+얻는 것: deploy가 라벨만 읽고 백업·복구를 주기로 돌릴 수 있다. 백업→복구 왕복과 변이(파일 변경·삭제·폴더 삭제, 백업 뒤 생긴 파일)를 실제 restic·restic-rest-server로 시험한다(`tests/test_backup_job.py`, 두 도구는 `scripts/setup-env.sh`가 부르는 `scripts/fetch-test-tools.sh`가 Debian 공식 패키지(버전 고정)에서 `build/tools`로 받고, 시험이 PATH에 더해 찾는다. 없으면 왕복 시험은 건너뛴다).
 감수하는 것: 이미지가 restic 때문에 커진다. 시험 도구(restic·restic-rest-server)가 없으면 왕복 시험은 건너뛰고 pytest는 종료 코드 77(SKIP, 통과 아님, automake 관례, deploy와 같은 규칙)로 끝난다(`tests/conftest.py`). 시험 서버는 `--no-auth`라 HTTP 기본 인증 경로는 실제 서버로 시험하지 않았다(자격을 환경 변수로 넘기는 연결만 단위로 본다). TLS·게이트웨이 CONNECT·실제 platform 백업 저장소와의 연동은 이 영역에서 돌리지 않았다(서비스끼리 도는 시험은 deploy). 한 날 안에 여러 번 백업하면 중간 스냅숏이 지워지고 최신은 남는다(restic 0.18로 확인; 정확히 몇 개가 남는지는 restic의 기간 규칙이다). 같은 저장소에 닿는 다른 경로·태그의 스냅숏은 건드리지 않는다.
 
 ## 되돌리는 조건

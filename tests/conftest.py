@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import copy
+import os
 from pathlib import Path
 
 import pytest
@@ -26,6 +27,10 @@ RULES_VERSION = str(load_rules()["rules_version"])
 
 # 왜: 백업 왕복 시험은 restic·restic-rest-server 가 있어야 돈다. 없을 때 건너뛴 채 종료 코드 0 으로 끝나면 통과로 읽힌다. 건너뛰었으면 77(SKIP, automake 관례, deploy 와 같은 규칙)로 끝낸다.
 # 다른 건너뜀(예: SD_REFERENCE_DATA_DIR 없음)은 이 규칙의 대상이 아니다. 사유 문장에 표지를 넣은 시험만 센다.
+# 왜 PATH 에 더하나: 표준 설치(scripts/setup-env.sh)가 시험 도구를 build/tools 에 받는다. 시험이 사용자의 PATH 설정에 기대지 않고 거기서 찾는다.
+# SD_TEST_TOOLS_DIR 은 그 폴더를 바꾸는 설정이다(없는 폴더를 주면 도구가 없는 환경을 시험할 수 있다: tests/test_backup_job.py).
+_TOOLS_DIR = os.environ.get("SD_TEST_TOOLS_DIR", str(Path(__file__).resolve().parent.parent / "build" / "tools" / "usr" / "bin"))
+os.environ["PATH"] = _TOOLS_DIR + os.pathsep + os.environ.get("PATH", "")
 TOOLS_MISSING_MARK = "[도구 없음: 종료 코드 77]"
 _tool_skips: list[str] = []
 
