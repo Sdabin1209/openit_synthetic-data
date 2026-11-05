@@ -2,7 +2,7 @@
 # 이미지를 빌드해 띄우고 /healthz, /readyz, 권한, 게시(POST)와 조회를 확인한다. 고정 포트를 쓰지 않는다(Docker가 배정, D22).
 # boundary-contracts wheel은 이웃 폴더가 아니라 requirements.lock이 고정한 태그에서 `pip wheel`로 만든다(git SSH 접근 필요).
 # 환경 변수: SMOKE_WHEELS(미리 만든 wheel 폴더. 없으면 태그에서 만든다), SMOKE_BC_VERSION(기본 requirements.lock의 boundary-contracts 태그),
-#            SURVEY_SCHEMA(기본 ../survey-service/schema; 읽기만 한다)
+#            SURVEY_SCHEMA(기본: 설치된 survey_schema 패키지의 v1; 읽기만 한다)
 set -eu
 # 실패하면 컨테이너를 지우기 전에 상태와 로그를 남긴다(정리 순서 결함 수정 2026-11-03: 지우고 나면 실패 원인을 볼 수 없다).
 # inspect 는 State 만 낸다(전체 inspect 는 환경 변수가 섞인다).
@@ -20,7 +20,9 @@ smoke_diag() {
 cd "$(dirname "$0")/.."
 . scripts/docker-env.sh; docker_env_setup      # 전역 ~/.docker 의 자격 도우미에 기대지 않는다(scripts/docker-env.sh)
 BC_VER=${SMOKE_BC_VERSION:-$(grep ^boundary-contracts requirements.lock | sed "s/.*@v//")}
-SCHEMA=${SURVEY_SCHEMA:-../survey-service/schema}
+# 문진 스키마는 설치된 survey_schema 패키지(판은 requirements.lock 의 태그)에서 꺼낸다. 이웃 리포 작업 폴더를 읽지 않는다(헤드 점검 2026-11-05)
+SCHEMA=${SURVEY_SCHEMA:-$(.venv/bin/python -c 'import survey_schema,pathlib;print(pathlib.Path(survey_schema.__file__).resolve().parent/"v1")')}
+[ -d "$SCHEMA/schemas" ] || { echo "smoke: 문진 스키마를 찾지 못했다($SCHEMA). bash scripts/setup-env.sh 로 survey_schema 를 설치한다" >&2; exit 2; }
 if [ -n "${SMOKE_WHEELS:-}" ]; then
   WHL=$(ls "$SMOKE_WHEELS"/boundary_contracts-"$BC_VER"-*.whl | head -1)
 else
