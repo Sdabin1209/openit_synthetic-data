@@ -376,7 +376,7 @@ def make_app(svc: Service):
     """WSGI 앱. 규약(인증, 413, 계약 검증, 오류 본문, 경로 인코딩, 405 Allow)은 openit_link.App(0.2.0)이 맡는다. 이 겉옷은 라이브러리에 없는 이 서버만의 방어 둘이다:
     (1) 인증 실패 횟수 제한: 같은 주소에서 401이 limit번 쌓이면 올바른 토큰도 잠시 거부해 토큰 추측이 맞는지 알 수 없게 한다(ADR 0012, 규약이 아니라 서버 방어라 라이브러리 몫이 아니다),
     (2) 처리하지 못한 예외를 비밀 없는 503으로(라이브러리는 예외를 잡지 않아 서버가 HTML 500을 낸다; 내부 오류 형식 이름만 로그)."""
-    inner = App(make_routes(svc), svc.tokens(), ready=svc.ready)
+    inner = App(make_routes(svc), svc.tokens(), ready=svc.ready, contract_service="dataset-store", contract_bindings={"read_roles": sorted(svc.roles()), "publish_max_body": svc.max_body})
 
     def respond_unavailable(start_response, message: str):
         import json
