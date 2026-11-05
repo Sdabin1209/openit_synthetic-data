@@ -19,7 +19,7 @@
 | 저장소 종류별 필수(file은 root, http는 http 설정, memory는 둘 다 없음) | `RunPlan.store`, `ImportPlan.store`의 `if/then` |
 | 비식별(deidentified=true)이 아닌 실패 사례 | `SeedCollectInput.cases[].deidentified`의 `const true` |
 | 시드의 정답 모양(LORA_A는 객체, LORA_B는 문자열) | `Seed`의 `if/then` |
-| dataset_id·version 문자 규칙과 길이, 파일 경로 정규형('..'·절대 경로·역슬래시·빈 마디·'.' 없음) | `PublishRequest`, `ManifestRequest`, `VersionsRequest`, `FileRequest`, `PublishDecisionInput`의 `pattern` |
+| dataset_id·version 문자 규칙과 길이, 파일 경로 정규형('..'·절대 경로·역슬래시·빈 마디·'.' 없음) | `StorePublishRequest`, `ManifestRequest`, `VersionsRequest`, `FileRequest`, `PublishDecisionInput`의 `pattern` |
 | 서비스 시작 시 읽기·쓰기 토큰이 하나도 없음 | `ServiceSettings`의 `anyOf` |
 | 허용치 범위(건수 0 이상, 비율 0~1, 의심 행 허용치 정수 또는 null) | `ImportJudgeInput.tolerance`, `ImportPlan.tolerance` |
 | 문항 세트 판정 결과의 모양(ADMITTED는 context, REJECTED는 error) | `QuestionSetAdmission`의 `if/then` |

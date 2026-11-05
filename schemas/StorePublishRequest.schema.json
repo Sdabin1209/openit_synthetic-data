@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://openit.invalid/synthetic-data/schemas/PublishRequest.schema.json",
-  "title": "PublishRequest",
+  "$id": "https://openit.invalid/synthetic-data/schemas/StorePublishRequest.schema.json",
+  "title": "StorePublishRequest",
   "description": "저장소 게시 요청: 매니페스트(계약 DatasetManifest)와 파일(경로 -> 디스크 경로).",
   "type": "object",
   "properties": {

@@ -1,6 +1,6 @@
 """데이터셋 저장소 컴포넌트(바깥 자원: 디스크·메모리). I2 DatasetStore의 파일 구현과 메모리 구현이 같은 게시 검증 규칙을 쓴다(한 파일에 둔 이유:
 컴포넌트끼리 import하지 않으므로 공통 규칙은 한 컴포넌트 안에 있어야 한다). 표면은 입력 스키마 -> 출력 스키마인 작업 넷이다:
-  publish(PublishRequest) -> DatasetManifest, get_manifest(ManifestRequest) -> DatasetManifest, list_versions(VersionsRequest) -> 버전 목록, open_file(FileRequest) -> 파일 바이트.
+  publish(StorePublishRequest) -> DatasetManifest, get_manifest(ManifestRequest) -> DatasetManifest, list_versions(VersionsRequest) -> 버전 목록, open_file(FileRequest) -> 파일 바이트.
 저장소가 이웃(HTTP)이면 같은 표면을 link_dataset_publish가 낸다. wiring이 어느 쪽을 주입할지 정한다.
 
 DatasetStore 구현의 공통 부분. 게시 검증 규칙은 한 곳(여기)에만 둬서 파일 구현과 메모리 구현이 같게 동작한다.
@@ -100,7 +100,7 @@ class DatasetStoreBase:
             return io.BytesIO(tmp.read_bytes())
 
     def publish(self, manifest: dict, files: Mapping[str, Path]) -> dict:
-        check("PublishRequest", {"manifest": manifest, "files": {p: str(f) for p, f in files.items()}})     # ID·경로 형식은 스키마가 거부한다(INVALID_RECORD)
+        check("StorePublishRequest", {"manifest": manifest, "files": {p: str(f) for p, f in files.items()}})     # ID·경로 형식은 스키마가 거부한다(INVALID_RECORD)
         _contract("DatasetManifest", manifest, "매니페스트")
         if _major(manifest["pipeline_schema_version"]) != SUPPORTED_PIPELINE_MAJOR:
             raise BoundaryError("UNSUPPORTED_VERSION", f"지원하지 않는 pipeline_schema_version: {manifest['pipeline_schema_version']}")
