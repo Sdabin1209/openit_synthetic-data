@@ -6,6 +6,7 @@
 # 기반 이미지도 Dockerfile 의 PYTHON_IMAGE(digest 고정)를 그대로 쓴다. 멱등: 같은 버전이 이미 풀려 있으면 아무것도 받지 않는다.
 set -euo pipefail
 cd "$(dirname "$0")/.."
+. scripts/docker-env.sh; docker_env_setup      # 전역 ~/.docker 의 자격 도우미에 기대지 않는다
 REST_SERVER_DEB_VERSION=0.13.0-2
 RESTIC_DEB_VERSION="$(sed -n 's/^ARG RESTIC_DEB_VERSION=//p' Dockerfile)"
 PYTHON_IMAGE="$(sed -n 's/^ARG PYTHON_IMAGE=//p' Dockerfile)"

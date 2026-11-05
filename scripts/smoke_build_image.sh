@@ -4,6 +4,7 @@
 # 왜 인자로 받나: 이웃 리포 경로를 이 스크립트에 적지 않는다(구조 규칙 1). 보통 deploy가 태그에서 꺼내 준다.
 set -euo pipefail
 cd "$(dirname "$0")/.."
+. scripts/docker-env.sh; docker_env_setup      # 전역 ~/.docker 의 자격 도우미에 기대지 않는다
 : "${SMOKE_BC_SRC:?}" "${SMOKE_SS_SRC:?}" "${SMOKE_BC_VERSION:?}" "${SMOKE_SS_VERSION:?}"
 TAG="synthetic-data-dataset-store:build-image-smoke-$$"
 REQ="$(mktemp)"; trap 'rm -f "$REQ"; ${DOCKER:-docker} rmi "$TAG" >/dev/null 2>&1 || true' EXIT

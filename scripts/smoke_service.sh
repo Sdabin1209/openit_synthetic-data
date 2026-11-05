@@ -18,6 +18,7 @@ smoke_diag() {
   done
 }
 cd "$(dirname "$0")/.."
+. scripts/docker-env.sh; docker_env_setup      # 전역 ~/.docker 의 자격 도우미에 기대지 않는다(scripts/docker-env.sh)
 BC_VER=${SMOKE_BC_VERSION:-$(grep ^boundary-contracts requirements.lock | sed "s/.*@v//")}
 SCHEMA=${SURVEY_SCHEMA:-../survey-service/schema}
 if [ -n "${SMOKE_WHEELS:-}" ]; then
