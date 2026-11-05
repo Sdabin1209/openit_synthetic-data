@@ -364,8 +364,8 @@ def make_routes(svc: Service) -> list[Route]:
     base = "/v1/datasets"
     return [
         Route("POST", base, publish, roles=frozenset({WRITE_ROLE}), stream_body=True, max_body=svc.max_body, response_schema="DatasetManifest"),
-        Route("GET", base, list_datasets, roles=readers),
-        Route("GET", base + "/{d}/versions", list_versions, roles=readers),
+        Route("GET", base, list_datasets, roles=readers, response_schema="ListEnvelope"),   # R7: 봉투를 내보내기 전에 계약으로 검증(HTTP.md list_ids)
+        Route("GET", base + "/{d}/versions", list_versions, roles=readers, response_schema="ListEnvelope"),   # R7(HTTP.md list_versions)
         Route("GET", base + "/{d}/versions/{v}", get_manifest, roles=readers, response_schema="DatasetManifest"),
         Route("GET", base + "/{d}/versions/{v}/files", get_tar, roles=readers),
         Route("GET", base + "/{d}/versions/{v}/files/{p}", get_file, roles=readers),
