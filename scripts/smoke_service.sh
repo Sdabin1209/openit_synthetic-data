@@ -1,4 +1,5 @@
 #!/bin/sh
+# deploy 와 같은 실행 조건으로 띄운다(읽기 전용 루트, /tmp tmpfs, cap_drop ALL, no-new-privileges, 쓸 수 있는 경로는 deploy compose 와 같게): 2026-11-06 E2E 기동에서야 드러난 쓰기 경로 결함을 스모크에서 잡는다
 # 이미지를 빌드해 띄우고 /healthz, /readyz, 권한, 게시(POST)와 조회를 확인한다. 고정 포트를 쓰지 않는다(Docker가 배정, D22).
 # boundary-contracts wheel은 이웃 폴더가 아니라 requirements.lock이 고정한 태그에서 `pip wheel`로 만든다(git SSH 접근 필요).
 # 환경 변수: SMOKE_WHEELS(미리 만든 wheel 폴더. 없으면 태그에서 만든다), SMOKE_BC_VERSION(기본 requirements.lock의 boundary-contracts 태그),
@@ -49,7 +50,7 @@ docker volume create "$NAME-data" >/dev/null
 RT=$(od -An -N24 -tx1 /dev/urandom | tr -d ' \n'); WT=$(od -An -N24 -tx1 /dev/urandom | tr -d ' \n')
 printf 'model-lab=%s\n' "$RT" > "$SECRETS/read"; printf 'synthetic-data=%s\n' "$WT" > "$SECRETS/write"
 chmod 755 "$SECRETS"; chmod 644 "$SECRETS"/*
-docker run -d --name "$NAME" -p 127.0.0.1::8080 -v "$NAME-data":/data -v "$SECRETS":/run/secrets:ro \
+docker run -d --name "$NAME" --read-only --tmpfs /tmp --cap-drop ALL --security-opt no-new-privileges:true -p 127.0.0.1::8080 -v "$NAME-data":/data -v "$SECRETS":/run/secrets:ro \
   -e DATASET_STORE_READ_TOKENS_FILE=/run/secrets/read -e DATASET_STORE_WRITE_TOKENS_FILE=/run/secrets/write "$TAG" >/dev/null
 PORT=$(docker port "$NAME" 8080/tcp | head -1 | sed 's/.*://')
 URL="http://127.0.0.1:$PORT"
