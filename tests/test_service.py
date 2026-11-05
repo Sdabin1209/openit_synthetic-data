@@ -65,6 +65,9 @@ class Srv:
         h = dict(headers or {})
         if token:
             h["Authorization"] = "Bearer " + token
+        if body is not None and method == "POST" and path == "/v1/datasets":
+            # 실제 클라이언트처럼 매체를 밝힌다(계약 application/x-tar). 밝히지 않으면 urllib 이 form-urlencoded 를 붙여 계약이 거부한다
+            h.setdefault("Content-Type", "application/x-tar")
         req = urllib.request.Request(self.url + path, data=body, method=method, headers=h)
         try:
             with urllib.request.urlopen(req, timeout=HANG_GUARD_SECONDS) as r:
