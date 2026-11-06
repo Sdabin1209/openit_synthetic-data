@@ -35,6 +35,10 @@ if a[0] == "build":
     labels = {{a[i + 1].split("=", 1)[0]: a[i + 1].split("=", 1)[1] for i, x in enumerate(a) if x == "--label"}}
     state.write_text(json.dumps({{"args": args, "ctx": ctx, "labels": labels, "tag": a[a.index("-t") + 1], "src": a[-1]}}))
     print("sha256:" + "ab" * 32)
+elif a[0] == "run" and "id" in a:   # 이미지 실행 사용자(주입 선언 정직성, 계약 ContainerInputs.process)
+    print("10001")
+elif a[0] == "rmi":
+    pass
 elif a[0] == "image":
     st = json.loads(state.read_text())
     if "{{{{.Id}}}}" in a[-2]:
@@ -63,6 +67,7 @@ def env(tmp_path):
     (src / "Dockerfile").write_text("FROM scratch\n")
     (src / "jobs.json").write_text((ROOT / "jobs.json").read_text(encoding="utf-8"))
     (src / "deploy-exposure.json").write_text((ROOT / "deploy-exposure.json").read_text(encoding="utf-8"))
+    (src / "deploy-inputs.json").write_text((ROOT / "deploy-inputs.json").read_text(encoding="utf-8"))   # 주입 선언(계약 ContainerInputs 3.5.0)
     fake = tmp_path / "fake-docker"
     fake.write_text(FAKE_DOCKER)
     fake.chmod(fake.stat().st_mode | stat.S_IEXEC)
@@ -87,10 +92,12 @@ def test_success_last_line_is_build_image_result_with_labels_from_request(env):
     assert res["image"] == req["image_tag"] and res["image_id"].startswith("sha256:")
     res["labels"].pop("io.openit.exposure")
     jobs = res["labels"].pop("io.openit.jobs")
+    inputs = res["labels"].pop("io.openit.inputs")   # 주입 선언(계약 ContainerInputs 3.5.0): 리포의 deploy-inputs.json 그대로
+    assert json.loads(inputs) == json.loads((ROOT / "deploy-inputs.json").read_text(encoding="utf-8"))
     assert json.loads(jobs) == json.loads((ROOT / "jobs.json").read_text(encoding="utf-8"))
     assert res["labels"] == {"io.openit.service": "dataset-store", "io.openit.revision": "abc1234", "io.openit.contracts.boundary": LOCK_BC,
                              "io.openit.contracts.survey-schema": LOCK_SS[1:].split(".")[0], "io.openit.model-runtime": "n/a"}
-    validator("ImageLabels").validate(res["labels"])
+    validator("ImageLabels").validate({**res["labels"], "io.openit.inputs": inputs})   # 위에서 꺼낸 선언 라벨을 되돌려 전체를 계약으로 본다
 
 
 def test_build_uses_only_dependency_sources_and_source_dir(env):

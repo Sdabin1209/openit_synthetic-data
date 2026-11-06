@@ -140,7 +140,9 @@ def _dockerfile_labels(revision: str, bc: str, survey: str) -> dict:
 
 def test_dockerfile_labels_satisfy_image_labels_contract():
     labels = _dockerfile_labels("96d56ba", "v2.8.0", "1")
-    validator("ImageLabels").validate(labels)
+    import json, pathlib
+    # 진입점(build-image)이 --label 로 다는 주입 선언(계약 ContainerInputs 3.5.0 필수): Dockerfile 만으로는 계약 이미지가 아니다
+    validator("ImageLabels").validate({**labels, "io.openit.inputs": json.dumps(json.loads((pathlib.Path(__file__).resolve().parents[1] / "deploy-inputs.json").read_text(encoding="utf-8")))})
     assert labels["io.openit.service"] == "dataset-store"
 
 

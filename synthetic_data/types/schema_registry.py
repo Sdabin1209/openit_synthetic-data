@@ -9,6 +9,7 @@ from functools import lru_cache
 from typing import Any
 
 import jsonschema
+from boundary_contracts import format_checker as _bc_format_checker  # 형식(format) 검증기가 없으면 조용히 넘기지 않고 실패한다(계약 3.5.0)
 from boundary_contracts import BoundaryError
 from boundary_contracts import validator as _contract_validator
 
@@ -1404,7 +1405,7 @@ _STORE = {s["$id"]: s for s in SCHEMAS.values()}
 def _validator(name: str):
     schema = SCHEMAS[name]
     resolver = jsonschema.RefResolver.from_schema(schema, store=_STORE)
-    return jsonschema.Draft202012Validator(schema, resolver=resolver)
+    return jsonschema.Draft202012Validator(schema, resolver=resolver, format_checker=_bc_format_checker(schema))
 
 
 def _code(e) -> str:

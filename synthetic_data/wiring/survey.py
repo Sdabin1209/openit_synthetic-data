@@ -7,6 +7,7 @@ from typing import Any, Optional
 
 import jsonschema
 from boundary_contracts.errors import BoundaryError
+from boundary_contracts import format_checker as _bc_format_checker  # 형식(format) 검증기가 없으면 조용히 넘기지 않고 실패한다(계약 3.5.0)
 
 
 class Survey:
@@ -35,6 +36,6 @@ class Survey:
                 raise BoundaryError("UNSUPPORTED_VERSION", f"문진 스키마가 없다: {name}")
             schema = json.loads(path.read_text(encoding="utf-8"))
             schema.pop("$id", None)   # 상대 $id("standalone/...")가 '#/$defs' 참조 해석을 깨뜨린다
-            self._cache[name] = jsonschema.Draft202012Validator(schema)
+            self._cache[name] = jsonschema.Draft202012Validator(schema, format_checker=_bc_format_checker(schema))
         return ["/".join(map(str, e.absolute_path)) + "#" + e.validator if e.absolute_path else "(루트)#" + e.validator
                 for e in sorted(self._cache[name].iter_errors(record), key=lambda e: list(map(str, e.absolute_path)))]
