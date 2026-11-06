@@ -248,3 +248,19 @@ def test_turn_engine_request_key_is_rejected_by_contract(env):
     tmp, fake, req = env
     req["versions"]["turn_engine"] = "v0.4.3"                    # 3.0.0에서 BuildImageRequest.versions에서 빠졌다
     assert run(tmp, fake, req).returncode != 0
+
+
+@pytest.mark.parametrize("change", ["missing", "extra"])
+def test_job_input_profiles_match_declaration_before_build(env, change):
+    tmp, fake, req = env
+    source = Path(req["source_dir"])
+    declaration = json.loads((source / "deploy-inputs.json").read_text())
+    if change == "missing":
+        declaration["jobs"].pop("synthetic-import")
+    else:
+        declaration["jobs"]["ghost"] = declaration["roles"]["default"]
+    (source / "deploy-inputs.json").write_text(json.dumps(declaration))
+    result = run(tmp, fake, req)
+    assert result.returncode != 0
+    assert "job profiles differ" in result.stderr
+    assert not fake.with_suffix(".state").exists()

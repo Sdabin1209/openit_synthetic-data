@@ -13,13 +13,27 @@ PY="${PYTHON:-}"; [ -n "$PY" ] || { [ -x "$HERE/.venv/bin/python" ] && PY="$HERE
 inputs_label() {   # inputs_label <선언 파일> <이미지 이름> -> 한 줄 JSON(표준 출력)
   "${PYTHON:-${PY:-python3}}" -c '
 import json, sys
-from boundary_contracts import validator
+from pathlib import Path
+from boundary_contracts import validator, load_schema
 d = json.load(open(sys.argv[1], encoding="utf-8"))
 if d.get("image") != sys.argv[2]:
     sys.exit("%s 의 image(%s)가 이미지 이름 %s 와 다르다" % (sys.argv[1], d.get("image"), sys.argv[2]))
 errs = list(validator("ContainerInputs").iter_errors(d))
 if errs:
     sys.exit("%s 가 ContainerInputs 를 어긴다: " % sys.argv[1] + ", ".join("/" + "/".join(map(str, e.absolute_path)) + ":" + e.validator for e in errs[:5]))
+jobs = json.loads(Path(sys.argv[1]).with_name("jobs.json").read_text())
+if list(validator("JobsDeclaration").iter_errors(jobs)):
+    sys.exit("jobs.json violates JobsDeclaration")
+if set(d["jobs"]) != {job["name"] for job in jobs["jobs"]}:
+    sys.exit("ContainerInputs job profiles differ from JobsDeclaration")
+for profile in [*d["roles"].values(), *d["jobs"].values()]:
+    try:
+        load_schema(profile["env_schema"])
+        for file in profile["files"]:
+            if file.get("schema"):
+                load_schema(file["schema"])
+    except (FileNotFoundError, KeyError):
+        sys.exit("ContainerInputs references a missing contract schema")
 print(json.dumps(d, ensure_ascii=False, separators=(",", ":"), sort_keys=True))' "$1" "$2"
 }
 inputs_check() {   # inputs_check <이미지 태그> <inputs_label 출력>: 다르면 이미지를 지우고 실패
@@ -44,6 +58,7 @@ REQ="$("$PY" -I "$HERE/scripts/build_image_request.py" "$1")" || { echo "build-i
 mapfile -t R <<<"$REQ"
 SRC="${R[0]}"; REV="${R[1]}"; BC="${R[2]}"; SS="${R[3]}"; BC_SRC="${R[4]}"; SS_SRC="${R[5]}"; TAG="${R[6]}"
 [ -d "$SRC" ] && [ -f "$SRC/Dockerfile" ] || { echo "build-image: source_dir에 Dockerfile이 없다" >&2; exit 2; }
+INPUTS=$(inputs_label "$SRC/deploy-inputs.json" dataset-store) || exit 2
 [ -f "$BC_SRC/pyproject.toml" ] || { echo "build-image: dependency_sources.boundary에 pyproject.toml이 없다" >&2; exit 2; }
 [ -f "$SS_SRC/CONTRACT_VERSION" ] && [ -d "$SS_SRC/schemas" ] || { echo "build-image: dependency_sources.survey_schema가 문진 스키마 디렉터리(CONTRACT_VERSION, schemas/)가 아니다" >&2; exit 2; }
 
@@ -84,7 +99,6 @@ EXPOSURE="$("$PY" -I "$HERE/scripts/build_image_request.py" --exposure "$SRC/dep
 
 # 3. 빌드. Dockerfile 인자 이름은 이 영역의 것이고 deploy는 모른다
 echo "build-image: 이미지 빌드 $TAG" >&2
-INPUTS=$(inputs_label "$SRC/deploy-inputs.json" dataset-store) || exit 2
 "$DOCKER" build -q -t "$TAG" --build-context "wheels=$WORK/wheels" --build-context "survey_schema=$SS_SRC" \
   --label "io.openit.jobs=$JOBS" --label "io.openit.exposure=$EXPOSURE" --label "io.openit.inputs=$INPUTS" --build-arg "BC_SPEC=/wheels/$WHL" --build-arg "LINK_SPEC=/wheels/$LINK_WHL" --build-arg "BC_VERSION=$BC_ACTUAL" --build-arg "REVISION=$REV" \
   --build-arg "SURVEY_SCHEMA_VERSION=$SS_ACTUAL" "$SRC" >&2
