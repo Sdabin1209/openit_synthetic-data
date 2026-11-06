@@ -5,6 +5,7 @@ backup/restore 잡: 0 ok, 75 재시도 가능, 1 실패, 2 설정 오류(계약 
 from __future__ import annotations
 
 import argparse
+import os
 import sys
 from dataclasses import asdict
 from pathlib import Path
@@ -44,20 +45,26 @@ def main(argv=None) -> int:
             return 2
         print(json.dumps(out["result"], ensure_ascii=False, sort_keys=True))     # 왜 마지막 줄: 계약 BackupJobResult 는 표준 출력 마지막 줄이다(R9.2)
         return out["exit_code"]
+    # 컨테이너 USER를 유지하고 출력 폴더의 작업 그룹이 결과를 관리하게 한다.
+    # setgid 작업 폴더와 POSIX umask 0007: 그룹 읽기·쓰기 허용, 다른 사용자 접근 금지.
+    previous_umask = os.umask(0o007)
     try:
-        if args.cmd == "import":
-            res = import_from_config(args.config, created_at=args.created_at)
-            print(_result_line(res))
-            return 4 if res.status == "REJECTED" else 0
-        res = build_from_config(args.config, created_at=args.created_at)
-    except ConfigError as e:
-        print(job_output.run({"kind": "ERROR", "record": {"error": "CONFIG", "message": str(e)}})["line"], file=sys.stderr)
-        return 2
-    except BoundaryError as e:
-        print(json.dumps(e.to_record(), ensure_ascii=False), file=sys.stderr)
-        return 75 if e.retryable else 3
-    print(_result_line(res))
-    return 0
+        try:
+            if args.cmd == "import":
+                res = import_from_config(args.config, created_at=args.created_at)
+                print(_result_line(res))
+                return 4 if res.status == "REJECTED" else 0
+            res = build_from_config(args.config, created_at=args.created_at)
+        except ConfigError as e:
+            print(job_output.run({"kind": "ERROR", "record": {"error": "CONFIG", "message": str(e)}})["line"], file=sys.stderr)
+            return 2
+        except BoundaryError as e:
+            print(json.dumps(e.to_record(), ensure_ascii=False), file=sys.stderr)
+            return 75 if e.retryable else 3
+        print(_result_line(res))
+        return 0
+    finally:
+        os.umask(previous_umask)
 
 
 if __name__ == "__main__":
