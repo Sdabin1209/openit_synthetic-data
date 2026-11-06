@@ -63,3 +63,15 @@ def test_crash_before_rename_leaves_no_visible_version(tmp_path, validators, cap
     with pytest.raises(BoundaryError) as e:
         st.get_manifest(m["dataset_id"], m["version"])
     assert e.value.code == "NOT_FOUND"
+
+
+@pytest.mark.parametrize("mode", [0o700, 0o750, 0o770])
+def test_published_directory_preserves_dataset_access_mode(tmp_path, validators, captured, mode):
+    manifest, blobs = captured
+    root = tmp_path / "store"
+    dataset = root / manifest["dataset_id"]
+    dataset.mkdir(parents=True)
+    dataset.chmod(mode)
+    FileDatasetStore(root, validators.contract_version).publish(manifest, write_files(tmp_path / "src", blobs))
+    version = dataset / manifest["version"]
+    assert version.stat().st_mode & 0o777 == mode

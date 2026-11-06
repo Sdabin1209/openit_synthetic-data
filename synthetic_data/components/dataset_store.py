@@ -245,6 +245,9 @@ class FileDatasetStore(DatasetStoreBase):
                 (tmp / "manifest.json").write_text(
                     json.dumps(manifest, ensure_ascii=False, sort_keys=True, indent=2) + "\n", encoding="utf-8")
                 (tmp / "meta.json").write_text(json.dumps({"seq": max(seqs, default=0) + 1}), encoding="utf-8")
+                # mkdtemp의 0700을 그대로 게시하면 작업 그룹이 결과를 읽거나 정리할 수 없다.
+                # 최종 디렉터리는 소유 데이터셋 폴더의 접근 정책을 유지한다(다른 사용자에게 더 열지 않는다).
+                tmp.chmod(ddir.stat().st_mode & 0o2777)
                 _fsync_tree(tmp)
                 try:
                     os.rename(tmp, ddir / ver)
