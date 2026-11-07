@@ -54,12 +54,13 @@ def make_cfg_raw(tmp_path: Path, **over) -> dict:
     raw = {
         "dataset_id": "ds-test", "seed": 7, "created_at": "2026-10-15T00:00:00Z", 
         "survey_schema_dir": str(SURVEY_DIR),
-        "adapters": {"question_reader": {"factory": "doubles:make_question_reader"},
-                     "failure_store": {"factory": "doubles:make_failure_store_factory"}},
+        # 계약 4.0.0(D135): 어댑터는 HttpClientSettings. 시험의 대역은 run_job 에 직접 넘긴다(설정에 대역 경로를 두지 않는다)
+        "adapters": {"question_reader": {"kind": "http", "base_url": "https://question-authoring", "token_secret": "QUESTION_READER_TOKEN"},
+                     "failure_store": {"kind": "http", "base_url": "https://ops-feedback", "token_secret": "FAILURE_STORE_TOKEN"}},
         "question_sets": [{"id": "qs-main", "usage": "TRAIN_POOL"}, {"id": "qs-unseen", "usage": "HELD_OUT_EVAL"}],
         "seeds": {"enabled": True, "question_set_id": "qs-main"},
         "split": {"ratios": {"TRAIN": 0.6, "VALIDATION": 0.2, "EVAL": 0.2}},
-        "output": {"work_dir": str(tmp_path / "work"), "store": {"kind": "memory"}},
+        "output": {"work_dir": str(tmp_path / "work"), "store": {"kind": "file", "root": str(tmp_path / "store")}},   # 계약 4.0.0: 시험용 memory 저장소는 설정에서 없어졌다
     }
     raw.update(over)
     return raw

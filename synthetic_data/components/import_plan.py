@@ -19,9 +19,10 @@ def _resolve(base_dir: str, s: str) -> str:
 
 def _store(store: dict, base_dir: str) -> dict:
     kind = store["kind"]
+    # 계약 4.0.0: http 저장소는 HttpClientSettings(token_secret·timeout_seconds), 시험용 memory 는 설정에서 없어졌다(D135)
     return {"kind": kind, "root": _resolve(base_dir, store["root"]) if kind == "file" else None,
-            "http": {"base_url": store["base_url"], "token_env": store.get("token_env", DEFAULT_TOKEN_ENV),
-                     "timeout": float(store.get("timeout", DEFAULT_TIMEOUT))} if kind == "http" else None}
+            "http": {"base_url": store["base_url"], "token_env": store["token_secret"],
+                     "timeout": float(store.get("timeout_seconds", DEFAULT_TIMEOUT))} if kind == "http" else None}
 
 
 def run(inp: dict) -> dict:

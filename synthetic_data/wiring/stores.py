@@ -4,7 +4,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from ..components import link_dataset_publish
-from ..components.dataset_store import FileDatasetStore, MemoryDatasetStore
+from ..components.dataset_store import FileDatasetStore
 from ..config import ConfigError
 
 
@@ -17,4 +17,4 @@ def build_store(store: dict, survey):
             raise ConfigError(str(e)) from None
     if store["kind"] == "file":
         return FileDatasetStore(Path(store["root"]), survey.contract_version)
-    return MemoryDatasetStore(survey.contract_version)
+    raise ConfigError(f"알 수 없는 저장소 종류: {store['kind']}")      # 계약 4.0.0: memory 는 설정에서 없어졌다(시험은 저장소를 직접 넘긴다)

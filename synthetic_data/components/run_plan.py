@@ -20,9 +20,10 @@ def _resolve(base_dir: str, s: str) -> str:
 def _store_plan(store: dict, base_dir: str) -> dict:
     """계약 SyntheticDefs.Store를 계획의 저장소 항목으로. http의 기본값은 여기서 채운다."""
     kind = store["kind"]
+    # 계약 4.0.0: http 저장소는 HttpClientSettings(token_secret·timeout_seconds), 시험용 memory 는 설정에서 없어졌다(D135)
     return {"kind": kind, "root": _resolve(base_dir, store["root"]) if kind == "file" else None,
-            "http": {"base_url": store["base_url"], "token_env": store.get("token_env", DEFAULT_TOKEN_ENV),
-                     "timeout": float(store.get("timeout", DEFAULT_TIMEOUT))} if kind == "http" else None}
+            "http": {"base_url": store["base_url"], "token_env": store["token_secret"],
+                     "timeout": float(store.get("timeout_seconds", DEFAULT_TIMEOUT))} if kind == "http" else None}
 
 
 def _survey_dir(inp: dict) -> str:
@@ -53,7 +54,8 @@ def run(inp: dict) -> dict:
     if sd.get("question_set_id") is not None and sd["question_set_id"] not in ids and sd.get("enabled", False):
         raise SchemaViolation("seeds.question_set_id가 question_sets에 없다")                                    # 스키마 밖 조건 표 2번
     ad = raw["adapters"]
-    adapter = lambda a: {"factory": a["factory"], "kwargs": dict(a.get("kwargs", {}))}
+    # 계약 4.0.0(D135): 어댑터는 역할별 HttpClientSettings. 역할이 클라이언트를 정하므로 계획에는 주소·토큰 이름·시간 한도만 둔다
+    adapter = lambda a: {"base_url": a["base_url"], "token_env": a["token_secret"], "timeout": float(a.get("timeout_seconds", 10.0))}
     plan = {
         "dataset_id": raw["dataset_id"], "seed": raw["seed"], "created_at": raw.get("created_at"), "version": raw.get("version"),
         "action_rules_version": _rules_version(raw, inp["installed_action_rules_version"]), "survey_schema_dir": _survey_dir(inp),

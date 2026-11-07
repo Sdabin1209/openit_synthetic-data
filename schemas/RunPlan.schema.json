@@ -35,39 +35,51 @@
     },
     "question_reader": {
       "type": "object",
-      "properties": {
-        "factory": {
-          "type": "string",
-          "pattern": "^[^:]+:[^:]+$"
-        },
-        "kwargs": {
-          "type": "object"
-        }
-      },
+      "additionalProperties": false,
       "required": [
-        "factory",
-        "kwargs"
+        "base_url",
+        "token_env",
+        "timeout"
       ],
-      "additionalProperties": false
+      "properties": {
+        "base_url": {
+          "type": "string",
+          "minLength": 1
+        },
+        "token_env": {
+          "type": "string",
+          "pattern": "^[A-Z][A-Z0-9_]*$"
+        },
+        "timeout": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        }
+      }
     },
     "failure_store": {
       "anyOf": [
         {
           "type": "object",
-          "properties": {
-            "factory": {
-              "type": "string",
-              "pattern": "^[^:]+:[^:]+$"
-            },
-            "kwargs": {
-              "type": "object"
-            }
-          },
+          "additionalProperties": false,
           "required": [
-            "factory",
-            "kwargs"
+            "base_url",
+            "token_env",
+            "timeout"
           ],
-          "additionalProperties": false
+          "properties": {
+            "base_url": {
+              "type": "string",
+              "minLength": 1
+            },
+            "token_env": {
+              "type": "string",
+              "pattern": "^[A-Z][A-Z0-9_]*$"
+            },
+            "timeout": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            }
+          }
         },
         {
           "type": "null"
@@ -190,7 +202,6 @@
         "kind": {
           "enum": [
             "file",
-            "memory",
             "http"
           ]
         },

@@ -26,7 +26,8 @@ def _file_hash(text: str) -> str:
 
 
 def _line(rec: dict) -> str:
-    return json.dumps(rec, ensure_ascii=False, sort_keys=True, separators=(",", ":")) + "\n"
+    # sort_keys 금지(CONVENTIONS 11절, 계약 4.0.0): 샘플의 input.state 키 순서는 모델 입력의 일부다. 키 순서는 만든 순서(결정적) 그대로 둔다
+    return json.dumps(rec, ensure_ascii=False, separators=(",", ":")) + "\n"
 
 
 def run(inp: dict) -> dict:

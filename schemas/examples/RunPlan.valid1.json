@@ -6,8 +6,9 @@
   "action_rules_version": "r1",
   "survey_schema_dir": "/s",
   "question_reader": {
-    "factory": "m:f",
-    "kwargs": {}
+    "base_url": "https://question-authoring",
+    "token_env": "QUESTION_READER_TOKEN",
+    "timeout": 10.0
   },
   "failure_store": null,
   "question_sets": [

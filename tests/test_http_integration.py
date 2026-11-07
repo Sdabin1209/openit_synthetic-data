@@ -38,8 +38,8 @@ def make_server(case_mutations=()):
 
 
 def http_cfg(tmp_path, url, **over):
-    ad = lambda f: {"factory": f"synthetic_data.adapters:{f}", "kwargs": {"base_url": url, "token_env": "SYN_TEST_TOKEN"}}
-    raw = make_cfg_raw(tmp_path, adapters={"question_reader": ad("http_question_reader"), "failure_store": ad("http_failure_store")},
+    ad = {"kind": "http", "base_url": url, "token_secret": "SYN_TEST_TOKEN"}     # 계약 4.0.0 HttpClientSettings(D135)
+    raw = make_cfg_raw(tmp_path, adapters={"question_reader": dict(ad), "failure_store": dict(ad)},
                        output={"work_dir": str(tmp_path / "w"), "store": {"kind": "file", "root": str(tmp_path / "st")}},
                        seeds={"enabled": True}, **over)
     p = tmp_path / "job.json"

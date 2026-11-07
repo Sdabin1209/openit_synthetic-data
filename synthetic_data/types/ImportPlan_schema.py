@@ -19,7 +19,7 @@ class Http(TypedDict):
 
 
 class Store(TypedDict):
-    kind: Literal['file', 'memory', 'http']
+    kind: Literal['file', 'http']
     root: str | None
     http: Http | None
 

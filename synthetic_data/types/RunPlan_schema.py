@@ -3,17 +3,19 @@
 
 from __future__ import annotations
 
-from typing import Any, Literal, TypedDict
+from typing import Literal, TypedDict
 
 
 class QuestionReader(TypedDict):
-    factory: str
-    kwargs: dict[str, Any]
+    base_url: str
+    token_env: str
+    timeout: float
 
 
 class FailureStore(TypedDict):
-    factory: str
-    kwargs: dict[str, Any]
+    base_url: str
+    token_env: str
+    timeout: float
 
 
 class QuestionSet(TypedDict):
@@ -35,7 +37,7 @@ class Http(TypedDict):
 
 
 class Store(TypedDict):
-    kind: Literal['file', 'memory', 'http']
+    kind: Literal['file', 'http']
     root: str | None
     http: Http | None
 

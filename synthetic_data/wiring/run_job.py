@@ -4,7 +4,6 @@ v1 생성 경로(시나리오 설계·발화/응답 생성·노이즈·정답 �
 이 모듈은 컴포넌트 출력을 다음 컴포넌트 입력으로 옮길 뿐 판정하지 않는다."""
 from __future__ import annotations
 
-import importlib
 import json
 from collections import Counter
 from dataclasses import dataclass, field
@@ -33,11 +32,6 @@ class JobResult:
     dataset_digest: Optional[str] = None
     counts: dict = field(default_factory=dict)
     report_path: Optional[str] = None
-
-
-def load_factory(spec: dict) -> Callable:
-    mod, _, fn = spec["factory"].partition(":")
-    return getattr(importlib.import_module(mod), fn)
 
 
 def _write_report(cfg: Plan, state: dict) -> tuple[str, dict]:
@@ -151,15 +145,16 @@ def _run(cfg: Plan, question_reader, store, failure_store, survey, clock, state:
 
 
 def build_from_config(config_path: Path, *, created_at: Optional[str] = None) -> JobResult:
-    """CLI 진입점이 쓴다. 어댑터(문항 읽기, 실패 사례 읽기)를 설정의 factory로 만든다."""
+    """CLI 진입점이 쓴다. 어댑터(문항 읽기, 실패 사례 읽기)를 설정의 HttpClientSettings 로 만든다(계약 4.0.0, D135)."""
     from ..config import ConfigError
     cfg = load_config(config_path)
     if created_at:
         cfg.created_at = created_at
     survey = Survey(cfg.survey_schema_dir)
     try:
-        reader = load_factory(cfg.question_reader)(**cfg.question_reader["kwargs"])
-        fstore = load_factory(cfg.failure_store)(**cfg.failure_store["kwargs"]) if cfg.failure_store else None
+        # 계약 4.0.0(D135): 역할이 계약 클라이언트를 정한다(설정은 주소·토큰 이름·시간 한도만). 시험은 run_job 에 대역을 직접 넘긴다
+        reader = link_question_reader.http_question_reader(**cfg.question_reader)
+        fstore = link_failure_reader.http_failure_store(**cfg.failure_store) if cfg.failure_store else None
     except (link_question_reader.TokenError, link_failure_reader.TokenError) as e:
         raise ConfigError(str(e)) from None
     return run_job(cfg, question_reader=reader, failure_store=fstore, store=build_store(cfg.store, survey), survey=survey)

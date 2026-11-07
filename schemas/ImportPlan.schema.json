@@ -93,7 +93,6 @@
         "kind": {
           "enum": [
             "file",
-            "memory",
             "http"
           ]
         },
