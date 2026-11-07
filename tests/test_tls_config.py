@@ -229,18 +229,18 @@ def test_job_clients_go_out_through_the_area_egress_proxy(tmp_path, monkeypatch)
         ls.close()
 
 
-def test_publish_client_also_uses_the_egress_proxy(tmp_path, monkeypatch):
-    # R1.8: 잡의 게시 클라이언트(I2)도 OPENIT_EGRESS_PROXY를 egress_proxy로 받는다(잘못된 형식이면 클라이언트가 거부 = 값이 클라이언트까지 닿았다는 증거)
+def test_publish_client_to_own_dataset_store_does_not_use_the_egress_proxy(tmp_path, monkeypatch):
+    # 게시 대상 dataset-store 는 이 영역의 서버다: R1.8 출구(자기 게이트웨이 CONNECT)는 영역 밖 호출에만 쓴다. 출구 허용 목록(노출 선언 egress)에 자기 영역이 없어
+    # 프록시로 보내면 CONNECT 가 거부된다(2026-11-07 교차검증). 영역 pod 안에서 OPENIT_EGRESS_PROXY 를 받아도 게시 클라이언트에는 넘기지 않는다
     from synthetic_data.components import link_dataset_publish
     tok = tmp_path / "tok"
     tok.write_text("t" * 40)
     monkeypatch.setenv("SD_TEST_TOKEN_FILE", str(tok))
-    spec = {"base_url": "https://dataset-store:8443", "token_env": "SD_TEST_TOKEN", "timeout": 300.0}
-    monkeypatch.setenv("OPENIT_EGRESS_PROXY", "http://example.org:3128")      # loopback 밖은 계약이 거부한다
-    with pytest.raises(ValueError):
-        link_dataset_publish.build(spec)
     monkeypatch.setenv("OPENIT_EGRESS_PROXY", "http://127.0.0.1:3128")
-    link_dataset_publish.build(spec)
+    seen = {}
+    monkeypatch.setattr(link_dataset_publish, "HttpDatasetStore", lambda *a, **k: seen.update(args=a, kwargs=k) or object())
+    link_dataset_publish.build({"base_url": "https://dataset-store:8443", "token_env": "SD_TEST_TOKEN", "timeout": 300.0})
+    assert "egress_proxy" not in seen["kwargs"] and len(seen["args"]) == 3
 
 
 def test_job_survey_schema_location_is_not_an_environment_input():

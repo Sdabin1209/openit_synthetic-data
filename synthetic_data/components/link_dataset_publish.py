@@ -3,10 +3,7 @@
 `<NAME>_FILE`이 가리키는 파일의 내용이 우선이고, 없으면 환경 변수 `<NAME>`(개발·시험용)."""
 from __future__ import annotations
 
-import os
-
 from boundary_contracts import SecretError, read_secret
-from boundary_contracts.clients import egress_proxy_from
 from openit_link.clients import HttpDatasetStore
 
 from ..types.schema_registry import check
@@ -24,4 +21,6 @@ def build(spec: dict) -> HttpDatasetStore:
         raise TokenError(str(e)) from None
     if not tok:
         raise TokenError(f"쓰기 토큰 {spec['token_env']}이(가) 없다: {spec['token_env']}_FILE(파일 경로) 또는 {spec['token_env']}(개발용)를 설정한다")
-    return HttpDatasetStore(spec["base_url"], tok, spec["timeout"], egress_proxy=egress_proxy_from(os.environ))      # 게시도 자기 영역 게이트웨이 출구(R1.8)
+    # 게시 대상 dataset-store 는 이 영역(synthetic-data)의 서버다: R1.8 의 출구(자기 게이트웨이 CONNECT)는 영역 밖 호출에만 쓴다.
+    # 출구는 영역 노출 선언 egress 에 있는 이웃만 허용하므로 자기 영역을 프록시로 보내면 거부된다(2026-11-07 교차검증). 영역 pod 안에서는 게시 주소가 자기 게이트웨이로 바로 간다
+    return HttpDatasetStore(spec["base_url"], tok, spec["timeout"])
