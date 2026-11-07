@@ -164,25 +164,6 @@
           "if": {
             "properties": {
               "kind": {
-                "const": "memory"
-              }
-            }
-          },
-          "then": {
-            "properties": {
-              "root": {
-                "type": "null"
-              },
-              "http": {
-                "type": "null"
-              }
-            }
-          }
-        },
-        {
-          "if": {
-            "properties": {
-              "kind": {
                 "const": "http"
               }
             }

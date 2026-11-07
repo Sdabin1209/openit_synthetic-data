@@ -31,8 +31,8 @@
   "regeneration_mode": "full",
   "work_dir": "/w",
   "store": {
-    "kind": "memory",
-    "root": null,
+    "kind": "file",
+    "root": "/s",
     "http": null
   }
 }

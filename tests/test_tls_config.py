@@ -202,7 +202,7 @@ def test_job_clients_go_out_through_the_area_egress_proxy(tmp_path, monkeypatch)
     # R1.8·CONVENTIONS 13: 이웃(I1)을 부르는 클라이언트는 OPENIT_EGRESS_PROXY의 CONNECT 터널로만 나간다.
     # 가짜 프록시가 CONNECT 줄을 기록하고 403으로 거절한다 -> 계약 클라이언트는 직접 연결하지 않았다.
     import socket
-    from synthetic_data.wiring.run_job import load_factory
+    from synthetic_data.components.link_question_reader import http_question_reader
     seen = []
     ls = socket.socket()
     ls.bind(("127.0.0.1", 0))
@@ -219,10 +219,10 @@ def test_job_clients_go_out_through_the_area_egress_proxy(tmp_path, monkeypatch)
     tok.write_text("t" * 40)
     monkeypatch.setenv("SD_TEST_TOKEN_FILE", str(tok))
     monkeypatch.setenv("OPENIT_EGRESS_PROXY", f"http://127.0.0.1:{ls.getsockname()[1]}")
-    spec = {"factory": "synthetic_data.adapters:http_question_reader", "kwargs": {"base_url": "https://question-authoring:8443", "token_env": "SD_TEST_TOKEN"}}
+    settings = {"base_url": "https://question-authoring:8443", "token_env": "SD_TEST_TOKEN"}     # 링크 함수의 인자 이름(설정의 token_secret 은 run_plan 이 token_env 로 옮긴다)
     try:
         with pytest.raises(BoundaryError):
-            load_factory(spec)(**spec["kwargs"]).latest("qs-main", reviewed_only=True)
+            http_question_reader(**settings).latest("qs-main", reviewed_only=True)
         t.join(HANG_GUARD_SECONDS)
         assert seen == [b"CONNECT question-authoring:8443 HTTP/1.1"]
     finally:

@@ -7,3 +7,4 @@ __pycache__/
 /store/
 # docker 설정과 실행 상태(scripts/docker-env.sh 가 만든다), 시험 로그·검증 사본: 리포 내용이 아니다
 /build/
+/.work/

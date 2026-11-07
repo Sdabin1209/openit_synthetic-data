@@ -140,23 +140,26 @@ def test_config_requires_split_ratios(tmp_path):
         parse_config(raw, Path("."))
 
 
-def test_cli(tmp_path, capsys):
-    raw = make_cfg_raw(tmp_path, output={"work_dir": str(tmp_path / "w"), "store": {"kind": "file", "root": str(tmp_path / "st")}})
-    cfgp = tmp_path / "job.json"
-    cfgp.write_text(json.dumps(raw))
-    assert main(["run", "--config", str(cfgp)]) == 0
-    out = json.loads(capsys.readouterr().out)
-    assert out["status"] == "PUBLISHED"
-    assert main(["run", "--config", str(cfgp), "--created-at", "2030-01-01T00:00:00Z"]) == 0
-    assert json.loads(capsys.readouterr().out)["status"] == "ALREADY_PUBLISHED"
-    assert FileDatasetStore(tmp_path / "st", __import__("synthetic_data.wiring.survey", fromlist=["Survey"]).Survey(SURVEY_DIR).contract_version).list_versions("ds-test") == [out["version"]]
-    bad = tmp_path / "bad.json"
-    bad.write_text("{}")
-    assert main(["run", "--config", str(bad)]) == 2
-    raw2 = dict(raw, survey_schema_dir=str(tmp_path / "nowhere"))
-    cfg2 = tmp_path / "job2.json"
-    cfg2.write_text(json.dumps(raw2))
-    assert main(["run", "--config", str(cfg2)]) == 3
+def test_cli(tmp_path, capsys, monkeypatch):
+    # 계약 4.0.0(D135): CLI 는 설정의 HttpClientSettings 로 계약 클라이언트를 만든다. 대역 경로는 설정에 없으므로 참조 서버(문항 읽기)를 띄운다
+    from test_http_integration import TOK, http_cfg, make_server
+    monkeypatch.setenv("SYN_TEST_TOKEN", TOK)
+    with make_server() as srv:
+        cfgp = http_cfg(tmp_path, srv.url)
+        raw = json.loads(cfgp.read_text())
+        assert main(["run", "--config", str(cfgp)]) == 0
+        out = json.loads(capsys.readouterr().out)
+        assert out["status"] == "PUBLISHED"
+        assert main(["run", "--config", str(cfgp), "--created-at", "2030-01-01T00:00:00Z"]) == 0
+        assert json.loads(capsys.readouterr().out)["status"] == "ALREADY_PUBLISHED"
+        assert FileDatasetStore(tmp_path / "st", __import__("synthetic_data.wiring.survey", fromlist=["Survey"]).Survey(SURVEY_DIR).contract_version).list_versions("ds-test") == [out["version"]]
+        bad = tmp_path / "bad.json"
+        bad.write_text("{}")
+        assert main(["run", "--config", str(bad)]) == 2
+        raw2 = dict(raw, survey_schema_dir=str(tmp_path / "nowhere"))
+        cfg2 = tmp_path / "job2.json"
+        cfg2.write_text(json.dumps(raw2))
+        assert main(["run", "--config", str(cfg2)]) == 3
 
 
 def test_hashes_only_via_canonical():

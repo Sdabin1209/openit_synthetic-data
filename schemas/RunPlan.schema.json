@@ -273,25 +273,6 @@
           "if": {
             "properties": {
               "kind": {
-                "const": "memory"
-              }
-            }
-          },
-          "then": {
-            "properties": {
-              "root": {
-                "type": "null"
-              },
-              "http": {
-                "type": "null"
-              }
-            }
-          }
-        },
-        {
-          "if": {
-            "properties": {
-              "kind": {
                 "const": "http"
               }
             }
@@ -343,21 +324,7 @@
       "then": {
         "properties": {
           "failure_store": {
-            "type": "object",
-            "properties": {
-              "factory": {
-                "type": "string",
-                "pattern": "^[^:]+:[^:]+$"
-              },
-              "kwargs": {
-                "type": "object"
-              }
-            },
-            "required": [
-              "factory",
-              "kwargs"
-            ],
-            "additionalProperties": false
+            "type": "object"
           }
         }
       }

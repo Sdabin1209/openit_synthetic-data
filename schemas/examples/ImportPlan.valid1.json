@@ -22,8 +22,8 @@
   "work_dir": "/w",
   "pending_policy": "report",
   "store": {
-    "kind": "memory",
-    "root": null,
+    "kind": "file",
+    "root": "/s",
     "http": null
   }
 }

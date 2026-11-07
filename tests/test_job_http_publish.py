@@ -24,7 +24,7 @@ def import_cfg(tmp, url, **store):
     raw = {"dataset_id": "ds-http", "input_dir": str(tmp / "in"), "survey_schema_dir": str(SURVEY_DIR), "question_sets": QS,
            "source_label": "fake-test", "action_rules_version": RULES_VERSION, "created_at": "2026-10-27T00:00:00Z",
            "tolerance": {"max_invalid_rows": 0, "max_invalid_rate": 0.0},
-           "output": {"work_dir": str(tmp / "work"), "store": {"kind": "http", "base_url": url, "token_env": "SD_TEST_WRITE_TOKEN", **store}}}
+           "output": {"work_dir": str(tmp / "work"), "store": {"kind": "http", "base_url": url, "token_secret": "SD_TEST_WRITE_TOKEN", **store}}}
     p = tmp / "imp.json"
     p.write_text(json.dumps(raw))
     return p
@@ -66,9 +66,19 @@ def test_missing_token_is_config_error_without_value(tmp_path, srv, monkeypatch,
 
 
 def test_run_job_publishes_over_http(tmp_path, srv, monkeypatch, capsys):
+    # 계약 4.0.0(D135): 읽기 어댑터는 설정의 HttpClientSettings 로 참조 서버(I1·I7)를 읽는다
+    from test_http_integration import TOK, make_server
     monkeypatch.setenv("SD_TEST_WRITE_TOKEN", WT)
-    raw = make_cfg_raw(tmp_path, output={"work_dir": str(tmp_path / "w"), "store": {
-        "kind": "http", "base_url": srv.url, "token_env": "SD_TEST_WRITE_TOKEN"}})
+    monkeypatch.setenv("SYN_TEST_TOKEN", TOK)
+    with make_server() as reader_srv:
+        ad = {"kind": "http", "base_url": reader_srv.url, "token_secret": "SYN_TEST_TOKEN"}
+        raw = make_cfg_raw(tmp_path, adapters={"question_reader": dict(ad), "failure_store": dict(ad)},
+                           output={"work_dir": str(tmp_path / "w"), "store": {
+                               "kind": "http", "base_url": srv.url, "token_secret": "SD_TEST_WRITE_TOKEN"}})
+        _run_twice(tmp_path, srv, raw, capsys)
+
+
+def _run_twice(tmp_path, srv, raw, capsys):
     p = tmp_path / "job.json"
     p.write_text(json.dumps(raw))
     assert main(["run", "--config", str(p)]) == 0

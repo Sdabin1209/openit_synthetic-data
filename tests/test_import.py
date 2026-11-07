@@ -47,7 +47,7 @@ def cfg_for(tmp, **over):
     raw = {"dataset_id": "ds-imp", "input_dir": str(tmp / "in"), "survey_schema_dir": str(SURVEY_DIR), "question_sets": QS,
            "source_label": "fake-test", "action_rules_version": RULES_VERSION, "created_at": "2026-10-27T00:00:00Z",
            "tolerance": {"max_invalid_rows": 0, "max_invalid_rate": 0.0},
-           "output": {"work_dir": str(tmp / "work"), "store": {"kind": "memory"}}}
+           "output": {"work_dir": str(tmp / "work"), "store": {"kind": "file", "root": str(tmp / "store")}}}
     raw.update(over)
     return parse_import_config(raw, tmp)
 

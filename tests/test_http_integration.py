@@ -37,11 +37,12 @@ def make_server(case_mutations=()):
     return srv
 
 
-def http_cfg(tmp_path, url, **over):
+def http_cfg(tmp_path, url, *, out=None, **over):
     ad = {"kind": "http", "base_url": url, "token_secret": "SYN_TEST_TOKEN"}     # 계약 4.0.0 HttpClientSettings(D135)
+    over.setdefault("seeds", {"enabled": True})
     raw = make_cfg_raw(tmp_path, adapters={"question_reader": dict(ad), "failure_store": dict(ad)},
-                       output={"work_dir": str(tmp_path / "w"), "store": {"kind": "file", "root": str(tmp_path / "st")}},
-                       seeds={"enabled": True}, **over)
+                       output=out or {"work_dir": str(tmp_path / "w"), "store": {"kind": "file", "root": str(tmp_path / "st")}},
+                       **over)
     p = tmp_path / "job.json"
     p.write_text(json.dumps(raw))
     return p
