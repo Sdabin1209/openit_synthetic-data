@@ -6,7 +6,7 @@
 set -euo pipefail
 START=$SECONDS
 # 왜 EXIT 트랩인가: 어디서 실패하든(설치 실패 포함) 마지막 줄은 보고여야 deploy가 요약표에 쓸 수 있다.
-trap 'rc=$?; st=ok; [ "$rc" -eq 0 ] || st=fail; printf '"'"'{"area":"synthetic-data","status":"%s","exit_code":%d,"seconds":%d,"environment":{"kind":"python-venv","path":".venv","test_command":[".venv/bin/python","-m","pytest","-q"]}}\n'"'"' "$st" "$rc" "$((SECONDS - START))"' EXIT
+trap 'rc=$?; st=ok; [ "$rc" -eq 0 ] || st=fail; printf '"'"'{"area":"synthetic-data","status":"%s","exit_code":%d,"seconds":%d,"environment":{"kind":"python-venv","path":".venv","test_command":[".venv/bin/python","-m","pytest","-q","-m","not reference_data"]}}\n'"'"' "$st" "$rc" "$((SECONDS - START))"' EXIT
 
 # 어느 폴더에서 실행해도 리포 루트 기준(이 파일 위치의 상위)으로 동작한다.
 cd "$(dirname "${BASH_SOURCE[0]}")/.."

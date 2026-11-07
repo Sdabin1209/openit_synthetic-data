@@ -366,6 +366,9 @@ def test_same_utterance_same_question_different_state_is_reported_not_rejected(t
     assert r["cross_split_duplicate_inputs"]["EVAL~TRAIN"] == 0
 
 
+# 외부 실제 데이터(SD_REFERENCE_DATA_DIR)가 있어야 도는 선택 시험: 표지 reference_data 로 선언한 전체 시험 명령에서 명시적으로 뺀다(건너뛰기로 숨기지 않는다, 2026-11-07).
+# 데이터를 가진 곳에서는 'SD_REFERENCE_DATA_DIR=... .venv/bin/python -m pytest -m reference_data' 로 돌린다
+@pytest.mark.reference_data
 @pytest.mark.skipif(not __import__("os").environ.get("SD_REFERENCE_DATA_DIR"), reason="SD_REFERENCE_DATA_DIR(실제 파일 경로)가 없다")
 def test_real_reference_data_if_provided(tmp_path, validators):
     """선택 시험: 실제 파일 6개를 읽기 전용으로 검증한다. 데이터는 리포에 없고 건수 기대값은 C1 빌드의 것이다."""
