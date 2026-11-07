@@ -28,7 +28,7 @@ HTTP 경로와 오류의 정본은 `../boundary-contracts/HTTP.md`(I2 서버 면
 | `synthetic_data/wiring/` | 컴포넌트 연결(`import_job.py`, `run_job.py`)과 주입(`stores.py`, `survey.py`), 설정→계획(`plans.py`), 서비스 기동(`service.py`) |
 | `synthetic_data/__main__.py`, `config.py`, `service/__main__.py`, `adapters/__init__.py` | 진입점, 설정 읽기, 공개 진입점(factory 이름, ADR 0022) |
 | `Dockerfile`, `requirements-service.txt`, `scripts/smoke_service.sh` | I2 HTTP 서버 이미지(dataset-store, D100, ADR 0012·0017). 잡은 `output.store.kind: http`로 게시(ADR 0013) |
-| `configs/dev.job.json` | 이웃 대역을 쓰는 개발용 설정 |
+| `configs/dev.job.json` | loopback 의 이웃 서비스·계약 참조 서버를 부르는 개발용 설정(계약 4.0.0 D135: 설정에 대역 공장 없음) |
 | `tests/` | 적합성·잡 종단·HTTP 통합·단위·구조 시험(`test_structure.py`), 이웃 대역 `doubles.py` |
 | `requirements.lock` | 의존 고정(boundary-contracts·openit-link 태그의 정본. Dockerfile·스모크가 여기서 읽는다) |
 | `docs/` | 8절 참고 |
@@ -52,8 +52,9 @@ bash scripts/setup-env.sh
 python -m pytest -q
 
 # 개발용 잡 실행 (이웃은 tests/doubles.py 대역)
-PYTHONPATH=tests python -m synthetic_data run --config configs/dev.job.json [--created-at 2026-10-15T00:00:00Z]
+python -m synthetic_data run --config configs/dev.job.json [--created-at 2026-10-15T00:00:00Z]
 ```
+  (어댑터 주소의 서비스를 먼저 띄운다: question-authoring 읽기 API(I1)와 ops-feedback 실패 사례 API(I7)를 loopback 18081·18082 에 띄우거나, 계약 참조 서버 `conformance.servers`를 쓴다. 토큰은 파일로 준다: `QUESTION_READER_TOKEN_FILE=<경로> FAILURE_STORE_TOKEN_FILE=<경로> python -m synthetic_data run --config configs/dev.job.json`)
 
 - 출력은 JSON 한 줄(`status`, `version`, `content_hash`, `counts`, `report_path`). 종료 코드: 0 성공, 2 설정 오류, 3 재시도 불가 경계 오류, 75 재시도 가능(스케줄러가 재실행).
 - 비밀(D84): 이웃 호출 토큰은 값이 아니라 `NAME_FILE`(파일 경로, 배포에서는 `/run/secrets/...`)로 받습니다. 설정의 `token_env`는 비밀 이름이고, 파일이 없을 때만 `NAME` 환경 변수(개발 전용)를 씁니다. 값은 로그·보고서에 남지 않습니다.
