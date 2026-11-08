@@ -16,7 +16,7 @@ import pytest
 
 from boundary_contracts.errors import BoundaryError
 from openit_link.clients import HttpDatasetStore
-from conftest import HANG_GUARD_SECONDS
+from conftest import HANG_GUARD_SECONDS, minimal_env
 
 PKG = Path(__file__).resolve().parent.parent / "synthetic_data"
 CODE = [p for p in PKG.rglob("*.py") if "__pycache__" not in p.parts and p.name != "schema_registry.py" and "_schema.py" not in p.name]
@@ -41,7 +41,7 @@ def test_no_code_disables_verification_or_overrides_sslmode():
 @pytest.mark.skipif(shutil.which("openssl") is None, reason="openssl 명령 도구가 없다")
 def test_https_call_trusts_private_root_via_ssl_cert_file(tmp_path, monkeypatch):
     def sh(*a):
-        subprocess.run(a, cwd=tmp_path, check=True, capture_output=True, timeout=HANG_GUARD_SECONDS)
+        subprocess.run(a, cwd=tmp_path, check=True, capture_output=True, timeout=HANG_GUARD_SECONDS, env=minimal_env())
     sh("openssl", "req", "-x509", "-newkey", "rsa:2048", "-nodes", "-keyout", "root.key", "-out", "root.pem", "-days", "1", "-subj", "/CN=test-root",
        "-addext", "basicConstraints=critical,CA:TRUE", "-addext", "keyUsage=critical,keyCertSign")
     sh("openssl", "req", "-newkey", "rsa:2048", "-nodes", "-keyout", "srv.key", "-out", "srv.csr", "-subj", "/CN=localhost")

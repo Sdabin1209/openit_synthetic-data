@@ -6,6 +6,18 @@ from pathlib import Path
 
 import pytest
 
+# RUNTIME R9.1(C45): 시험은 상속받은 환경 변수를 통째로 하위 프로세스에 넘기지 않는다. 허용 목록의 이름만 담은 최소 환경을 쓰고, 그 호출에 필요한 이름만 더한다.
+# ALLOWED 는 head 의 check-container-inputs 와 같은 최소 집합이다. 호출마다 필요한 이름(예: DOCKER, SSH_AUTH_SOCK)은 extra 로 명시한다.
+ALLOWED_ENV = ("PATH", "HOME", "LANG", "TMPDIR", "DOCKER_CONFIG", "DOCKER_HOST")
+
+
+def minimal_env(*names: str, **extra: str) -> dict:
+    """허용 목록 + `names`(상속받은 값을 이름으로 가져옴) + `extra`(값을 직접 줌)."""
+    env = {k: os.environ[k] for k in (*ALLOWED_ENV, *names) if k in os.environ}
+    env.update(extra)
+    return env
+
+
 import doubles
 import survey_schema
 from boundary_contracts import PIPELINE_SCHEMA_VERSION

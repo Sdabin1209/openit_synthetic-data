@@ -2,11 +2,13 @@
 import subprocess
 from pathlib import Path
 
+from conftest import minimal_env
+
 S = str(Path(__file__).resolve().parent.parent / "scripts" / "assert_no_secret.sh")
 
 
 def run(text, *secrets):
-    return subprocess.run(["sh", S, *secrets], input=text.encode(), capture_output=True)
+    return subprocess.run(["sh", S, *secrets], input=text.encode(), capture_output=True, env=minimal_env())
 
 
 def test_leak_fails():

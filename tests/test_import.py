@@ -9,7 +9,7 @@ from pathlib import Path
 import pytest
 
 import doubles
-from conftest import RULES_VERSION, SURVEY_DIR, ROOT
+from conftest import RULES_VERSION, SURVEY_DIR, ROOT, minimal_env
 from synthetic_data.components.import_source import INPUT_FILES
 from synthetic_data.wiring.import_job import InputError, run_import
 from synthetic_data.wiring.plans import load_import_config, parse_import_config
@@ -182,7 +182,7 @@ def test_cli_exit_codes(tmp_path):
            "output": {"work_dir": str(tmp_path / "w"), "store": {"kind": "file", "root": str(tmp_path / "s")}}}
     cfgp = tmp_path / "c.json"
     cfgp.write_text(json.dumps(raw), encoding="utf-8")
-    run = lambda: subprocess.run([sys.executable, "-m", "synthetic_data", "import", "--config", str(cfgp)], cwd=ROOT,
+    run = lambda: subprocess.run([sys.executable, "-m", "synthetic_data", "import", "--config", str(cfgp)], cwd=ROOT, env=minimal_env(),
                                  capture_output=True, text=True)
     p = run()
     assert p.returncode == 4 and json.loads(p.stdout)["status"] == "REJECTED"

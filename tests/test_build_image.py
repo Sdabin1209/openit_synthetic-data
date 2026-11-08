@@ -14,7 +14,7 @@ from pathlib import Path
 
 import pytest
 
-from conftest import HANG_GUARD_SECONDS
+from conftest import HANG_GUARD_SECONDS, minimal_env
 
 from boundary_contracts import validator
 
@@ -80,7 +80,7 @@ def run(tmp_path, fake, req):
     p = tmp_path / "req.json"
     p.write_text(json.dumps(req))
     return subprocess.run(["bash", str(SCRIPT), str(p)], capture_output=True, text=True, timeout=HANG_GUARD_SECONDS,
-                          env={**os.environ, "DOCKER": str(fake), "PYTHON": sys.executable})
+                          env=minimal_env(DOCKER=str(fake), PYTHON=sys.executable))
 
 
 def test_success_last_line_is_build_image_result_with_labels_from_request(env):
@@ -131,7 +131,7 @@ def test_invalid_or_incomplete_request_fails_before_docker(env, mutate):
 def test_missing_request_file_fails(env):
     tmp, fake, _ = env
     r = subprocess.run(["bash", str(SCRIPT), str(tmp / "none.json")], capture_output=True, text=True,
-                       env={**os.environ, "DOCKER": str(fake), "PYTHON": sys.executable})
+                       env=minimal_env(DOCKER=str(fake), PYTHON=sys.executable))
     assert r.returncode != 0
 
 

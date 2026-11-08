@@ -10,6 +10,7 @@ from pathlib import Path
 
 import jsonschema
 import pytest
+from conftest import minimal_env
 
 ROOT = Path(__file__).resolve().parent.parent
 PKG = ROOT / "synthetic_data"
@@ -91,7 +92,7 @@ def test_4_every_schema_has_valid_and_invalid_examples_with_right_results():
 def test_5_types_equal_regenerated_output():
     pytest.importorskip("datamodel_code_generator")
     with tempfile.TemporaryDirectory() as td:
-        subprocess.run([sys.executable, str(ROOT / "scripts" / "gen_types.py"), "--out", td], check=True, capture_output=True)
+        subprocess.run([sys.executable, str(ROOT / "scripts" / "gen_types.py"), "--out", td], check=True, capture_output=True, env=minimal_env())
         fresh = {p.name: p.read_text(encoding="utf-8") for p in Path(td).glob("*.py")}
     have = {p.name: p.read_text(encoding="utf-8") for p in (PKG / "types").glob("*.py")}
     assert set(fresh) == set(have), sorted(set(fresh) ^ set(have))

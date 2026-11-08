@@ -11,7 +11,7 @@ from pathlib import Path
 
 import pytest
 
-from conftest import HANG_GUARD_SECONDS, TOOLS_MISSING_MARK
+from conftest import HANG_GUARD_SECONDS, TOOLS_MISSING_MARK, minimal_env
 
 from boundary_contracts import validator
 from synthetic_data import __main__ as entry
@@ -101,7 +101,7 @@ CLOCK = lambda: "2026-11-05T00:00:00Z"     # 주입 시계(ADR 0023): 시험이 
 def rest_server(tmp_path):
     # --listen 포트 0: 서버가 빈 포트를 고르고 "start server on <주소>" 한 줄을 낸다. 그 줄을 읽을 때까지 막혀 기다릴 뿐 시간을 재지 않는다
     # --no-auth: 인증 경로는 잡이 아니라 서버의 몫이라 여기서 시험하지 않는다(자격은 환경 변수로 restic 에 전달만 한다). 시험 전용 loopback 서버다
-    p = subprocess.Popen(["restic-rest-server", "--path", str(tmp_path / "repos"), "--listen", "127.0.0.1:0", "--no-auth"], stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+    p = subprocess.Popen(["restic-rest-server", "--path", str(tmp_path / "repos"), "--listen", "127.0.0.1:0", "--no-auth"], env=minimal_env(), stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
     try:
         port = None
         for line in p.stdout:
