@@ -222,7 +222,7 @@ def test_input_schema_rejects_bad_input():
 def test_missing_tools_make_pytest_exit_77_not_0(tmp_path):
     """도구가 없을 때 건너뜀이 통과(0)로 보이지 않는다. PATH 에서 restic 을 뺀 하위 pytest 가 왕복 시험만 골라 돌리면 종료 코드 77 이다."""
     import os, sys
-    env = {k: v for k, v in os.environ.items() if k != "PATH"}
+    env = minimal_env()                                             # 왜: 허용 목록 최소 환경(C45), PATH 는 아래에서 빈 폴더로 바꾼다
     env["PATH"] = str(tmp_path)                                     # 빈 폴더: restic·restic-rest-server 가 없다
     env["SD_TEST_TOOLS_DIR"] = str(tmp_path)                        # 표준 설치가 받은 build/tools 도 보지 않게 한다
     r = subprocess.run([sys.executable, "-m", "pytest", "-q", "-p", "no:cacheprovider", str(Path(__file__)), "-k", "round_trip_with_mutations"],

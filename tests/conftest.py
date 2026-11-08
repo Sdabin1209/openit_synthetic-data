@@ -11,11 +11,20 @@ import pytest
 ALLOWED_ENV = ("PATH", "HOME", "LANG", "TMPDIR", "DOCKER_CONFIG", "DOCKER_HOST")
 
 
-def minimal_env(*names: str, **extra: str) -> dict:
-    """허용 목록 + `names`(상속받은 값을 이름으로 가져옴) + `extra`(값을 직접 줌)."""
-    env = {k: os.environ[k] for k in (*ALLOWED_ENV, *names) if k in os.environ}
+# 왜: Docker 를 부르는 호출은 연결에 필요한 이름을 명시 허용해야 한다(출처: codex C2 검토, 2026-11-09). 비밀이 아니라 연결 설정 이름이다.
+DOCKER_CONNECT_ENV = ("DOCKER_CONFIG", "DOCKER_HOST", "DOCKER_CONTEXT", "DOCKER_TLS_VERIFY", "DOCKER_CERT_PATH", "SSH_AUTH_SOCK")
+
+
+def allow_env(names, **extra: str) -> dict:
+    """`names` 중 상속받은 환경에 있는 것만 이름으로 가져오고 `extra`(값을 직접 줌)를 더한다. 최소 환경을 만드는 유일한 곳."""
+    env = {k: os.environ[k] for k in names if k in os.environ}
     env.update(extra)
     return env
+
+
+def minimal_env(*names: str, **extra: str) -> dict:
+    """허용 목록 + `names`(상속받은 값을 이름으로 가져옴) + `extra`(값을 직접 줌)."""
+    return allow_env((*ALLOWED_ENV, *names), **extra)
 
 
 import doubles

@@ -7,7 +7,7 @@ import os
 import subprocess
 from pathlib import Path
 
-from conftest import HANG_GUARD_SECONDS
+from conftest import DOCKER_CONNECT_ENV, HANG_GUARD_SECONDS, allow_env
 
 ROOT = Path(__file__).resolve().parent.parent
 BROKEN = json.dumps({"credsStore": "nonexistent-helper-xyz"})      # 없는 자격 도우미: 부르는 순간 "error getting credentials"
@@ -16,10 +16,9 @@ BROKEN = json.dumps({"credsStore": "nonexistent-helper-xyz"})      # 없는 자�
 def _env(tmp: Path, **extra) -> dict:
     home = tmp / "home"; (home / ".docker").mkdir(parents=True, exist_ok=True)
     (home / ".docker" / "config.json").write_text(BROKEN)
-    e = {k: v for k, v in os.environ.items() if k not in ("DOCKER_CONFIG", "DOCKER_HOST")}
-    e["HOME"] = str(home)
-    e.update(extra)
-    return e
+    # 왜 DOCKER_CONFIG 를 뺀 허용 목록: 이 시험은 호출자가 설정을 주는 경우와 안 주는 경우를 직접 가른다(주는 쪽은 extra)
+    names = ("PATH", "LANG", "TMPDIR", *(n for n in DOCKER_CONNECT_ENV if n != "DOCKER_CONFIG"))
+    return allow_env(names, HOME=str(home), **extra)
 
 
 def _sh(script: str, env: dict) -> subprocess.CompletedProcess:
@@ -56,3 +55,17 @@ def test_broken_user_global_config_is_not_used_so_docker_build_succeeds(tmp_path
 def test_mutation_without_the_setup_the_same_build_fails_on_credentials(tmp_path):
     r = subprocess.run(["docker", "build", "-q", "--no-cache", "-t", f"sd-docker-env-mut-{os.getpid()}", str(_ctx(tmp_path))], env=_env(tmp_path), capture_output=True, text=True, timeout=HANG_GUARD_SECONDS)
     assert r.returncode != 0 and "credentials" in r.stderr
+
+
+def test_docker_connection_names_are_passed_through_not_dropped(tmp_path):
+    """연결에 필요한 이름이 하위 프로세스에 전달된다(가짜 값, 출력하지 않는다)."""
+    fake = {n: "fake-" + n.lower() for n in DOCKER_CONNECT_ENV if n != "DOCKER_CONFIG"}
+    saved = {n: os.environ.get(n) for n in fake}
+    os.environ.update(fake)
+    try:
+        e = _env(tmp_path)
+    finally:
+        for n, v in saved.items():
+            if v is None: os.environ.pop(n, None)
+            else: os.environ[n] = v
+    assert all(e.get(n) == v for n, v in fake.items())
