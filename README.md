@@ -85,13 +85,13 @@ python -m synthetic_data run --config configs/dev.job.json [--created-at 2026-10
 
 ## 5. 시험 상태
 
-시험 상태(이 영역 시험 개수는 이 절에만 적는다). 이 작업 환경(`requirements.lock`의 태그(계약·openit-link, 버전은 그 파일이 정본)를 설치한 `.venv`, 로컬 미러는 `GIT_CONFIG_GLOBAL=head/shared/gitconfig-local-mirrors`)에서 `python -m pytest -q -rs`로 확인한다. 개수는 이 문서에 적지 않고 실행 명령으로 센다(L26). 건너뜀 1건은 `SD_REFERENCE_DATA_DIR`(실제 학습 데이터 파일 경로)가 없어서다. 구조 검사 `head/scripts/structure-check.py`: 통과. 이미지 스모크 `scripts/smoke_service.sh`와 빌드 진입점 `scripts/smoke_build_image.sh`: 같은 환경에서 SMOKE_OK와 BuildImageResult 확인(`/healthz`·`/readyz`·권한·게시·조회). 줄 검증 속도는 한 줄 약 0.5ms(LoRA-A 대표 행 2000줄 측정)이고 실제 C1 데이터 6개(64,459행) 전체로는 돌리지 않았다. 돌리지 않은 것: 서비스끼리 도는 시험, 운영 이웃 영역과의 연동. 서비스끼리 도는 시험의 결과는 deploy/docs/E2E_RESULTS.md를 본다.
+시험 상태(개수는 적지 않는다). 이 작업 환경(`requirements.lock`의 태그(계약·openit-link, 버전은 그 파일이 정본)를 설치한 `.venv`, 로컬 미러는 `GIT_CONFIG_GLOBAL=head/shared/gitconfig-local-mirrors`)에서 `python -m pytest -q -rs`로 확인한다. 개수는 이 문서에 적지 않고 실행 명령으로 센다(L26). `reference_data` 표시 시험은 `SD_REFERENCE_DATA_DIR`(실제 학습 데이터 파일 경로)가 없으면 건너뛰므로 선언한 전체 시험 명령은 `-m "not reference_data"`로 뺀다. 구조 검사 `head/scripts/structure-check.py`: 통과. 이미지 스모크 `scripts/smoke_service.sh`와 빌드 진입점 `scripts/smoke_build_image.sh`: 같은 환경에서 SMOKE_OK와 BuildImageResult 확인(`/healthz`·`/readyz`·권한·게시·조회). 줄 검증 속도는 한 줄 약 0.5ms(LoRA-A 대표 행 2000줄 측정)이고 실제 C1 데이터 6개(64,459행) 전체로는 돌리지 않았다. 돌리지 않은 것: 서비스끼리 도는 시험, 운영 이웃 영역과의 연동. 서비스끼리 도는 시험의 결과는 deploy/docs/E2E_RESULTS.md를 본다.
 
 ## 6. 이 영역의 열린 항목 (head/docs/OPEN_GAPS.md)
 
 | ID | 요약 | 막는 것 |
 |---|---|---|
-| G02 | v1 생성 경로와 보류 시험 15건 | 제거함(ADR 0010). 시드 경로(`run`)는 E2E 단계 7이 쓰므로 남김. 게시기 구현됨, 운영 게시는 미실시, 열린 질문은 CR-006. 시드를 이 영역에 계속 둘지는 헤드 결정(ADR 0010 대안 1) |
+| G02 | v1 생성 경로와 보류 시험 | 제거함(ADR 0010). 시드 경로(`run`)는 E2E 단계 7이 쓰므로 남김. 게시기 구현됨, 운영 게시는 미실시, 열린 질문은 CR-006. 시드를 이 영역에 계속 둘지는 헤드 결정(ADR 0010 대안 1) |
 | (대장 밖) 시드 `run` 존속 | 헤드 결정(2026-10-28): 유지. deploy 단계 7이 호출 | 제거 여부는 데이터셋 담당 이전 계획과 함께 나중에(ADR 0010 후속) |
 | (대장 밖) `regeneration.mode`, 감수 샘플링(`review_sample.jsonl`, `review.per_kind`) | 이름은 생성용. deploy는 설정 값을 써넣기만 하고 산출물을 읽는 곳은 grep으로 못 찾음 | 삭제하지 않고 열림(ADR 0010) |
 | U07(일부) | v2 E2E에서 "단계 2(G02)"를 건너뜀 | G02 결정 |
