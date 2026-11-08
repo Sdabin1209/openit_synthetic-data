@@ -6,7 +6,7 @@ import inspect
 
 import pytest
 
-# 배포 설정(deploy e2e)과 계약 SyntheticJobConfigRun이 가리키는 공개 factory. 이름을 지우거나 옮기려면 ADR 0022를 대체하는 새 ADR이 먼저다.
+# ADR 0022 시절 배포 설정이 가리킨 공개 factory(계약 3.7.0부터 설정은 factory를 두지 않는다). 이름을 지우거나 옮기려면 ADR 0022를 대체하는 새 ADR이 먼저다.
 PUBLIC_FACTORIES = {
     "synthetic_data.adapters:http_question_reader": "HttpQuestionReader",
     "synthetic_data.adapters:http_failure_store": "HttpFailureStore",

@@ -562,7 +562,7 @@ SCHEMAS: dict[str, dict] = {'BackupJobInput': {'$id': 'https://openit.invalid/sy
  'JobOutputLine': {'$id': 'https://openit.invalid/synthetic-data/schemas/JobOutputLine.schema.json',
                    '$schema': 'https://json-schema.org/draft/2020-12/schema',
                    'additionalProperties': False,
-                   'description': '내보낼 JSON 한 줄(키 정렬).',
+                   'description': '내보낼 JSON 한 줄(RESULT 줄만 키 정렬, ERROR 줄은 만든 순서).',
                    'properties': {'line': {'minLength': 2, 'type': 'string'}},
                    'required': ['line'],
                    'title': 'JobOutputLine',

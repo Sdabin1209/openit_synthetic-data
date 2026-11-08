@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://openit.invalid/synthetic-data/schemas/JobOutputLine.schema.json",
   "title": "JobOutputLine",
-  "description": "내보낼 JSON 한 줄(키 정렬).",
+  "description": "내보낼 JSON 한 줄(RESULT 줄만 키 정렬, ERROR 줄은 만든 순서).",
   "type": "object",
   "properties": {
     "line": {

@@ -35,7 +35,7 @@ def run(inp: dict) -> dict:
     tol, out = raw["tolerance"], raw["output"]
     plan = {
         "dataset_id": raw["dataset_id"], "input_dir": _resolve(base, raw["input_dir"]),
-        "survey_schema_dir": _resolve(base, inp["survey_dir_override"] or raw["survey_schema_dir"]),   # 환경 변수가 설정보다 우선(run_plan과 같은 이유)
+        "survey_schema_dir": _resolve(base, inp["survey_dir_override"] or raw["survey_schema_dir"]),   # 이미지 안 고정 경로(config.IMAGE_SURVEY_SCHEMA_DIR)가 있으면 설정보다 우선(run_plan과 같은 이유)
         "question_sets": raw["question_sets"], "source_label": raw["source_label"].strip(), "action_rules_version": installed,
         "tolerance": {"max_invalid_rows": tol["max_invalid_rows"], "max_invalid_rate": float(tol["max_invalid_rate"]),
                       "max_pii_suspect_rows": tol["max_pii_suspect_rows"] if "max_pii_suspect_rows" in tol else 0},

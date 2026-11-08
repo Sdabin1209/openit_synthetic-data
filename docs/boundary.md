@@ -38,8 +38,8 @@ store = FileDatasetStore(root, survey_contract_version)     # 또는 MemoryDatas
 
 | 소비 | 인터페이스 | 용도 | 영역 안의 형태 |
 | --- | --- | --- | --- |
-| 문항, 변경 분류 | I1 `QuestionReader` | `latest(reviewed_only)`, `list_versions`, `get_question_bank`(해시 재확인), `get_reviews`, `get_change`(REGENERATE_SAMPLES) | 설정의 `adapters.question_reader.factory`가 만든 객체. Protocol만 안다 |
-| 실패 사례, 비식별 trace | I7 `FailureStore`(`question_set`, `expected_kind` 사용, 없으면 폴백) | `list_cases(review_status=CONFIRMED)`, `get_trace` | `adapters.failure_store.factory` |
+| 문항, 변경 분류 | I1 `QuestionReader` | `latest(reviewed_only)`, `list_versions`, `get_question_bank`(해시 재확인), `get_reviews`, `get_change`(REGENERATE_SAMPLES) | 설정의 `adapters.question_reader`(HttpClientSettings)로 `link_question_reader.http_question_reader`가 만든 계약 클라이언트. Protocol만 안다 |
+| 실패 사례, 비식별 trace | I7 `FailureStore`(`question_set`, `expected_kind` 사용, 없으면 폴백) | `list_cases(review_status=CONFIRMED)`, `get_trace` | 설정의 `adapters.failure_store`(HttpClientSettings)로 `link_failure_reader.http_failure_store`가 만든 계약 클라이언트 |
 
 2026-10-28(헤드 허가, ADR 0010): 위 I1·I7은 시드 잡 `run`만 소비한다. `import` 모드는 이웃 읽기 SDK를 쓰지 않고 파일 jsonl 6개를 읽는다. v1 합성 생성은 제거돼 I1은 문항 세트 참조·본문 확인용이다.
 | LoRA-A 출력 규칙의 세대 | 계약 규칙 데이터 | `boundary_contracts.action_rules.load_rules()["rules_version"]` | 매니페스트 `action_rules_version`. 설정 값은 기대값이라 다르면 거부 |
@@ -49,8 +49,8 @@ store = FileDatasetStore(root, survey_contract_version)     # 또는 MemoryDatas
   - 서버(dataset-store) 쪽, 복수형(역할=토큰 목록 파일): `DATASET_STORE_READ_TOKENS_FILE`, `DATASET_STORE_WRITE_TOKENS_FILE`.
   - 잡(`run`/`import`의 `store.kind=http`) 쪽, 단수형(쓰기 토큰 값 하나): `DATASET_STORE_WRITE_TOKEN_FILE`(`token_env` 설정으로 이름을 바꿀 수 있다).
   - 정본 배선은 deploy compose를 본다(이 목록은 이름만 적는다).
-- 지원 버전: 문진 스키마 정수 버전은 `CONTRACT_VERSION`과 정확히 일치해야 한다(현재 1, 다르면 `UNSUPPORTED_VERSION`). 경계 계약은 `pipeline_schema_version` MAJOR 3(현재 3.1, 쓰는 값은 설치된 `boundary_contracts.PIPELINE_SCHEMA_VERSION`, 계약 태그는 `requirements.lock`). 이웃 호출은 HTTP(`openit_link.clients.HttpQuestionReader`/`HttpFailureStore`(계약 클라이언트 재수출), 설정의 factory로 선택). 다른 MAJOR는 `UNSUPPORTED_VERSION`이다. 쓸 때는 엄격하다(`additionalProperties: false`라 모르는 필드는 `INVALID_RECORD`). 저장된 파일은 해석하지 않고 바이트 그대로 돌려주므로 `ext`는 보존된다.
-- 시험용 대역은 `tests/doubles.py`(`FakeQuestionReader`, `FakeFailureStore`)에 있다. 소유 영역의 메모리 구현이 나오면 설정의 `factory` 문자열만 바꾼다.
+- 지원 버전: 문진 스키마 정수 버전은 `CONTRACT_VERSION`과 정확히 일치해야 한다(다르면 `UNSUPPORTED_VERSION`). 경계 계약은 `pipeline_schema_version`의 MAJOR가 같아야 한다(쓰는 값은 설치된 `boundary_contracts.PIPELINE_SCHEMA_VERSION`, 계약 태그는 `requirements.lock`). 이웃 호출은 HTTP(`openit_link.clients.HttpQuestionReader`/`HttpFailureStore`(계약 클라이언트 재수출). 계약 3.7.0부터 설정은 역할별 HttpClientSettings이고 factory로 선택하지 않는다). 다른 MAJOR는 `UNSUPPORTED_VERSION`이다. 쓸 때는 엄격하다(`additionalProperties: false`라 모르는 필드는 `INVALID_RECORD`). 저장된 파일은 해석하지 않고 바이트 그대로 돌려주므로 `ext`는 보존된다.
+- 시험용 대역은 `tests/doubles.py`(`FakeQuestionReader`, `FakeFailureStore`)에 있다. 시험은 대역을 `run_job`에 직접 넘긴다(설정에 대역 경로를 두지 않는다, 계약 4.0.0).
 - 비식별되지 않은 실패 사례(`deidentified != true`)를 받으면 실행을 `INVALID_RECORD`로 거부한다.
 
 ## 5. 게시 검증 (I2 `publish`)

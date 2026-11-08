@@ -35,7 +35,7 @@ I7 `FailureStore`로만 읽는다. `review_status=CONFIRMED`이고 `expected`가
 
 ## 9. 패키징 (`components/run_package.py`, 게시기는 `components/import_package.py`)
 
-`<role>/<split>.jsonl`(lora_a/lora_b, train/validation/eval/eval_unseen). 줄은 키 정렬·구분자 고정 JSON, 샘플 ID 순이라 같은 샘플 집합은 같은 바이트다. 파일 해시는 `canonical.file_hash`, 매니페스트 해시는 `canonical.content_hash`. 매니페스트는 계약 버전, 문항 세트 ArtifactRef 목록, 생성기 버전, 시드 사례 ID, 분할별 파일과 개수, 규칙 세대을 담는다. 샘플은 쓰기 전에 경계 스키마와 문진 스키마로 검증한다(품질 검사 단계).
+`<role>/<split>.jsonl`(lora_a/lora_b, train/validation/eval/eval_unseen). 줄은 구분자 고정 JSON(키 순서는 만든 순서 그대로, sort_keys 금지: input.state 키 순서가 모델 입력의 일부), 샘플 ID 순이라 같은 샘플 집합은 같은 바이트다. 파일 해시는 `canonical.file_hash`, 매니페스트 해시는 `canonical.content_hash`. 매니페스트는 계약 버전, 문항 세트 ArtifactRef 목록, 생성기 버전, 시드 사례 ID, 분할별 파일과 개수, 규칙 세대을 담는다. 샘플은 쓰기 전에 경계 스키마와 문진 스키마로 검증한다(품질 검사 단계).
 
 ## 10. 재현성
 

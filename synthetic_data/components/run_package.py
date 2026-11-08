@@ -1,7 +1,7 @@
 """시드 잡 패키징. RunPackageInput -> PackagedDataset.
 
 파일: <role>/<split>.jsonl. 학습에 쓰지 않은 문항 세트(HELD_OUT_EVAL)의 평가 샘플은 <role>/eval_unseen.jsonl로 따로 쓰고,
-모든 파일의 files[].question_sets에 그 파일의 샘플이 쓰는 문항 세트를 적는다(D32). 직렬화는 키 정렬·샘플 ID 순이라 같은 샘플 집합은 항상 같은 바이트다.
+모든 파일의 files[].question_sets에 그 파일의 샘플이 쓰는 문항 세트를 적는다(D32). 직렬화는 샘플 ID 순이고 줄 안의 키 순서는 만든 순서 그대로(sort_keys 금지, 아래 _line)라 같은 샘플 집합은 항상 같은 바이트다.
 해시는 boundary_contracts.canonical로만 계산한다."""
 from __future__ import annotations
 

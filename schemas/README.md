@@ -16,7 +16,7 @@
 | 줄 판정: 통과면 샘플과 빈 사유, 실패면 sample null과 사유 | `RowVerdict`의 `oneOf` |
 | 분할 비율의 합이 0보다 큼 | `RunPlan.ratios`의 `anyOf`(음수 아님과 함께) |
 | seeds.enabled인데 failure_store가 없음 | `RunPlan`의 `if/then` |
-| 저장소 종류별 필수(file은 root, http는 http 설정, memory는 둘 다 없음) | `RunPlan.store`, `ImportPlan.store`의 `if/then` |
+| 저장소 종류별 필수(file은 root, http는 http 설정) | `RunPlan.store`, `ImportPlan.store`의 `if/then` |
 | 비식별(deidentified=true)이 아닌 실패 사례 | `SeedCollectInput.cases[].deidentified`의 `const true` |
 | 시드의 정답 모양(LORA_A는 객체, LORA_B는 문자열) | `Seed`의 `if/then` |
 | dataset_id·version 문자 규칙과 길이, 파일 경로 정규형('..'·절대 경로·역슬래시·빈 마디·'.' 없음) | `StorePublishRequest`, `ManifestRequest`, `VersionsRequest`, `FileRequest`, `PublishDecisionInput`의 `pattern` |

@@ -24,9 +24,9 @@ HTTP 경로와 오류의 정본은 `../boundary-contracts/HTTP.md`(I2 서버 면
 |---|---|
 | `schemas/` | 영역 내부 타입의 JSON Schema(draft 2020-12)와 통과·거부 예시(`schemas/examples/`) |
 | `synthetic_data/types/` | `schemas/`에서 생성한 코드 타입과 스키마 사본(손으로 고치지 않는다, 4절 생성 명령) |
-| `synthetic_data/components/` | 컴포넌트마다 파일 하나(29개). 통신은 `link_*`(받는 쪽 `link_dataset_store_server`, 보내는 쪽 `link_question_reader`·`link_failure_reader`·`link_dataset_publish`), 저장소는 `dataset_store` |
+| `synthetic_data/components/` | 컴포넌트마다 파일 하나(30개). 통신은 `link_*`(받는 쪽 `link_dataset_store_server`, 보내는 쪽 `link_question_reader`·`link_failure_reader`·`link_dataset_publish`), 저장소는 `dataset_store` |
 | `synthetic_data/wiring/` | 컴포넌트 연결(`import_job.py`, `run_job.py`)과 주입(`stores.py`, `survey.py`), 설정→계획(`plans.py`), 서비스 기동(`service.py`) |
-| `synthetic_data/__main__.py`, `config.py`, `service/__main__.py`, `adapters/__init__.py` | 진입점, 설정 읽기, 공개 진입점(factory 이름, ADR 0022) |
+| `synthetic_data/__main__.py`, `config.py`, `service/__main__.py`, `adapters/__init__.py` | 진입점, 설정 읽기, 공개 진입점(factory 이름, ADR 0022. 계약 3.7.0부터 설정은 이를 가리키지 않는다) |
 | `Dockerfile`, `requirements-service.txt`, `scripts/smoke_service.sh` | I2 HTTP 서버 이미지(dataset-store, D100, ADR 0012·0017). 잡은 `output.store.kind: http`로 게시(ADR 0013) |
 | `configs/dev.job.json` | loopback 의 이웃 서비스·계약 참조 서버를 부르는 개발용 설정(계약 4.0.0 D135: 설정에 대역 공장 없음) |
 | `tests/` | 적합성·잡 종단·HTTP 통합·단위·구조 시험(`test_structure.py`), 이웃 대역 `doubles.py` |
@@ -85,7 +85,7 @@ python -m synthetic_data run --config configs/dev.job.json [--created-at 2026-10
 
 ## 5. 시험 상태
 
-시험 상태(이 영역 시험 개수는 이 절에만 적는다). 이 작업 환경(계약 v3.4.17·openit-link v0.4.22를 태그에서 설치한 `.venv`, 로컬 미러는 `GIT_CONFIG_GLOBAL=head/shared/gitconfig-local-mirrors`)에서 `python -m pytest -q -rs`로 확인한다. 개수는 이 문서에 적지 않고 실행 명령으로 센다(L26). 건너뜀 1건은 `SD_REFERENCE_DATA_DIR`(실제 학습 데이터 파일 경로)가 없어서다. 구조 검사 `head/scripts/structure-check.py`: 통과. 이미지 스모크 `scripts/smoke_service.sh`와 빌드 진입점 `scripts/smoke_build_image.sh`: 같은 환경에서 SMOKE_OK와 BuildImageResult 확인(`/healthz`·`/readyz`·권한·게시·조회). 줄 검증 속도는 한 줄 약 0.5ms(LoRA-A 대표 행 2000줄 측정)이고 실제 C1 데이터 6개(64,459행) 전체로는 돌리지 않았다. 돌리지 않은 것: 서비스끼리 도는 시험, 운영 이웃 영역과의 연동. 서비스끼리 도는 시험의 결과는 deploy/docs/E2E_RESULTS.md를 본다.
+시험 상태(이 영역 시험 개수는 이 절에만 적는다). 이 작업 환경(`requirements.lock`의 태그(계약·openit-link, 버전은 그 파일이 정본)를 설치한 `.venv`, 로컬 미러는 `GIT_CONFIG_GLOBAL=head/shared/gitconfig-local-mirrors`)에서 `python -m pytest -q -rs`로 확인한다. 개수는 이 문서에 적지 않고 실행 명령으로 센다(L26). 건너뜀 1건은 `SD_REFERENCE_DATA_DIR`(실제 학습 데이터 파일 경로)가 없어서다. 구조 검사 `head/scripts/structure-check.py`: 통과. 이미지 스모크 `scripts/smoke_service.sh`와 빌드 진입점 `scripts/smoke_build_image.sh`: 같은 환경에서 SMOKE_OK와 BuildImageResult 확인(`/healthz`·`/readyz`·권한·게시·조회). 줄 검증 속도는 한 줄 약 0.5ms(LoRA-A 대표 행 2000줄 측정)이고 실제 C1 데이터 6개(64,459행) 전체로는 돌리지 않았다. 돌리지 않은 것: 서비스끼리 도는 시험, 운영 이웃 영역과의 연동. 서비스끼리 도는 시험의 결과는 deploy/docs/E2E_RESULTS.md를 본다.
 
 ## 6. 이 영역의 열린 항목 (head/docs/OPEN_GAPS.md)
 

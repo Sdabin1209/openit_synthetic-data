@@ -27,9 +27,9 @@ def _store_plan(store: dict, base_dir: str) -> dict:
 
 
 def _survey_dir(inp: dict) -> str:
-    """환경 변수가 있으면 설정 값보다 우선한다.
+    """이미지 안 고정 경로(config.IMAGE_SURVEY_SCHEMA_DIR, 입력 survey_dir_override)가 있으면 설정 값보다 우선한다. 환경 변수는 쓰지 않는다(config.py).
     왜: 이미지 안의 스키마 위치는 이미지의 내부 사항이다. 잡 선언(io.openit.jobs)으로 이미지를 돌리는 쪽(deploy)이 그 경로를 몰라도 되게,
-    이미지가 ENV로 위치를 정해 두고 설정의 survey_schema_dir(계약 스키마가 필수로 요구)보다 이것을 쓴다. 설정 쪽을 생략 가능하게 하는 것은 CR-009."""
+    Dockerfile이 스키마를 그 경로에 복사해 두고 설정의 survey_schema_dir(계약 스키마가 필수로 요구)보다 이것을 쓴다. 설정 쪽을 생략 가능하게 하는 것은 CR-009."""
     return _resolve(inp["base_dir"], inp["survey_dir_override"] or inp["raw"]["survey_schema_dir"])
 
 

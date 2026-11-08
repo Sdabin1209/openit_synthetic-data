@@ -9,7 +9,7 @@ from ..config import ConfigError
 
 
 def build_store(store: dict, survey):
-    """kind: file(root) | memory | http. file·memory는 로컬 개발용이고, 운영에서 dataset-store(I2 서버)로 게시할 때는 http다(D100, CR-D26)."""
+    """kind: file(root) | http. file은 로컬 개발용이고, 운영에서 dataset-store(I2 서버)로 게시할 때는 http다(D100, CR-D26)."""
     if store["kind"] == "http":
         try:
             return link_dataset_publish.build(store["http"])

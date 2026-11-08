@@ -130,7 +130,7 @@ class FakeQuestionReader:
 
 
 def make_question_reader(**_ignored) -> FakeQuestionReader:
-    """설정 파일의 adapters.question_reader.factory가 부르는 공장."""
+    """시험용 문항 읽기 대역을 만든다(계약 4.0.0부터 설정의 factory가 부르지 않는다. 시험이 run_job 에 직접 넘긴다)."""
     r = FakeQuestionReader()
     r.add("qs-main", "1", make_bank("main"))
     r.add("qs-unseen", "1", make_bank("unseen"))
@@ -220,7 +220,3 @@ def make_failure_store(bank: dict) -> FakeFailureStore:
     fs.add(failure_case("fc-b", "tr-b", b_expected(), expected_kind="LORA_B", reviewed_input=b_input()))
     fs.add(failure_case("fc-pending", "tr-x", None, status="PENDING"))
     return fs
-
-
-def make_failure_store_factory(**_ignored) -> FakeFailureStore:
-    return make_failure_store(make_bank("main"))

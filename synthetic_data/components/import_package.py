@@ -1,7 +1,7 @@
 """게시기 패키징. ImportPackageInput -> PackagedDataset.
 
 같은 입력(파일 바이트)과 같은 설정이면 같은 dataset_digest와 같은 version이 나온다(docs/adr/0006). 해시는 boundary_contracts.canonical로 계산한다.
-파일 본문은 키 정렬·샘플 순서 그대로의 JSONL이라 같은 샘플 집합은 항상 같은 바이트다."""
+파일 본문은 샘플 순서와 줄 안의 키 순서(만든 순서, sort_keys 금지) 그대로의 JSONL이라 같은 샘플 집합은 항상 같은 바이트다."""
 from __future__ import annotations
 
 import json
