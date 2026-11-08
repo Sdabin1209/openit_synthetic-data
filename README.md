@@ -41,7 +41,7 @@ import: 설정(JSON) + 학습 데이터 jsonl 6개 -> 행 검증 -> 허용치 �
 
 ## 3. 실행 방법
 
-전제: Python 3.10 이상(pyproject.toml), git, 계약·문진 스키마 태그를 받을 SSH 접근. 이웃 폴더는 시험에 필요 없습니다(둘 다 `requirements.lock`의 태그로 설치). 개발과 시험에는 Docker가 필요 없습니다. 운영에서 잡은 dataset-store 이미지에서 이미지 라벨 `io.openit.jobs`(소스 `jobs.json`) 선언으로 돕니다(ADR 0019).
+전제: Python 3.11 이상(pyproject.toml), git, 계약·문진 스키마 태그를 받을 SSH 접근. 이웃 폴더는 시험에 필요 없습니다(둘 다 `requirements.lock`의 태그로 설치). 개발과 시험에는 Docker가 필요 없습니다. 운영에서 잡은 dataset-store 이미지에서 이미지 라벨 `io.openit.jobs`(소스 `jobs.json`) 선언으로 돕니다(ADR 0019).
 
 ```bash
 # 설치 (멱등. .venv 생성, requirements.lock + pytest + -e . 설치)
