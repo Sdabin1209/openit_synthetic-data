@@ -102,7 +102,7 @@ def test_6_every_code_file_belongs_somewhere():
         top = rel.parts[0]
         if top in ("components", "wiring", "types"):
             continue
-        if p.name in ENTRY or (top == "adapters" and p.name == "__init__.py"):
+        if p.name in ENTRY:
             continue
         bad.append(str(rel))
     assert not bad, bad
@@ -112,3 +112,13 @@ def test_components_check_their_input_with_a_schema():
     """컴포넌트는 입력 검사를 스키마 검증 하나로 한다(DESIGN.md 5절): 파일마다 schema_registry의 check를 부른다."""
     missing = [p.name for p in (PKG / "components").glob("*.py") if "check(" not in p.read_text(encoding="utf-8")]
     assert not missing, missing
+
+
+def test_no_factory_entry_point_after_contract_4_0_0():
+    """ADR 0026: 계약 4.0.0(D135)이 잡 설정의 factory 를 없앴으므로 synthetic_data.adapters 공개 진입점은 없다. 설정은 factory 문자열을 읽지도 않는다."""
+    assert not (PKG / "adapters").exists()
+    import tomllib
+    pkgs = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))["tool"]["setuptools"]["packages"]
+    assert "synthetic_data.adapters" not in pkgs
+    code = "\n".join(p.read_text(encoding="utf-8") for p in code_files())
+    assert "load_factory" not in code and '"factory"' not in code

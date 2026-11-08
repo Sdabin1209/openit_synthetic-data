@@ -1,5 +1,5 @@
 """보내는 쪽 통신: 확정된 실패 사례 읽기(I7, ops-feedback). FailureReadRequest -> ConfirmedCases.
-계약 클라이언트(openit_link.clients, D118)로 CONFIRMED의 최신 버전만 쪽 단위로 모두 읽는다. 클라이언트 공장(http_failure_store)은 설정의 factory가 가리킨다."""
+계약 클라이언트(openit_link.clients, D118)로 CONFIRMED의 최신 버전만 쪽 단위로 모두 읽는다. 클라이언트 공장(http_failure_store)은 wiring이 설정의 HttpClientSettings 값으로 직접 부른다(계약 4.0.0부터 설정에 factory 없음, ADR 0026)."""
 from __future__ import annotations
 
 import os

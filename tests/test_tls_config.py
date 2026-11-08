@@ -275,3 +275,15 @@ def test_service_uses_declared_survey_dir_name_else_contract_default(tmp_path, m
         with pytest.raises(Stop):
             wsvc.main(env)
     assert seen == [Path(SURVEY_DIR), Path("/app/survey_schema")]
+
+
+def test_link_clients_missing_secret_is_a_clear_error(monkeypatch):
+    """운영 공장 둘은 비밀이 없으면 이유가 적힌 TokenError 로 멈춘다(ADR 0022 시험에서 옮김, ADR 0026)."""
+    import pytest
+    from synthetic_data.components import link_failure_reader, link_question_reader
+    monkeypatch.delenv("SD_TEST_TOKEN", raising=False)
+    monkeypatch.delenv("SD_TEST_TOKEN_FILE", raising=False)
+    with pytest.raises(link_question_reader.TokenError):
+        link_question_reader.http_question_reader("http://127.0.0.1:1", "SD_TEST_TOKEN")
+    with pytest.raises(link_failure_reader.TokenError):
+        link_failure_reader.http_failure_store("http://127.0.0.1:1", "SD_TEST_TOKEN")

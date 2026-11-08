@@ -26,7 +26,7 @@ HTTP 경로와 오류의 정본은 `../boundary-contracts/HTTP.md`(I2 서버 면
 | `synthetic_data/types/` | `schemas/`에서 생성한 코드 타입과 스키마 사본(손으로 고치지 않는다, 4절 생성 명령) |
 | `synthetic_data/components/` | 컴포넌트마다 파일 하나(30개). 통신은 `link_*`(받는 쪽 `link_dataset_store_server`, 보내는 쪽 `link_question_reader`·`link_failure_reader`·`link_dataset_publish`), 저장소는 `dataset_store` |
 | `synthetic_data/wiring/` | 컴포넌트 연결(`import_job.py`, `run_job.py`)과 주입(`stores.py`, `survey.py`), 설정→계획(`plans.py`), 서비스 기동(`service.py`) |
-| `synthetic_data/__main__.py`, `config.py`, `service/__main__.py`, `adapters/__init__.py` | 진입점, 설정 읽기, 공개 진입점(factory 이름, ADR 0022. 계약 3.7.0부터 설정은 이를 가리키지 않는다) |
+| `synthetic_data/__main__.py`, `config.py`, `service/__main__.py` | 진입점, 설정 읽기(factory 공개 진입점은 계약 4.0.0 이후 없다, ADR 0026) |
 | `Dockerfile`, `requirements-service.txt`, `scripts/smoke_service.sh` | I2 HTTP 서버 이미지(dataset-store, D100, ADR 0012·0017). 잡은 `output.store.kind: http`로 게시(ADR 0013) |
 | `configs/dev.job.json` | loopback 의 이웃 서비스·계약 참조 서버를 부르는 개발용 설정(계약 4.0.0 D135: 설정에 대역 공장 없음) |
 | `tests/` | 적합성·잡 종단·HTTP 통합·단위·구조 시험(`test_structure.py`), 이웃 대역 `doubles.py` |
@@ -115,6 +115,6 @@ v2 의미 검사는 계약의 `boundary_contracts.action_rules.check_action_extr
 | `docs/runbook.md` | 실행, GPU 호스트, 설정 필드, 문제 대응, 비밀 |
 | `docs/STATUS.md` | 한 일, 남은 일, 막힌 것 |
 | `docs/CHANGELOG.md` | 변경 이력 |
-| `docs/adr/` | 구조 선택의 '왜' (ADR 0001~0023, 목록은 `docs/adr/README.md`) |
+| `docs/adr/` | 구조 선택의 '왜' (ADR 0001~0026, 목록은 `docs/adr/README.md`) |
 | `docs/change-requests/` | 헤드에게 낸 변경 요청 CR-001~009, CR-S-001·002 |
 | `docs/rules/` | 헤드가 전달한 업무 규칙(출처 SOURCE.md) |

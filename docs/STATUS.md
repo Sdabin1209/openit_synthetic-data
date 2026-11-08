@@ -55,7 +55,7 @@
 - 같은 입력과 시드는 같은 `dataset_digest`와(`created_at` 고정 시) 같은 `content_hash`.
 
 ## 남은 일
-- 이웃 영역의 읽기 SDK/메모리 구현이 나오면 `tests/doubles.py`를 그쪽으로 교체(설정 factory만 변경).
+- 이웃 영역의 읽기 SDK/메모리 구현이 나오면 `tests/doubles.py`를 그쪽으로 교체(wiring/run_job.py 에 넘기는 대역만 바꾼다, 계약 4.0.0부터 설정에 factory 없음).
 - (turn-engine은 퇴역했다, D109. 이 항목은 없어졌다.)
 - O11 확정 후 평가셋 구성(합성·실제 비율, 지표, 임계치) 반영. 지금은 `split.ratios` 설정만 있다.
 - 컨테이너(D22): I2 서버(dataset-store)는 `Dockerfile`과 `scripts/smoke_service.sh`가 있고, 잡(`run`, `import`)은 같은 이미지에서 `io.openit.jobs` 선언으로 돈다(ADR 0019, docs/runbook.md).

@@ -1,7 +1,7 @@
 # ADR 0022: 잡 설정의 factory 이름은 이 영역의 공개 진입점이다
 
 ## 상태
-채택(2026-10-30, 헤드 결정: 계약은 v3.1.1에서 바꾸지 않는다). 변경 요청 CR-S-001을 닫는다.
+대체됨([ADR 0026](0026-factory-공개-진입점을-제거한다.md), 2026-11-08). 원래: 채택(2026-10-30, 헤드 결정: 계약은 v3.1.1에서 바꾸지 않는다). 변경 요청 CR-S-001을 닫는다.
 
 ## 맥락
 계약 `SyntheticJobConfigRun`의 `adapters.question_reader.factory`·`adapters.failure_store.factory`는 `module:function` 문자열이고, 배포 설정(deploy e2e)이 `synthetic_data.adapters:http_question_reader`, `synthetic_data.adapters:http_failure_store`와 kwargs(`base_url`, `token_env`)를 적는다. D117 개편(ADR 0021)으로 구현이 `components/link_*`로 옮겨 가면서 이 이름을 별칭으로만 남겼고, 이웃이 내부 모듈 경로를 안다는 점이 구조 규칙 1과 어긋난다는 CR-S-001을 냈다. 계약을 바꾸지 않기로 해서 설정 값 형식은 그대로다.

@@ -49,7 +49,7 @@ store = FileDatasetStore(root, survey_contract_version)     # 또는 MemoryDatas
   - 서버(dataset-store) 쪽, 복수형(역할=토큰 목록 파일): `DATASET_STORE_READ_TOKENS_FILE`, `DATASET_STORE_WRITE_TOKENS_FILE`.
   - 잡(`run`/`import`의 `store.kind=http`) 쪽, 단수형(쓰기 토큰 값 하나): `DATASET_STORE_WRITE_TOKEN_FILE`(`token_env` 설정으로 이름을 바꿀 수 있다).
   - 정본 배선은 deploy compose를 본다(이 목록은 이름만 적는다).
-- 지원 버전: 문진 스키마 정수 버전은 `CONTRACT_VERSION`과 정확히 일치해야 한다(다르면 `UNSUPPORTED_VERSION`). 경계 계약은 `pipeline_schema_version`의 MAJOR가 같아야 한다(쓰는 값은 설치된 `boundary_contracts.PIPELINE_SCHEMA_VERSION`, 계약 태그는 `requirements.lock`). 이웃 호출은 HTTP(`openit_link.clients.HttpQuestionReader`/`HttpFailureStore`(계약 클라이언트 재수출). 계약 3.7.0부터 설정은 역할별 HttpClientSettings이고 factory로 선택하지 않는다). 다른 MAJOR는 `UNSUPPORTED_VERSION`이다. 쓸 때는 엄격하다(`additionalProperties: false`라 모르는 필드는 `INVALID_RECORD`). 저장된 파일은 해석하지 않고 바이트 그대로 돌려주므로 `ext`는 보존된다.
+- 지원 버전: 문진 스키마 정수 버전은 `CONTRACT_VERSION`과 정확히 일치해야 한다(다르면 `UNSUPPORTED_VERSION`). 경계 계약은 `pipeline_schema_version`의 MAJOR가 같아야 한다(쓰는 값은 설치된 `boundary_contracts.PIPELINE_SCHEMA_VERSION`, 계약 태그는 `requirements.lock`). 이웃 호출은 HTTP(`openit_link.clients.HttpQuestionReader`/`HttpFailureStore`(계약 클라이언트 재수출). 계약 4.0.0(D135)부터 설정은 역할별 HttpClientSettings이고 factory로 선택하지 않는다, ADR 0026). 다른 MAJOR는 `UNSUPPORTED_VERSION`이다. 쓸 때는 엄격하다(`additionalProperties: false`라 모르는 필드는 `INVALID_RECORD`). 저장된 파일은 해석하지 않고 바이트 그대로 돌려주므로 `ext`는 보존된다.
 - 시험용 대역은 `tests/doubles.py`(`FakeQuestionReader`, `FakeFailureStore`)에 있다. 시험은 대역을 `run_job`에 직접 넘긴다(설정에 대역 경로를 두지 않는다, 계약 4.0.0).
 - 비식별되지 않은 실패 사례(`deidentified != true`)를 받으면 실행을 `INVALID_RECORD`로 거부한다.
 

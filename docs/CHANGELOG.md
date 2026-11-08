@@ -1,5 +1,8 @@
 # 변경 이력
 
+## 미배포 (2026-11-08, 전수 점검 후속)
+- 제거: 공개 진입점 `synthetic_data.adapters`(`http_question_reader`·`http_failure_store` 별칭)와 `tests/test_public_factories.py`. 계약 4.0.0(D135)이 잡 설정의 factory 를 없앴다([ADR 0026](adr/0026-factory-공개-진입점을-제거한다.md), ADR 0022 대체). 구현·시그니처는 `components/link_*`에 그대로다. 비밀 누락 오류 시험은 `tests/test_tls_config.py`로 옮겼다.
+
 ## 미배포 (2026-11-05, 계약 3.4.16)
 - 의존: boundary-contracts v3.4.16, openit-link v0.4.21.
 - 추가(동작): 잡 `dataset-backup`·`dataset-restore`(`python -m synthetic_data backup|restore`, 종료 코드 0/75/1/2, 마지막 줄 BackupJobResult), 노출 선언 egress `external:backup`, 이미지에 restic. 기존 동작은 바꾸지 않았다.

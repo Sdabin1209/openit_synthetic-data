@@ -1,7 +1,7 @@
 """보내는 쪽 통신: 문항 읽기(I1, question-authoring). QuestionSetQuery -> QuestionSetFetch.
 
 계약 클라이언트(openit_link.clients, D118)로 문항 세트 하나를 읽어 영역 내부 타입으로 바꾼다. 업무 컴포넌트는 계약 타입이나 HTTP를 모른다(DESIGN.md 4절).
-클라이언트를 만드는 공장(http_question_reader)은 설정의 adapters.question_reader.factory가 가리킨다(계약 SyntheticJobConfigRun이 정한 설정 값)."""
+클라이언트를 만드는 공장(http_question_reader)은 wiring이 설정의 HttpClientSettings 값으로 직접 부른다(계약 4.0.0부터 설정에 factory 없음, ADR 0026)."""
 from __future__ import annotations
 
 import os
