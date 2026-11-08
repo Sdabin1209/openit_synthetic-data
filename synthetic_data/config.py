@@ -19,8 +19,11 @@ def read_json_file(config_path: Path) -> tuple[dict, Path]:
     try:
         # 왜 strict_json: 설정 파일은 사람이 쓰는 입력이다. 계약 JSON 공통 규칙(중복 키·NaN·깊이·크기, 계약 5.0.0 CONVENTIONS)을 같은 구현으로 건다
         raw = strict_json.loads(p.read_bytes())
-    except (OSError, BoundaryError) as e:
+    except OSError as e:
         raise ConfigError(f"설정 파일을 읽을 수 없다: {p}: {e}") from e
+    except BoundaryError as e:
+        # 왜 위치와 코드만 싣나: 계약 메시지에는 입력 조각이 섞일 수 있다(설정에 잘못 들어온 토큰 값 등). 값은 오류·로그에 싣지 않는다(ADR 0003, INTERFACES I7). 원인 연쇄도 끊는다
+        raise ConfigError(f"설정 파일이 계약 JSON 규칙을 어겼다: {p} ({e.code})") from None
     if not isinstance(raw, dict):
         raise ConfigError("설정 파일의 최상위는 객체여야 한다")
     return raw, p.parent

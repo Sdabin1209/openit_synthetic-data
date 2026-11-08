@@ -287,3 +287,19 @@ def test_link_clients_missing_secret_is_a_clear_error(monkeypatch):
         link_question_reader.http_question_reader("http://127.0.0.1:1", "SD_TEST_TOKEN")
     with pytest.raises(link_failure_reader.TokenError):
         link_failure_reader.http_failure_store("http://127.0.0.1:1", "SD_TEST_TOKEN")
+
+
+def test_config_file_json_rule_violation_does_not_echo_input(tmp_path):
+    """설정 파일이 계약 JSON 규칙을 어기면 위치와 코드만 싣고 입력 조각은 싣지 않는다(INTERFACES I7). 중복 키·NaN·깊이 초과를 본다."""
+    import pytest
+    from synthetic_data.config import ConfigError, read_json_file
+    secret = "tok-SECRET-VALUE-123"
+    bodies = {"dup": '{"token": "%s", "token": "x"}' % secret, "nan": '{"token": "%s", "n": NaN}' % secret,
+              "deep": "[" * 100 + '"%s"' % secret + "]" * 100}
+    for name, text in bodies.items():
+        p = tmp_path / f"{name}.json"
+        p.write_text(text, encoding="utf-8")
+        with pytest.raises(ConfigError) as e:
+            read_json_file(p)
+        assert secret not in str(e.value) and "INVALID_RECORD" in str(e.value), name
+        assert e.value.__cause__ is None and e.value.__suppress_context__
