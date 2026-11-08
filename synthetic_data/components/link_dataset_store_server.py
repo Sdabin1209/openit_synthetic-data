@@ -15,6 +15,7 @@ from collections import defaultdict, deque
 from contextlib import contextmanager
 from pathlib import Path
 
+import boundary_contracts
 from boundary_contracts import PIPELINE_SCHEMA_VERSION, BoundaryError, canonical, strict_json
 from openit_link import App, Request, Response, Route
 from waitress import wasyncore
@@ -29,15 +30,12 @@ MIN_TOKEN_LEN = 32                 # 128비트 이상 무작위 16진수(OWASP �
 def parse_tokens(spec):
     """'역할=토큰,역할=토큰' -> {토큰: 역할}"""
     out = {}
-    for part in (spec or "").split(","):
-        part = part.strip()
-        if not part:
-            continue
-        if "=" not in part:
-            raise ValueError("토큰 설정은 역할=토큰 형식이어야 한다")
+    spec = (spec or "").strip()
+    # 왜 계약 함수: 비밀 파일 내용의 형식 문법은 계약이 정한다(secret_format_problems, 계약 5.0.1, D117). 값은 오류에 싣지 않는다
+    if spec and boundary_contracts.secret_format_problems("role_token_list", spec):
+        raise ValueError("토큰 설정은 역할=토큰[,역할=토큰] 형식이어야 한다(공백·빈 항목·제어 문자 없음)")
+    for part in spec.split(",") if spec else []:
         role, tok = part.split("=", 1)
-        if not role or not tok:
-            raise ValueError("역할과 토큰은 비어 있을 수 없다")
         out[tok] = role
     return out
 

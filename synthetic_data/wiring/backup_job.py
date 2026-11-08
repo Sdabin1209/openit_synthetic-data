@@ -7,7 +7,7 @@ from datetime import datetime, timezone
 from typing import Mapping
 from urllib.parse import urlsplit
 
-from boundary_contracts import SecretError, read_secret
+from boundary_contracts import SecretError, read_secret, secret_format_problems
 
 from ..components import backup_job
 from ..config import ConfigError
@@ -30,7 +30,8 @@ def build_input(mode: str, env: Mapping[str, str] = os.environ) -> dict:
         cred = read_secret("OPENIT_BACKUP_CREDENTIALS", environ=env)
     except SecretError as e:
         raise ConfigError("OPENIT_BACKUP_CREDENTIALS_FILE을 읽지 못했다") from e
-    if not cred or ":" not in cred:
+    # 왜 계약 함수: 자격 파일의 형식 문법은 계약이 정한다(secret_format_problems credentials_line, 계약 5.0.1, D117)
+    if not cred or secret_format_problems("credentials_line", cred.strip()):
         raise ConfigError("OPENIT_BACKUP_CREDENTIALS_FILE의 내용은 한 줄 '<사용자>:<암호>'여야 한다(RFC 7617)")
     user, _, password = cred.strip().partition(":")
     return {"mode": mode, "data_dir": env.get("DATASET_STORE_ROOT", "/data"), "exclude": list(EXCLUDE),

@@ -5,10 +5,8 @@ import json
 from pathlib import Path
 from typing import Any, Optional
 
-import jsonschema
 from boundary_contracts.errors import BoundaryError
-from boundary_contracts.schemas_api import ContractValidator
-from boundary_contracts import format_checker as _bc_format_checker  # 형식(format) 검증기가 없으면 조용히 넘기지 않고 실패한다(계약 3.5.0)
+from boundary_contracts import schema_validator
 
 
 class Survey:
@@ -37,7 +35,7 @@ class Survey:
                 raise BoundaryError("UNSUPPORTED_VERSION", f"문진 스키마가 없다: {name}")
             schema = json.loads(path.read_text(encoding="utf-8"))
             schema.pop("$id", None)   # 상대 $id("standalone/...")가 '#/$defs' 참조 해석을 깨뜨린다
-            # 왜 감싸나: 문진 스키마도 비유한 수 검사를 같게 받는다. 계약 5.0.1 의 schema_validator 가 나오면 그것으로 바꾼다
-            self._cache[name] = ContractValidator(jsonschema.Draft202012Validator(schema, format_checker=_bc_format_checker(schema)))
+            # 왜 schema_validator: 문진 스키마 5.0.0 은 계약 안정 URI $ref 를 가진다. 표준 검증기로는 풀리지 않는다(계약 5.0.1)
+            self._cache[name] = schema_validator(schema)
         return ["/".join(map(str, e.absolute_path)) + "#" + e.validator if e.absolute_path else "(루트)#" + e.validator
                 for e in sorted(self._cache[name].iter_errors(record), key=lambda e: list(map(str, e.absolute_path)))]

@@ -1,7 +1,8 @@
 # 변경 이력
 
 ## 미배포 (2026-11-08, 계약 5.0.0)
-- 의존: boundary-contracts v5.0.0. link·문진 스키마 태그는 헤드 알림 뒤 맞춘다(`requirements.lock`).
+- 의존: boundary-contracts v5.0.1, openit-link v0.6.0, 문진 스키마 survey-schema-v5.0.0(`requirements.lock`).
+- 변경: 검증기를 `schema_validator`로, 서버 토큰 목록·백업 자격 줄의 형식 검사를 계약 `secret_format_problems`로(ADR 0028 5.0.1 갱신).
 - 변경: `schemas/`의 ID 패턴 사본 17칸을 계약 `Id` 위임(`x-contract`)으로. 문항 세트 ID 칸(`RunPlan`, `SeedPairingInput`)도 계약 `Id`로 좁아졌다(4.x 에서 통과하던 공백·비ASCII 같은 값은 거부). 생성 타입 재생성. 자세한 이유는 [ADR 0028](adr/0028-계약-5.0.0-반영-ID-위임-엄격-JSON-옛-MAJOR-저장-데이터.md).
 - 변경: 설정 파일·게시 본문(manifest.json·샘플 줄)을 `strict_json`으로 읽는다(중복 키·NaN·깊이 64·1 MiB).
 - 추가(동작): 저장소에 옛 pipeline MAJOR 매니페스트가 있으면 `/readyz` 503(사유 `STORE_PIPELINE_MAJOR_UNSUPPORTED`)이고 읽기는 `UNSUPPORTED_VERSION`이다. 4.x 데이터는 이전하지 않는다.
