@@ -6,9 +6,7 @@
 사유는 '<단계>: <경로>#<스키마 키워드>' 코드뿐이고 입력 값(행 내용, 스키마 메시지)은 담지 않는다(SD-1)."""
 from __future__ import annotations
 
-import json
-
-from boundary_contracts import PIPELINE_SCHEMA_VERSION
+from boundary_contracts import PIPELINE_SCHEMA_VERSION, BoundaryError, strict_json
 
 from ..types.schema_registry import check, codes, contract_codes
 
@@ -34,9 +32,10 @@ def run(inp: dict) -> dict:
     if not text.strip(_WS):
         return _verdict(None, ["record_blank: 빈 줄"], None)
     try:
-        row = json.loads(text)
-    except json.JSONDecodeError as e:
-        return _verdict(None, [f"record_json: JSON이 아니다({e.msg})"], None)
+        # 왜 strict_json: 이 행은 dataset-store 를 거쳐 model-lab 으로 가는 영역 사이 데이터라 계약 JSON 공통 규칙(CONVENTIONS 10절, I-JSON)의 대상이다(헤드 결정, ADR 0028). 어기면 기존 사유 record_json 으로 거른다
+        row = strict_json.loads(text)
+    except BoundaryError:
+        return _verdict(None, ["record_json: JSON이 아니다(계약 JSON 규칙 위반 포함)"], None)
     if not isinstance(row, dict):
         return _verdict(None, ["record_shape: 행이 객체가 아니다"], None)
     rs = row.get("split")
@@ -47,14 +46,14 @@ def run(inp: dict) -> dict:
     msgs = row["messages"]
     reasons: list[str] = []
     try:
-        user = json.loads(msgs[1]["content"])
-    except json.JSONDecodeError:
+        user = strict_json.loads(msgs[1]["content"])
+    except BoundaryError:
         user = None
         reasons.append("record_user_json: user 내용이 JSON이 아니다")
     if role == "LORA_A":
         try:
-            out = json.loads(msgs[2]["content"])
-        except json.JSONDecodeError:
+            out = strict_json.loads(msgs[2]["content"])
+        except BoundaryError:
             out = None
             reasons.append("record_assistant_json: LoRA-A assistant 내용이 JSON이 아니다")
     else:

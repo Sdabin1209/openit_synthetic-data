@@ -389,3 +389,11 @@ def test_unknown_import_config_key_is_rejected(tmp_path):
 def test_shipped_import_example_has_only_known_keys():
     """SD-01: 거부가 켜져도 리포에 있는 import 예시 설정은 통과해야 한다."""
     load_import_config(Path(__file__).resolve().parent.parent / "configs" / "import.example.json")
+
+
+def test_row_violating_contract_json_rules_is_rejected_as_record_json():
+    """헤드 결정(ADR 0028): 행 JSON도 계약 JSON 규칙(중복 키·NaN·범위 밖 수)을 지킨다. 어기면 기존 사유 record_json 이다."""
+    from synthetic_data.components import import_row_check
+    for text in ('{"a": 1, "a": 2}', '{"a": NaN}', '{"a": 1e999}', '{"a": 9007199254740993}'):
+        v = import_row_check.run({"role": "LORA_A", "split": "TRAIN", "lineno": 1, "text": text})
+        assert any(r.startswith("record_json") for r in v["reasons"]), (text, v)
