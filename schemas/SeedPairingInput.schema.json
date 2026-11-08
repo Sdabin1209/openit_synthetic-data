@@ -34,9 +34,9 @@
       }
     },
     "fallback_question_set_id": {
-      "type": [
-        "string",
-        "null"
+      "anyOf": [
+        {"type": "null"},
+        {"type": "string", "x-contract": "_common#/$defs/Id"}
       ]
     }
   },

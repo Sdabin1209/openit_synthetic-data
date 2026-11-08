@@ -7,8 +7,7 @@
   "properties": {
     "dataset_id": {
       "type": "string",
-      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
-      "maxLength": 128
+      "x-contract": "_common#/$defs/Id"
     },
     "seed": {
       "type": "integer"
@@ -93,7 +92,7 @@
         "properties": {
           "id": {
             "type": "string",
-            "minLength": 1
+            "x-contract": "_common#/$defs/Id"
           },
           "version": {
             "type": [
@@ -124,9 +123,9 @@
       "type": "boolean"
     },
     "seeds_question_set_id": {
-      "type": [
-        "string",
-        "null"
+      "anyOf": [
+        {"type": "null"},
+        {"type": "string", "x-contract": "_common#/$defs/Id"}
       ]
     },
     "seeds_max_pii_suspect": {

@@ -1,5 +1,11 @@
 # 변경 이력
 
+## 미배포 (2026-11-08, 계약 5.0.0)
+- 의존: boundary-contracts v5.0.0. link·문진 스키마 태그는 헤드 알림 뒤 맞춘다(`requirements.lock`).
+- 변경: `schemas/`의 ID 패턴 사본 17칸을 계약 `Id` 위임(`x-contract`)으로. 문항 세트 ID 칸(`RunPlan`, `SeedPairingInput`)도 계약 `Id`로 좁아졌다(4.x 에서 통과하던 공백·비ASCII 같은 값은 거부). 생성 타입 재생성. 자세한 이유는 [ADR 0028](adr/0028-계약-5.0.0-반영-ID-위임-엄격-JSON-옛-MAJOR-저장-데이터.md).
+- 변경: 설정 파일·게시 본문(manifest.json·샘플 줄)을 `strict_json`으로 읽는다(중복 키·NaN·깊이 64·1 MiB).
+- 추가(동작): 저장소에 옛 pipeline MAJOR 매니페스트가 있으면 `/readyz` 503(사유 `STORE_PIPELINE_MAJOR_UNSUPPORTED`)이고 읽기는 `UNSUPPORTED_VERSION`이다. 4.x 데이터는 이전하지 않는다.
+
 ## 미배포 (2026-11-08, 전수 점검 후속)
 - 제거: 공개 진입점 `synthetic_data.adapters`(`http_question_reader`·`http_failure_store` 별칭)와 `tests/test_public_factories.py`. 계약 4.0.0(D135)이 잡 설정의 factory 를 없앴다([ADR 0026](adr/0026-factory-공개-진입점을-제거한다.md), ADR 0022 대체). 구현·시그니처는 `components/link_*`에 그대로다. 비밀 누락 오류 시험은 `tests/test_tls_config.py`로 옮겼다.
 

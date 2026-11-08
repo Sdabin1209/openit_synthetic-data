@@ -56,6 +56,7 @@
 | 23 | 디스크 여유, 동시 게시·다운로드 상한, 인증 실패 횟수 제한 | `link_dataset_store_server` | 서버의 실행 시점 상태다 |
 | 24 | 토큰 목록 문자열의 해석('역할=토큰', 쓰기 역할은 synthetic-data만, 읽기·쓰기에 같은 토큰 없음, 토큰 강도) | `link_dataset_store_server` | 값이 비밀이라 스키마 예시·오류 메시지에 실을 수 없는 문자열 안의 목록이다 |
 | 25 | 쓰기 토큰이 있음(`NAME_FILE` 또는 `NAME`) | `link_dataset_publish`, `link_question_reader`, `link_failure_reader` | 파일 시스템·환경 상태다 |
+| 26 | seeds.enabled 일 때 주입된 실패 사례 읽기 객체(failure_store)가 있음 | `wiring/run_job.py`(`_seed_samples`) | 실행 시점에 주입하는 객체의 유무다. 설정에 `adapters.failure_store`가 있어야 한다는 조건은 RunPlan 스키마가 이미 요구한다(CLI 경로는 설정에서 객체를 만든다). 시험은 객체를 직접 넘기므로 이 검사가 따로 필요하다 |
 
 ## 약속
 

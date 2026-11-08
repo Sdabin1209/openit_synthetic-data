@@ -30,6 +30,10 @@ from functools import lru_cache
 from typing import Any
 
 import jsonschema
+from referencing import Registry, Resource
+from referencing.jsonschema import DRAFT202012
+from boundary_contracts import schema_dir as _bc_schema_dir
+from boundary_contracts.schemas_api import ContractValidator, schema_registry as _bc_registry
 from boundary_contracts import format_checker as _bc_format_checker  # 형식(format) 검증기가 없으면 조용히 넘기지 않고 실패한다(계약 3.5.0)
 from boundary_contracts import BoundaryError
 from boundary_contracts import validator as _contract_validator
@@ -45,14 +49,34 @@ class SchemaViolation(BoundaryError):
         super().__init__("INVALID_RECORD", message, details or {})
 
 
-_STORE = {s["$id"]: s for s in SCHEMAS.values()}
+def _delegated(node):
+    """`x-contract: "<계약 파일>#<조각>"` 노드를 계약 스키마 `$ref`로 바꾼다(D117: ID 같은 계약 타입은 사본 없이 계약에 위임, 계약 5.0.0).
+    왜 x-contract 를 `$ref` 로 풀어 쓰나: 계약 스키마의 `$id`는 설치 위치의 file URI라 영역 스키마 파일에 적을 수 없다(안정 URI 는 계약 5.0.1 예정).
+    위임 노드의 나머지 키워드(type, description)는 그대로 둔다. 생성 타입이 str 이 되도록 type 을 함께 적는다."""
+    if isinstance(node, list):
+        return [_delegated(x) for x in node]
+    if not isinstance(node, dict):
+        return node
+    out = {k: _delegated(v) for k, v in node.items() if k != "x-contract"}
+    if "x-contract" in node:
+        name, _, frag = node["x-contract"].partition("#")
+        out["$ref"] = f"{_bc_schema_dir().as_uri()}/{name}.schema.json" + ("#" + frag if frag else "")
+    return out
+
+
+@lru_cache(maxsize=1)
+def _registry() -> Registry:
+    reg = _bc_registry()
+    for s in SCHEMAS.values():
+        reg = reg.with_resource(s["$id"], Resource.from_contents(_delegated(s), default_specification=DRAFT202012))
+    return reg
 
 
 @lru_cache(maxsize=None)
 def _validator(name: str):
-    schema = SCHEMAS[name]
-    resolver = jsonschema.RefResolver.from_schema(schema, store=_STORE)
-    return jsonschema.Draft202012Validator(schema, resolver=resolver, format_checker=_bc_format_checker(schema))
+    schema = _delegated(SCHEMAS[name])
+    # 왜 ContractValidator 로 감싸나: 계약 5.0.0 의 JSON 공통 규칙(비유한 수 검사)이 영역 스키마 검증에도 같게 걸린다. 계약 5.0.1 의 schema_validator 가 나오면 그것으로 바꾼다
+    return ContractValidator(jsonschema.Draft202012Validator(schema, registry=_registry(), format_checker=_bc_format_checker(schema)))
 
 
 def _code(e) -> str:

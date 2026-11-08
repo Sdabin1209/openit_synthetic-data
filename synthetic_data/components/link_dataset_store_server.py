@@ -15,7 +15,7 @@ from collections import defaultdict, deque
 from contextlib import contextmanager
 from pathlib import Path
 
-from boundary_contracts import PIPELINE_SCHEMA_VERSION, BoundaryError, canonical
+from boundary_contracts import PIPELINE_SCHEMA_VERSION, BoundaryError, canonical, strict_json
 from openit_link import App, Request, Response, Route
 from waitress import wasyncore
 from waitress.server import create_server
@@ -146,6 +146,11 @@ class Service:
         self.tmp.mkdir(parents=True, exist_ok=True)
         for leftover in self.store.root.glob("*/.tmp-*"):  # 게시 도중 죽은 잔해(저장소가 rename 전에 쓰던 폴더)
             shutil.rmtree(leftover, ignore_errors=True)
+        # 계약 5.0.0(새 환경 전제, 이전 없음): 지원하지 않는 pipeline MAJOR 의 저장 데이터가 남아 있으면 /readyz 가 사유 코드로 실패한다. 기동 때 한 번만 센다(요청마다 저장소 전체를 읽지 않는다)
+        scan = getattr(self.store, "stale_pipeline_versions", None)
+        self.stale_versions = scan() if scan else []
+        if self.stale_versions:
+            self.log(f"경보: 지원하지 않는 pipeline_schema_version 의 저장 데이터 {len(self.stale_versions)}건. /readyz 는 실패한다")
 
     def check_free_space(self, n: int) -> None:
         # 본문 tar(n) + 풀어 둔 사본(n) + 저장소의 스테이징 사본(n) = 최대 약 3n이 동시에 디스크에 있다. 측정 안 함(ADR 0012)
@@ -180,6 +185,8 @@ class Service:
                 q.append(self.clock())
 
     def ready(self) -> tuple:
+        if self.stale_versions:
+            return False, {"status": "not_ready", "reason": "STORE_PIPELINE_MAJOR_UNSUPPORTED", "count": len(self.stale_versions)}
         try:
             self.store.root.stat()
             p = self.tmp / ".ready"
@@ -334,11 +341,10 @@ def make_routes(svc: Service) -> list[Route]:
             mp = td / "in" / "manifest.json"
             if not mp.is_file():
                 raise BoundaryError("INVALID_RECORD", "tar에 manifest.json이 있어야 한다")
-            import json
             try:
-                manifest = json.loads(mp.read_text(encoding="utf-8"))
-            except ValueError:
-                raise BoundaryError("INVALID_RECORD", "manifest.json이 JSON이 아니다") from None
+                manifest = strict_json.loads(mp.read_bytes())      # 왜 strict_json: 게시 본문의 manifest.json 은 이웃 입력이다(계약 JSON 공통 규칙 5.0.0)
+            except BoundaryError:
+                raise BoundaryError("INVALID_RECORD", "manifest.json이 올바른 계약 JSON이 아니다") from None
             if not isinstance(manifest, dict):
                 raise BoundaryError("INVALID_RECORD", "manifest.json이 객체가 아니다")
             fdir = td / "in" / "files"

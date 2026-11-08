@@ -67,6 +67,7 @@ python -m synthetic_data run --config configs/dev.job.json [--created-at 2026-10
 | --- | --- |
 | `CONFLICT` | 같은 `version`을 고정했는데 입력·시드가 바뀌었다. `version`을 비우거나 올린다 |
 | `UNSUPPORTED_VERSION` | `survey_schema_dir/CONTRACT_VERSION`이 읽는 문항 세트의 계약과 다르다 |
+| `/readyz` 503, 사유 `STORE_PIPELINE_MAJOR_UNSUPPORTED` | 저장소(`DATASET_STORE_ROOT`)에 옛 pipeline MAJOR(4.x)로 게시한 데이터셋이 남아 있다. 계약 5.0.0은 4.x 데이터를 이전하지 않는다(새 환경 전제). 새 저장소 볼륨으로 시작한다. 기동 로그의 '경보' 줄이 건수를 말한다 |
 | `INVALID_RECORD`(비식별) | 실패 사례 저장소가 `deidentified=false`를 냈다. 실행이 거부된 것이 정상이다. ops-feedback에 알린다 |
 | `FAILED_PRECONDITION` | 지정한 문항 세트 버전에 검수 승인이 없다(`reviewed_only`),  |
 | `NOTHING_TO_DO` | `affected_only`인데 `REGENERATE_SAMPLES`가 없거나 품질 검사 뒤 샘플이 없다. `report.json`의 `notes`, `dropped` |

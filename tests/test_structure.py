@@ -69,13 +69,16 @@ def _resolver_store():
     return docs, {d["$id"]: d for d in docs.values()}
 
 
+from synthetic_data.types.schema_registry import _validator  # noqa: E402
+
+
 def test_4_every_schema_has_valid_and_invalid_examples_with_right_results():
     docs, store = _resolver_store()
     bad = []
     for fname, schema in docs.items():
         stem = fname[: -len(".schema.json")]
         jsonschema.Draft202012Validator.check_schema(schema)
-        v = jsonschema.Draft202012Validator(schema, resolver=jsonschema.RefResolver.from_schema(schema, store=store))
+        v = _validator(stem)    # x-contract 위임을 풀어 계약 스키마로 판정하는 영역의 실제 검증기(D117)
         ok = sorted((SCHEMAS / "examples").glob(f"{stem}.valid*.json"))
         no = sorted((SCHEMAS / "examples").glob(f"{stem}.invalid*.json"))
         if not ok or not no:

@@ -9,6 +9,10 @@ from functools import lru_cache
 from typing import Any
 
 import jsonschema
+from referencing import Registry, Resource
+from referencing.jsonschema import DRAFT202012
+from boundary_contracts import schema_dir as _bc_schema_dir
+from boundary_contracts.schemas_api import ContractValidator, schema_registry as _bc_registry
 from boundary_contracts import format_checker as _bc_format_checker  # 형식(format) 검증기가 없으면 조용히 넘기지 않고 실패한다(계약 3.5.0)
 from boundary_contracts import BoundaryError
 from boundary_contracts import validator as _contract_validator
@@ -81,15 +85,11 @@ SCHEMAS: dict[str, dict] = {'BackupJobInput': {'$id': 'https://openit.invalid/sy
                  '$schema': 'https://json-schema.org/draft/2020-12/schema',
                  'additionalProperties': False,
                  'description': "파일 읽기 요청. 경로는 '..'·절대 경로·역슬래시·빈 마디가 없는 정규형.",
-                 'properties': {'dataset_id': {'maxLength': 128,
-                                               'pattern': '^[A-Za-z0-9][A-Za-z0-9._:-]*$',
-                                               'type': 'string'},
+                 'properties': {'dataset_id': {'type': 'string', 'x-contract': '_common#/$defs/Id'},
                                 'path': {'maxLength': 1024,
                                          'pattern': '^(?!\\.\\.?(?:/|$))[^/\\\\\\x00]+(?:/(?!\\.\\.?(?:/|$))[^/\\\\\\x00]+)*$',
                                          'type': 'string'},
-                                'version': {'maxLength': 128,
-                                            'pattern': '^[A-Za-z0-9][A-Za-z0-9._:-]*$',
-                                            'type': 'string'}},
+                                'version': {'type': 'string', 'x-contract': '_common#/$defs/Id'}},
                  'required': ['dataset_id', 'version', 'path'],
                  'title': 'FileRequest',
                  'type': 'object'},
@@ -162,9 +162,7 @@ SCHEMAS: dict[str, dict] = {'BackupJobInput': {'$id': 'https://openit.invalid/sy
                         'properties': {'action_rules_version': {'minLength': 1, 'type': 'string'},
                                        'contract_version': {'minimum': 0, 'type': 'integer'},
                                        'created_at': {'minLength': 1, 'type': 'string'},
-                                       'dataset_id': {'maxLength': 128,
-                                                      'pattern': '^[A-Za-z0-9][A-Za-z0-9._:-]*$',
-                                                      'type': 'string'},
+                                       'dataset_id': {'type': 'string', 'x-contract': '_common#/$defs/Id'},
                                        'files': {'items': {'additionalProperties': False,
                                                            'properties': {'name': {'pattern': '^lora_[ab]_(train|val|test)\\.jsonl$',
                                                                                    'type': 'string'},
@@ -221,9 +219,7 @@ SCHEMAS: dict[str, dict] = {'BackupJobInput': {'$id': 'https://openit.invalid/sy
                                                      'required': ['max_invalid_rows', 'max_invalid_rate'],
                                                      'type': 'object'},
                                        'tool_version': {'type': 'string'},
-                                       'version': {'anyOf': [{'maxLength': 128,
-                                                              'pattern': '^[A-Za-z0-9][A-Za-z0-9._:-]*$',
-                                                              'type': 'string'},
+                                       'version': {'anyOf': [{'type': 'string', 'x-contract': '_common#/$defs/Id'},
                                                              {'type': 'null'}]}},
                         'required': ['dataset_id',
                                      'version',
@@ -248,9 +244,7 @@ SCHEMAS: dict[str, dict] = {'BackupJobInput': {'$id': 'https://openit.invalid/sy
                 'description': '게시기 실행 계획: 설정 파일을 정규화한 것.',
                 'properties': {'action_rules_version': {'minLength': 1, 'type': 'string'},
                                'created_at': {'type': ['string', 'null']},
-                               'dataset_id': {'maxLength': 128,
-                                              'pattern': '^[A-Za-z0-9][A-Za-z0-9._:-]*$',
-                                              'type': 'string'},
+                               'dataset_id': {'type': 'string', 'x-contract': '_common#/$defs/Id'},
                                'input_dir': {'minLength': 1, 'type': 'string'},
                                'max_cross_split_duplicates': {'minimum': 0, 'type': 'integer'},
                                'pending_policy': {'enum': ['report', 'exclude', 'reject']},
@@ -313,9 +307,7 @@ SCHEMAS: dict[str, dict] = {'BackupJobInput': {'$id': 'https://openit.invalid/sy
                        '$schema': 'https://json-schema.org/draft/2020-12/schema',
                        'additionalProperties': False,
                        'description': '게시기 보고서 재료. 도달하지 못한 단계는 null이다(경계 오류로 멈추면 앞 단계만 있다).',
-                       'properties': {'dataset_id': {'maxLength': 128,
-                                                     'pattern': '^[A-Za-z0-9][A-Za-z0-9._:-]*$',
-                                                     'type': 'string'},
+                       'properties': {'dataset_id': {'type': 'string', 'x-contract': '_common#/$defs/Id'},
                                       'error': {'type': ['object', 'null']},
                                       'overlap': {'anyOf': [{'additionalProperties': False,
                                                              'properties': {'duplicate_inputs': {'additionalProperties': False,
@@ -571,12 +563,8 @@ SCHEMAS: dict[str, dict] = {'BackupJobInput': {'$id': 'https://openit.invalid/sy
                      '$schema': 'https://json-schema.org/draft/2020-12/schema',
                      'additionalProperties': False,
                      'description': '매니페스트 읽기 요청.',
-                     'properties': {'dataset_id': {'maxLength': 128,
-                                                   'pattern': '^[A-Za-z0-9][A-Za-z0-9._:-]*$',
-                                                   'type': 'string'},
-                                    'version': {'maxLength': 128,
-                                                'pattern': '^[A-Za-z0-9][A-Za-z0-9._:-]*$',
-                                                'type': 'string'}},
+                     'properties': {'dataset_id': {'type': 'string', 'x-contract': '_common#/$defs/Id'},
+                                    'version': {'type': 'string', 'x-contract': '_common#/$defs/Id'}},
                      'required': ['dataset_id', 'version'],
                      'title': 'ManifestRequest',
                      'type': 'object'},
@@ -702,12 +690,10 @@ SCHEMAS: dict[str, dict] = {'BackupJobInput': {'$id': 'https://openit.invalid/sy
                                                    'propertyNames': {'pattern': '^(?!\\.\\.?(?:/|$))[^/\\\\\\x00]+(?:/(?!\\.\\.?(?:/|$))[^/\\\\\\x00]+)*$'},
                                                    'type': 'object'},
                                          'manifest': {'additionalProperties': True,
-                                                      'properties': {'dataset_id': {'maxLength': 128,
-                                                                                    'pattern': '^[A-Za-z0-9][A-Za-z0-9._:-]*$',
-                                                                                    'type': 'string'},
-                                                                     'version': {'maxLength': 128,
-                                                                                 'pattern': '^[A-Za-z0-9][A-Za-z0-9._:-]*$',
-                                                                                 'type': 'string'}},
+                                                      'properties': {'dataset_id': {'type': 'string',
+                                                                                    'x-contract': '_common#/$defs/Id'},
+                                                                     'version': {'type': 'string',
+                                                                                 'x-contract': '_common#/$defs/Id'}},
                                                       'required': ['dataset_id', 'version'],
                                                       'type': 'object'}},
                           'required': ['manifest', 'digest', 'files'],
@@ -929,15 +915,11 @@ SCHEMAS: dict[str, dict] = {'BackupJobInput': {'$id': 'https://openit.invalid/sy
                                                  'type': 'array'},
                                     'contract_version': {'minimum': 0, 'type': 'integer'},
                                     'created_at': {'minLength': 1, 'type': 'string'},
-                                    'dataset_id': {'maxLength': 128,
-                                                   'pattern': '^[A-Za-z0-9][A-Za-z0-9._:-]*$',
-                                                   'type': 'string'},
+                                    'dataset_id': {'type': 'string', 'x-contract': '_common#/$defs/Id'},
                                     'generator_version': {'minLength': 1, 'type': 'string'},
                                     'pipeline_schema_version': {'pattern': '^[0-9]+\\.[0-9]+$', 'type': 'string'},
                                     'samples': {'items': {'type': 'object'}, 'type': 'array'},
-                                    'version': {'anyOf': [{'maxLength': 128,
-                                                           'pattern': '^[A-Za-z0-9][A-Za-z0-9._:-]*$',
-                                                           'type': 'string'},
+                                    'version': {'anyOf': [{'type': 'string', 'x-contract': '_common#/$defs/Id'},
                                                           {'type': 'null'}]}},
                      'required': ['samples',
                                   'contexts',
@@ -958,9 +940,7 @@ SCHEMAS: dict[str, dict] = {'BackupJobInput': {'$id': 'https://openit.invalid/sy
              'description': '시드 잡 실행 계획: 설정 파일을 정규화한 것(기본값을 채우고 경로를 절대 경로로).',
              'properties': {'action_rules_version': {'minLength': 1, 'type': 'string'},
                             'created_at': {'type': ['string', 'null']},
-                            'dataset_id': {'maxLength': 128,
-                                           'pattern': '^[A-Za-z0-9][A-Za-z0-9._:-]*$',
-                                           'type': 'string'},
+                            'dataset_id': {'type': 'string', 'x-contract': '_common#/$defs/Id'},
                             'failure_store': {'anyOf': [{'additionalProperties': False,
                                                          'properties': {'base_url': {'minLength': 1, 'type': 'string'},
                                                                         'timeout': {'exclusiveMinimum': 0,
@@ -978,7 +958,8 @@ SCHEMAS: dict[str, dict] = {'BackupJobInput': {'$id': 'https://openit.invalid/sy
                                                 'required': ['base_url', 'token_env', 'timeout'],
                                                 'type': 'object'},
                             'question_sets': {'items': {'additionalProperties': False,
-                                                        'properties': {'id': {'minLength': 1, 'type': 'string'},
+                                                        'properties': {'id': {'type': 'string',
+                                                                              'x-contract': '_common#/$defs/Id'},
                                                                        'usage': {'enum': ['TRAIN_POOL',
                                                                                           'HELD_OUT_EVAL']},
                                                                        'version': {'type': ['string', 'null']}},
@@ -1001,7 +982,8 @@ SCHEMAS: dict[str, dict] = {'BackupJobInput': {'$id': 'https://openit.invalid/sy
                             'seed': {'type': 'integer'},
                             'seeds_enabled': {'type': 'boolean'},
                             'seeds_max_pii_suspect': {'minimum': 0, 'type': ['integer', 'null']},
-                            'seeds_question_set_id': {'type': ['string', 'null']},
+                            'seeds_question_set_id': {'anyOf': [{'type': 'null'},
+                                                                {'type': 'string', 'x-contract': '_common#/$defs/Id'}]},
                             'store': {'additionalProperties': False,
                                       'allOf': [{'if': {'properties': {'kind': {'const': 'file'}}},
                                                  'then': {'properties': {'http': {'type': 'null'},
@@ -1053,9 +1035,7 @@ SCHEMAS: dict[str, dict] = {'BackupJobInput': {'$id': 'https://openit.invalid/sy
                     'additionalProperties': False,
                     'description': '시드 잡 보고서 재료. 단계에 도달하지 못했으면 해당 키가 없다. samples가 있으면 counts(역할·분할·출처·종류별 개수)를 센다.',
                     'properties': {'dataset_digest': {'pattern': '^sha256:[0-9a-f]{64}$', 'type': 'string'},
-                                   'dataset_id': {'maxLength': 128,
-                                                  'pattern': '^[A-Za-z0-9][A-Za-z0-9._:-]*$',
-                                                  'type': 'string'},
+                                   'dataset_id': {'type': 'string', 'x-contract': '_common#/$defs/Id'},
                                    'dropped': {'additionalProperties': {'minimum': 0, 'type': 'integer'},
                                                'type': 'object'},
                                    'error': {'type': 'object'},
@@ -1208,7 +1188,9 @@ SCHEMAS: dict[str, dict] = {'BackupJobInput': {'$id': 'https://openit.invalid/sy
                                                             'required': ['ref', 'usage'],
                                                             'type': 'object'},
                                                   'type': 'array'},
-                                     'fallback_question_set_id': {'type': ['string', 'null']},
+                                     'fallback_question_set_id': {'anyOf': [{'type': 'null'},
+                                                                            {'type': 'string',
+                                                                             'x-contract': '_common#/$defs/Id'}]},
                                      'seeds': {'items': {'$ref': 'Seed.schema.json'}, 'type': 'array'}},
                       'required': ['seeds', 'contexts', 'fallback_question_set_id'],
                       'title': 'SeedPairingInput',
@@ -1313,9 +1295,8 @@ SCHEMAS: dict[str, dict] = {'BackupJobInput': {'$id': 'https://openit.invalid/sy
                                                   'propertyNames': {'pattern': '^(?!\\.\\.?(?:/|$))[^/\\\\\\x00]+(?:/(?!\\.\\.?(?:/|$))[^/\\\\\\x00]+)*$'},
                                                   'type': 'object'},
                                         'manifest': {'additionalProperties': True,
-                                                     'properties': {'dataset_id': {'maxLength': 128,
-                                                                                   'pattern': '^[A-Za-z0-9][A-Za-z0-9._:-]*$',
-                                                                                   'type': 'string'},
+                                                     'properties': {'dataset_id': {'type': 'string',
+                                                                                   'x-contract': '_common#/$defs/Id'},
                                                                     'files': {'items': {'additionalProperties': True,
                                                                                         'properties': {'path': {'maxLength': 1024,
                                                                                                                 'pattern': '^(?!\\.\\.?(?:/|$))[^/\\\\\\x00]+(?:/(?!\\.\\.?(?:/|$))[^/\\\\\\x00]+)*$',
@@ -1323,9 +1304,8 @@ SCHEMAS: dict[str, dict] = {'BackupJobInput': {'$id': 'https://openit.invalid/sy
                                                                                         'required': ['path'],
                                                                                         'type': 'object'},
                                                                               'type': 'array'},
-                                                                    'version': {'maxLength': 128,
-                                                                                'pattern': '^[A-Za-z0-9][A-Za-z0-9._:-]*$',
-                                                                                'type': 'string'}},
+                                                                    'version': {'type': 'string',
+                                                                                'x-contract': '_common#/$defs/Id'}},
                                                      'required': ['dataset_id', 'version', 'files'],
                                                      'type': 'object'}},
                          'required': ['manifest', 'files'],
@@ -1375,9 +1355,7 @@ SCHEMAS: dict[str, dict] = {'BackupJobInput': {'$id': 'https://openit.invalid/sy
                      '$schema': 'https://json-schema.org/draft/2020-12/schema',
                      'additionalProperties': False,
                      'description': '버전 목록 요청.',
-                     'properties': {'dataset_id': {'maxLength': 128,
-                                                   'pattern': '^[A-Za-z0-9][A-Za-z0-9._:-]*$',
-                                                   'type': 'string'}},
+                     'properties': {'dataset_id': {'type': 'string', 'x-contract': '_common#/$defs/Id'}},
                      'required': ['dataset_id'],
                      'title': 'VersionsRequest',
                      'type': 'object'}}
@@ -1390,14 +1368,34 @@ class SchemaViolation(BoundaryError):
         super().__init__("INVALID_RECORD", message, details or {})
 
 
-_STORE = {s["$id"]: s for s in SCHEMAS.values()}
+def _delegated(node):
+    """`x-contract: "<계약 파일>#<조각>"` 노드를 계약 스키마 `$ref`로 바꾼다(D117: ID 같은 계약 타입은 사본 없이 계약에 위임, 계약 5.0.0).
+    왜 x-contract 를 `$ref` 로 풀어 쓰나: 계약 스키마의 `$id`는 설치 위치의 file URI라 영역 스키마 파일에 적을 수 없다(안정 URI 는 계약 5.0.1 예정).
+    위임 노드의 나머지 키워드(type, description)는 그대로 둔다. 생성 타입이 str 이 되도록 type 을 함께 적는다."""
+    if isinstance(node, list):
+        return [_delegated(x) for x in node]
+    if not isinstance(node, dict):
+        return node
+    out = {k: _delegated(v) for k, v in node.items() if k != "x-contract"}
+    if "x-contract" in node:
+        name, _, frag = node["x-contract"].partition("#")
+        out["$ref"] = f"{_bc_schema_dir().as_uri()}/{name}.schema.json" + ("#" + frag if frag else "")
+    return out
+
+
+@lru_cache(maxsize=1)
+def _registry() -> Registry:
+    reg = _bc_registry()
+    for s in SCHEMAS.values():
+        reg = reg.with_resource(s["$id"], Resource.from_contents(_delegated(s), default_specification=DRAFT202012))
+    return reg
 
 
 @lru_cache(maxsize=None)
 def _validator(name: str):
-    schema = SCHEMAS[name]
-    resolver = jsonschema.RefResolver.from_schema(schema, store=_STORE)
-    return jsonschema.Draft202012Validator(schema, resolver=resolver, format_checker=_bc_format_checker(schema))
+    schema = _delegated(SCHEMAS[name])
+    # 왜 ContractValidator 로 감싸나: 계약 5.0.0 의 JSON 공통 규칙(비유한 수 검사)이 영역 스키마 검증에도 같게 걸린다. 계약 5.0.1 의 schema_validator 가 나오면 그것으로 바꾼다
+    return ContractValidator(jsonschema.Draft202012Validator(schema, registry=_registry(), format_checker=_bc_format_checker(schema)))
 
 
 def _code(e) -> str:

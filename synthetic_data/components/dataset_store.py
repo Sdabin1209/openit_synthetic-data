@@ -23,7 +23,7 @@ import tempfile
 from pathlib import Path, PurePosixPath
 from typing import BinaryIO, Mapping, Optional
 
-from boundary_contracts import PIPELINE_SCHEMA_VERSION, canonical
+from boundary_contracts import PIPELINE_SCHEMA_VERSION, canonical, strict_json
 from boundary_contracts.errors import BoundaryError
 
 from ..types.schema_registry import check, contract_codes
@@ -77,6 +77,9 @@ class DatasetStoreBase:
         m = self._load_manifest(dataset_id, version)
         if m is None:
             raise BoundaryError("NOT_FOUND", f"데이터셋이 없다: {dataset_id}@{version}")
+        # 왜 읽을 때도 MAJOR 를 보나: 계약 5.0.0 은 4.x 저장 데이터를 이전하지 않는다(새 환경 전제). 남아 있으면 조용히 섞어 내보내지 않고 UNSUPPORTED_VERSION 으로 드러낸다
+        if _major(m.get("pipeline_schema_version", "0")) != SUPPORTED_PIPELINE_MAJOR:
+            raise BoundaryError("UNSUPPORTED_VERSION", f"저장된 매니페스트의 pipeline_schema_version이 지원하지 않는 MAJOR다: {dataset_id}@{version}")
         if canonical.content_hash(m) != m.get("content_hash"):
             raise BoundaryError("INTEGRITY_ERROR", f"저장된 매니페스트의 해시가 맞지 않는다: {dataset_id}@{version}")
         return copy.deepcopy(m)
@@ -172,11 +175,10 @@ class DatasetStoreBase:
                 if not line.strip():
                     raise _inv(f"{p}:{lineno}: 빈 줄")
                 try:
-                    rec = json.loads(line.decode("utf-8"))
-                except UnicodeDecodeError:
-                    raise _inv(f"{p}:{lineno}: UTF-8이 아니다") from None      # 왜: 예외 문구에는 문제의 바이트 값이 들어간다. 값은 오류에 싣지 않는다(ADR 0003)
-                except json.JSONDecodeError as e:
-                    raise _inv(f"{p}:{lineno}: JSON이 아니다({e.msg})") from None
+                    rec = strict_json.loads(line)       # 왜 strict_json: 게시 본문의 줄은 이웃이 보낸 입력이다. 계약 JSON 공통 규칙(5.0.0)을 같은 구현으로 건다
+                except BoundaryError:
+                    # 왜 메시지를 다시 쓰나: 계약 메시지에는 입력 조각이 섞일 수 있다. 값은 오류에 싣지 않고 위치만 싣는다(ADR 0003)
+                    raise _inv(f"{p}:{lineno}: 올바른 계약 JSON이 아니다(UTF-8·중복 키·수 범위·깊이·크기)") from None
                 where = f"{p}:{lineno}"
                 _contract(_SAMPLE_SCHEMA[role], rec, where)
                 if _major(rec["pipeline_schema_version"]) != SUPPORTED_PIPELINE_MAJOR:
@@ -271,6 +273,23 @@ class FileDatasetStore(DatasetStoreBase):
             return int(json.loads((vdir / "meta.json").read_text())["seq"])
         except (OSError, ValueError, KeyError):
             return 0
+
+    def stale_pipeline_versions(self) -> list[str]:
+        """저장된 매니페스트 중 지원하지 않는 pipeline MAJOR(예: 4.x)인 `<데이터셋>/<버전>` 목록. 서버가 기동 때 한 번 부른다(/readyz 사유)."""
+        out = []
+        for ddir in sorted(self.root.iterdir()) if self.root.is_dir() else []:
+            if not ddir.is_dir() or ddir.name.startswith("."):
+                continue
+            for vdir in sorted(ddir.iterdir()):
+                if not vdir.is_dir() or vdir.name.startswith(".tmp-"):
+                    continue
+                try:
+                    major = _major(json.loads((vdir / "manifest.json").read_text(encoding="utf-8")).get("pipeline_schema_version", "0"))
+                except (OSError, ValueError):
+                    continue          # 읽을 수 없는 매니페스트는 get_manifest 가 INTEGRITY_ERROR 로 드러낸다
+                if major != SUPPORTED_PIPELINE_MAJOR:
+                    out.append(f"{ddir.name}/{vdir.name}")
+        return out
 
     def _list_versions(self, dataset_id) -> list[str]:
         ddir = self.root / dataset_id

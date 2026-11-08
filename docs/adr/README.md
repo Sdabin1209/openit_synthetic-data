@@ -29,3 +29,4 @@ Nygard 형식. 영역 내부 구조 선택의 정본이다. 근거를 모르는 
 - [ADR 0025: dataset-store 데이터를 restic으로 백업·복구하는 잡 둘](0025-dataset-store-데이터를-restic으로-백업·복구하는-잡-둘.md)
 - [ADR 0026: factory 공개 진입점을 제거한다(ADR 0022 대체)](0026-factory-공개-진입점을-제거한다.md)
 - [ADR 0027: 지원하는 Python 하한을 3.11로 올린다](0027-지원하는-Python-하한을-3.11로-올린다.md)
+- [ADR 0028: 계약 5.0.0 반영 — ID 위임, 엄격 JSON, 옛 MAJOR 저장 데이터](0028-계약-5.0.0-반영-ID-위임-엄격-JSON-옛-MAJOR-저장-데이터.md)

@@ -459,3 +459,30 @@ def test_oversized_publish_is_413_with_boundary_error_body(tmp_path, captured):
         assert json.loads(s.call("GET", "/v1/datasets")[1])["items"] == []
     finally:
         s.close()
+
+
+def _seed_old_major_store(tmp_path, captured):
+    """계약 4.x 가 쓴 저장 데이터를 흉내 낸다: 지원하는 MAJOR 로 게시한 뒤 저장된 매니페스트의 MAJOR 만 4 로 바꾼다(해시는 일부러 맞추지 않는다. 읽기 전에 MAJOR 가 먼저 걸려야 한다)."""
+    from doubles import OLD_PIPELINE_SCHEMA_VERSION
+    m, b = captured
+    store = FileDatasetStore(tmp_path / "root" / "datasets", Survey(SURVEY_DIR).contract_version)
+    store.publish(m, write_files(tmp_path / "pub", b))
+    p = tmp_path / "root" / "datasets" / m["dataset_id"] / m["version"] / "manifest.json"
+    doc = json.loads(p.read_text(encoding="utf-8"))
+    doc["pipeline_schema_version"] = OLD_PIPELINE_SCHEMA_VERSION
+    p.write_text(json.dumps(doc), encoding="utf-8")
+    return m
+
+
+def test_old_major_store_fails_readyz_with_reason_and_reads_are_refused(tmp_path, captured):
+    """계약 5.0.0 새 환경 전제: 지원하지 않는 pipeline MAJOR 의 저장 데이터가 남아 있으면 조용히 섞이지 않는다(/readyz 503 + 사유, 읽기 UNSUPPORTED_VERSION)."""
+    m = _seed_old_major_store(tmp_path, captured)
+    s = Srv(tmp_path)
+    try:
+        code, body, _ = s.call("GET", "/readyz", token=None)
+        assert code == 503 and json.loads(body)["reason"] == "STORE_PIPELINE_MAJOR_UNSUPPORTED"
+        assert s.call("GET", "/healthz", token=None)[0] == 200
+        code, body, _ = s.call("GET", f"/v1/datasets/{m['dataset_id']}/versions/{m['version']}")
+        assert code == 422 and json.loads(body)["code"] == "UNSUPPORTED_VERSION"
+    finally:
+        s.close()
