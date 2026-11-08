@@ -182,3 +182,13 @@ def test_config_action_rules_version_must_match_installed_rules(tmp_path):
         parse_config(make_cfg_raw(tmp_path, action_rules_version=RULES_VERSION + "9"), tmp_path)
     with pytest.raises(ConfigError):                       # 3.0.0에서 없어진 키는 계약 스키마가 거부한다
         parse_config(make_cfg_raw(tmp_path, turn_engine_version="0.4.3"), tmp_path)
+
+
+def test_unknown_store_kind_is_rejected_at_plan_validation(tmp_path):
+    """build_store 는 kind 를 file|http 로 믿는다(D117): 스키마 밖 값은 설정을 계획으로 바꾸는 검증 단계에서 두 설정 모두 거부된다."""
+    run_base, imp_base = load(EX / "SyntheticJobConfigRun.json"), load(EX / "SyntheticJobConfigImport.json")
+    out = {**run_base["output"], "store": {"kind": "memory"}}
+    with pytest.raises(ConfigError):
+        parse_config(_with_output(run_base, out), tmp_path)
+    with pytest.raises(ConfigError):
+        parse_import_config(_with_output(imp_base, out), tmp_path)

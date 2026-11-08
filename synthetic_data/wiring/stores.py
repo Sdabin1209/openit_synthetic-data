@@ -15,6 +15,5 @@ def build_store(store: dict, survey):
             return link_dataset_publish.build(store["http"])
         except link_dataset_publish.TokenError as e:
             raise ConfigError(str(e)) from None
-    if store["kind"] == "file":
-        return FileDatasetStore(Path(store["root"]), survey.contract_version)
-    raise ConfigError(f"알 수 없는 저장소 종류: {store['kind']}")      # 계약 4.0.0: memory 는 설정에서 없어졌다(시험은 저장소를 직접 넘긴다)
+    # 왜 else 분기가 없나(D117): kind 는 RunPlan·ImportPlan 스키마 enum(file|http)이 plans.py 를 지나며 이미 막는다. 코드 안에서 다시 거부하지 않는다(tests/test_contract_schemas.py)
+    return FileDatasetStore(Path(store["root"]), survey.contract_version)
